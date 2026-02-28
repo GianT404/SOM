@@ -1,0 +1,44 @@
+# Go
+server
+main
+*.exe
+*.exe~
+*.test
+/cmd/server/server
+
+# Node
+node_modules/
+.npm/
+.yarn/
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Android
+app/android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/local.properties
+app/android/.idea/
+
+# iOS
+app/ios/Pods/
+app/ios/build/
+app/ios/*.xcworkspace/xcuserdata/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.log
+
+# Project specific
+cookies.txt
