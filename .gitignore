@@ -1,6 +1,6 @@
 # Go
-server
-main
+/server
+/main
 *.exe
 *.exe~
 *.test
