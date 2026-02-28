@@ -3,10 +3,11 @@ import {
     View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW, RETRO_SHADOW_SM, HEADER, headerTitle, avatar, headerTitleContainer, headerLeft, searchBar, searchInput, searchIcon } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW, RETRO_SHADOW_SM, HEADER, headerTitle, backBtn, headerTitleContainer, headerLeft, searchBar, searchInput, searchIcon } from '../theme';
 import { usePlayer } from '../contexts/PlayerContext';
 import api, { SearchResult } from '../services/api';
 import SongRow from '../components/SongRow';
+import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
 
 const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { play } = usePlayer();
@@ -38,11 +39,13 @@ const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
             <View style={HEADER}>
                 <View style={headerLeft}>
-                    <View style={[RETRO_SHADOW_SM, avatar]}>
-                        <MaterialIcons name="person" size={22} color={COLORS.primary} />
-                    </View>
+                    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
+                        <NeoShadowWrapper borderRadius={16} offset={3} style={backBtn}>
+                            <MaterialIcons name="arrow-back" size={24} color={COLORS.textDark} />
+                        </NeoShadowWrapper>
+                    </TouchableOpacity>
                 </View>
-                <View style={headerTitleContainer}>
+                <View style={headerTitleContainer} pointerEvents="none">
                     <Text style={headerTitle}>Tìm kiếm</Text>
                 </View>
             </View>
@@ -64,7 +67,6 @@ const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     returnKeyType="search"
                 />
 
-                {/* Logic chuyển đổi Icon ở đây */}
                 <TouchableOpacity
                     style={searchIcon}
                     onPress={() => {

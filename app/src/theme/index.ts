@@ -125,3 +125,12 @@ export const searchIcon = {
     justifyContent: 'center', alignItems: 'center', marginRight: SPACING.xs,
 } as const;
 
+export const backBtn = {
+    width: 44,
+    height: 44,
+    backgroundColor: '#FFB26B',
+    borderRadius: RADIUS.md,
+    ...RETRO_BORDER,
+    justifyContent: 'center',
+    alignItems: 'center',
+} as const;

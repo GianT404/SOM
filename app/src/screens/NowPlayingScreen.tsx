@@ -8,6 +8,7 @@ import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
 import { usePlayer } from '../contexts/PlayerContext';
 import { downloadAndAdd, DownloadProgress, isDownloaded } from '../services/playlistStore';
 import SyncedLyrics from '../components/SyncedLyrics';
+import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
 import { COLORS } from '../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -20,23 +21,23 @@ interface NeoShadowWrapperProps {
     offset?: number;
 }
 
-const NeoShadowWrapper: React.FC<NeoShadowWrapperProps> = ({
-    children,
-    style,
-    borderRadius = 0,
-    offset = 4,
-    containerStyle
-}) => (
-    <View style={[{ position: 'relative' }, containerStyle]}>
-        <View style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: '#1A1A1A', borderRadius: borderRadius, transform: [{ translateX: offset }, { translateY: offset }] }
-        ]} />
-        <View style={[{ borderWidth: 2, borderColor: '#1A1A1A', borderRadius: borderRadius, overflow: 'hidden', backgroundColor: '#FFF' }, style]}>
-            {children}
-        </View>
-    </View>
-);
+// const NeoShadowWrapper: React.FC<NeoShadowWrapperProps> = ({
+//     children,
+//     style,
+//     borderRadius = 0,
+//     offset = 4,
+//     containerStyle
+// }) => (
+//     <View style={[{ position: 'relative' }, containerStyle]}>
+//         <View style={[
+//             StyleSheet.absoluteFillObject,
+//             { backgroundColor: '#1A1A1A', borderRadius: borderRadius, transform: [{ translateX: offset }, { translateY: offset }] }
+//         ]} />
+//         <View style={[{ borderWidth: 2, borderColor: '#1A1A1A', borderRadius: borderRadius, overflow: 'hidden', backgroundColor: '#FFF' }, style]}>
+//             {children}
+//         </View>
+//     </View>
+// );
 
 const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
     const { currentTrack, isPlaying, pause, resume, isLoading, position, duration, seekTo } = usePlayer() as any;
