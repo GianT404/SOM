@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import ImageColors from 'react-native-image-colors';
-import { COLORS, SPACING, cardShadow } from '../theme';
+import { COLORS, SPACING, NEO_BRUTALISM, RADIUS } from '../theme';
 
 interface MusicCardProps {
     id: string;
@@ -46,7 +46,7 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
 
     return (
         <View style={styles.container}>
-            <View style={[cardShadow, { backgroundColor: accentColor }]} />
+            <View style={[NEO_BRUTALISM.shadowSm, { backgroundColor: accentColor }]} />
 
             {/* Thân Card chính */}
             <TouchableOpacity
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     card: {
         width: '100%',
         backgroundColor: COLORS.card,
-        borderRadius: 20,
+        borderRadius: RADIUS.sm,
         borderWidth: 2,
         borderColor: '#1A1A1A',
         padding: 8,

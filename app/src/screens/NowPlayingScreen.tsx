@@ -9,7 +9,7 @@ import { usePlayer } from '../contexts/PlayerContext';
 import { downloadAndAdd, DownloadProgress, isDownloaded } from '../services/playlistStore';
 import SyncedLyrics from '../components/SyncedLyrics';
 import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
-import { COLORS } from '../theme';
+import { COLORS, RADIUS } from '../theme';
 import MarqueeText from '../components/MarqueeText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -149,7 +149,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
 
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
-                    <NeoShadowWrapper borderRadius={16} offset={3} style={[styles.headerBtn, styles.btnOrange]}>
+                    <NeoShadowWrapper borderRadius={RADIUS.sm} offset={3} style={[styles.headerBtn, styles.btnOrange]}>
                         <MaterialIcons name="keyboard-arrow-down" size={26} color="#1A1A1A" />
                     </NeoShadowWrapper>
                 </TouchableOpacity>
@@ -164,7 +164,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                 </View>
 
                 <TouchableOpacity onPress={() => setShowMenu(true)} activeOpacity={0.8}>
-                    <NeoShadowWrapper borderRadius={16} offset={3} style={[styles.headerBtn, styles.btnWhite]}>
+                    <NeoShadowWrapper borderRadius={RADIUS.sm} offset={3} style={[styles.headerBtn, styles.btnWhite]}>
                         <MaterialIcons name="more-horiz" size={26} color="#1A1A1A" />
                     </NeoShadowWrapper>
                 </TouchableOpacity>
@@ -173,7 +173,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
             <Modal visible={showMenu} transparent animationType="fade">
                 <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
                     <View style={styles.modalOverlay}>
-                        <NeoShadowWrapper borderRadius={16} offset={4} style={styles.dropdownMenu} containerStyle={styles.dropdownMenuContainer}>
+                        <NeoShadowWrapper borderRadius={RADIUS.sm} offset={4} style={styles.dropdownMenu} containerStyle={styles.dropdownMenuContainer}>
                             <TouchableOpacity style={styles.menuItem} onPress={handleDownload} disabled={dlState !== 'idle'}>
                                 <MaterialIcons
                                     name={dlState === 'done' ? 'check-circle' : 'file-download'}
@@ -214,7 +214,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
             <View style={styles.artContainer}>
                 <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ flex: 1, width: SCREEN_WIDTH }}>
                     <View style={{ width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
-                        <NeoShadowWrapper borderRadius={24} offset={6} style={styles.artWrapper}>
+                        <NeoShadowWrapper borderRadius={RADIUS.sm} offset={6} style={styles.artWrapper}>
                             <Image source={{ uri: currentTrack.thumbnail }} style={styles.albumArt} />
                         </NeoShadowWrapper>
                     </View>
@@ -229,7 +229,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                 </ScrollView>
             </View>
 
-            <NeoShadowWrapper borderRadius={30} offset={6} containerStyle={{ marginHorizontal: 24, marginBottom: 30 }} style={styles.controlBox}>
+            <NeoShadowWrapper borderRadius={RADIUS.sm} offset={6} containerStyle={{ marginHorizontal: 24, marginBottom: 30 }} style={styles.controlBox}>
                 <View style={styles.waveformRow}>
                     <Text style={styles.timeText}>{formatTime(displayPosition)}</Text>
 
@@ -274,7 +274,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                     <TouchableOpacity><MaterialIcons name="skip-previous" size={32} color="#1A1A1A" /></TouchableOpacity>
 
                     <TouchableOpacity onPress={isPlaying ? pause : resume} activeOpacity={0.8}>
-                        <NeoShadowWrapper borderRadius={32} offset={4} style={styles.playPauseBtn}>
+                        <NeoShadowWrapper borderRadius={RADIUS.sm} offset={4} style={styles.playPauseBtn}>
                             {isLoading ? (
                                 <MaterialIcons name="hourglass-empty" size={30} color="#1A1A1A" />
                             ) : (
@@ -289,7 +289,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
             </NeoShadowWrapper>
 
             {dlState === 'downloading' && (
-                <NeoShadowWrapper borderRadius={16} offset={4} containerStyle={styles.miniProgressContainer}>
+                <NeoShadowWrapper borderRadius={RADIUS.sm} offset={4} containerStyle={styles.miniProgressContainer}>
                     <View style={styles.miniProgress}>
                         <Text style={styles.miniProgressText}>Đang tải: {dlProgressText}</Text>
                     </View>
@@ -318,14 +318,14 @@ const styles = StyleSheet.create({
 
     artContainer: { alignItems: 'center', marginTop: 20, height: 340, width: SCREEN_WIDTH },
     artWrapper: { width: SCREEN_WIDTH * 0.78, height: SCREEN_WIDTH * 0.78, backgroundColor: '#FFF', padding: 12 },
-    albumArt: { width: '100%', height: '100%', borderRadius: 14 },
+    albumArt: { width: '100%', height: '100%', borderRadius: RADIUS.sm },
 
     trackDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10, marginBottom: 30, paddingHorizontal: 24 },
     trackTextContainer: { flex: 1 },
     trackTitle: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
     trackArtist: { fontSize: 14, color: '#666', fontWeight: '600' },
     paginationDots: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4 },
-    dot: { width: 6, height: 6, borderRadius: 3 },
+    dot: { width: 6, height: 6, borderRadius: RADIUS.sm },
 
     controlBox: { backgroundColor: '#FFF', paddingVertical: 24, paddingHorizontal: 20 },
     waveformRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },

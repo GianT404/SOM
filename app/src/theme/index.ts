@@ -112,7 +112,7 @@ export const headerLeft = {
 
 export const searchBar = {
     flexDirection: 'row', alignItems: 'center', marginHorizontal: SPACING.lg,
-    backgroundColor: COLORS.card, ...RETRO_BORDER, borderRadius: RADIUS.full,
+    backgroundColor: COLORS.card, ...RETRO_BORDER, borderRadius: RADIUS.sm,
     height: 48, marginBottom: SPACING.lg,
 } as const;
 
@@ -129,19 +129,35 @@ export const backBtn = {
     width: 44,
     height: 44,
     backgroundColor: '#FFB26B',
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.sm,
     ...RETRO_BORDER,
     justifyContent: 'center',
     alignItems: 'center',
 } as const;
 
-export const cardShadow = {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    right: 6,
-    bottom: -6,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#1A1A1A',
-} as const;
+export const NEO_BRUTALISM = {
+    border: {
+        borderWidth: 2,
+        borderColor: COLORS.textDark,
+    },
+    // shadow: {
+    //     position: 'absolute' as const,
+    //     top: 6,
+    //     left: 6,
+    //     right: 6,
+    //     bottom: -6,
+    //     borderWidth: 2,
+    //     borderRadius: RADIUS.sm,
+    //     borderColor: COLORS.textDark,
+    // },
+    shadowSm: {
+        position: 'absolute' as const,
+        top: 1,
+        left: 3,
+        right: 3,
+        bottom: -6,
+        borderWidth: 2,
+        borderRadius: RADIUS.sm,
+        borderColor: COLORS.textDark,
+    }
+};

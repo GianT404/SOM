@@ -83,7 +83,7 @@ const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
 const styles = StyleSheet.create({
     container: {
         ...RETRO_BORDER,
-        borderRadius: 20,
+        borderRadius: RADIUS.lg,
         marginHorizontal: SPACING.md,
         overflow: 'hidden',
         height: 75,
