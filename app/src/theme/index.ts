@@ -134,3 +134,14 @@ export const backBtn = {
     justifyContent: 'center',
     alignItems: 'center',
 } as const;
+
+export const cardShadow = {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    bottom: -6,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#1A1A1A',
+} as const;

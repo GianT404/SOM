@@ -5,71 +5,9 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import ImageColors from 'react-native-image-colors';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW_SM } from '../theme';
 import { usePlayer } from '../contexts/PlayerContext';
-
-const MarqueeText = ({ text, style }: { text: string; style: any }) => {
-    const [containerWidth, setContainerWidth] = useState(0);
-    const [textWidth, setTextWidth] = useState(0);
-    const translateX = useRef(new Animated.Value(0)).current;
-    const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-
-    useEffect(() => {
-        translateX.setValue(0);
-        if (animationRef.current) {
-            animationRef.current.stop();
-        }
-
-        if (textWidth > containerWidth && containerWidth > 0) {
-            const distance = textWidth + SPACING.lg;
-            const duration = distance * 25;
-
-            animationRef.current = Animated.loop(
-                Animated.timing(translateX, {
-                    toValue: -distance,
-                    duration: duration,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                })
-            );
-
-            animationRef.current.start();
-        }
-
-        return () => {
-            if (animationRef.current) animationRef.current.stop();
-        };
-    }, [textWidth, containerWidth, text]);
-
-    return (
-        <View
-            style={styles.marqueeContainer}
-            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-        >
-            <Animated.View
-                style={{
-                    flexDirection: 'row',
-                    transform: [{ translateX }],
-                    width: textWidth > 0 ? textWidth * 2 + SPACING.lg : undefined,
-                }}
-            >
-                <Text
-                    onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
-                    style={[style, { alignSelf: 'flex-start' }]}
-                    numberOfLines={1}
-                >
-                    {text}
-                </Text>
-
-                {textWidth > containerWidth && (
-                    <Text style={[style, { marginLeft: SPACING.lg }]}>
-                        {text}
-                    </Text>
-                )}
-            </Animated.View>
-        </View>
-    );
-};
+import MarqueeText from './MarqueeText';
 
 // --- Component chính: MiniPlayer ---
 const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
@@ -99,7 +37,7 @@ const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
 
     return (
         <TouchableOpacity
-            style={[styles.container, { backgroundColor: mainColor }]}
+            style={[styles.container, { backgroundColor: mainColor }, RETRO_SHADOW_SM]}
             onPress={onPress}
             activeOpacity={0.95}
         >

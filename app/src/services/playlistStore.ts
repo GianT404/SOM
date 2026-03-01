@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from './api';
 
 const PLAYLIST_KEY = 'dm4a_offline_playlist';
+const DELETED_PLAYLIST_KEY = 'dm4a_deleted_playlist';
 const DOWNLOAD_DIR = `${FileSystem.documentDirectory}dm4a_downloads/`;
 
 export interface OfflineTrack {
@@ -44,14 +45,53 @@ export const isDownloaded = async (id: string): Promise<boolean> => {
     return list.some(t => t.id === id);
 };
 
-export const removeFromPlaylist = async (id: string) => {
+export const getDeletedPlaylist = async (): Promise<OfflineTrack[]> => {
+    try {
+        const json = await AsyncStorage.getItem(DELETED_PLAYLIST_KEY);
+        return json ? JSON.parse(json) : [];
+    } catch {
+        return [];
+    }
+};
+
+const saveDeletedPlaylist = async (tracks: OfflineTrack[]) => {
+    await AsyncStorage.setItem(DELETED_PLAYLIST_KEY, JSON.stringify(tracks));
+};
+
+export const softDeleteTrack = async (id: string) => {
     const list = await getPlaylist();
+    const track = list.find(t => t.id === id);
+    if (track) {
+        // Remove from main playlist
+        await savePlaylist(list.filter(t => t.id !== id));
+
+        // Add to deleted playlist
+        const deletedList = await getDeletedPlaylist();
+        await saveDeletedPlaylist([...deletedList, track]);
+    }
+};
+
+export const restoreTrack = async (id: string) => {
+    const deletedList = await getDeletedPlaylist();
+    const track = deletedList.find(t => t.id === id);
+    if (track) {
+        // Remove from deleted playlist
+        await saveDeletedPlaylist(deletedList.filter(t => t.id !== id));
+
+        // Add to main playlist
+        const list = await getPlaylist();
+        await savePlaylist([...list, track]);
+    }
+};
+
+export const permanentlyDeleteTrack = async (id: string) => {
+    const list = await getDeletedPlaylist();
     const track = list.find(t => t.id === id);
     if (track) {
         // Delete local file
         try { await FileSystem.deleteAsync(track.localUri, { idempotent: true }); } catch { }
     }
-    await savePlaylist(list.filter(t => t.id !== id));
+    await saveDeletedPlaylist(list.filter(t => t.id !== id));
 };
 
 // ---------- Download + Add ----------

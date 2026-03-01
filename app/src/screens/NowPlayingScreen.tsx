@@ -10,6 +10,7 @@ import { downloadAndAdd, DownloadProgress, isDownloaded } from '../services/play
 import SyncedLyrics from '../components/SyncedLyrics';
 import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
 import { COLORS } from '../theme';
+import MarqueeText from '../components/MarqueeText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -20,24 +21,6 @@ interface NeoShadowWrapperProps {
     borderRadius?: number;
     offset?: number;
 }
-
-// const NeoShadowWrapper: React.FC<NeoShadowWrapperProps> = ({
-//     children,
-//     style,
-//     borderRadius = 0,
-//     offset = 4,
-//     containerStyle
-// }) => (
-//     <View style={[{ position: 'relative' }, containerStyle]}>
-//         <View style={[
-//             StyleSheet.absoluteFillObject,
-//             { backgroundColor: '#1A1A1A', borderRadius: borderRadius, transform: [{ translateX: offset }, { translateY: offset }] }
-//         ]} />
-//         <View style={[{ borderWidth: 2, borderColor: '#1A1A1A', borderRadius: borderRadius, overflow: 'hidden', backgroundColor: '#FFF' }, style]}>
-//             {children}
-//         </View>
-//     </View>
-// );
 
 const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
     const { currentTrack, isPlaying, pause, resume, isLoading, position, duration, seekTo } = usePlayer() as any;
@@ -118,7 +101,6 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
         setSeekProgress(p);
         return p;
     };
-
     useEffect(() => {
         if (!currentTrack) return;
         isDownloaded(currentTrack.id).then(yes => {
@@ -173,8 +155,12 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                 </TouchableOpacity>
 
                 <View style={styles.headerCenter}>
-                    <Text style={styles.playingFrom}>PLAYING FROM PLAYLIST</Text>
-                    <Text style={styles.playlistName}>Retro Vibes</Text>
+
+                    <MarqueeText
+                        text={currentTrack.title}
+                        style={styles.trackTitle}
+                    />
+                    <Text style={styles.trackArtist}>{currentTrack.uploader || "Unknown Artist"}</Text>
                 </View>
 
                 <TouchableOpacity onPress={() => setShowMenu(true)} activeOpacity={0.8}>
@@ -241,18 +227,6 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                         />
                     </View>
                 </ScrollView>
-            </View>
-
-            <View style={styles.trackDetailRow}>
-                <View style={styles.trackTextContainer}>
-                    <Text style={styles.trackTitle} numberOfLines={1}>{currentTrack.title || "Jazz Classics"}</Text>
-                    <Text style={styles.trackArtist}>{currentTrack.uploader || "Unknown Artist"}</Text>
-                </View>
-                <View style={styles.paginationDots}>
-                    <View style={[styles.dot, { backgroundColor: '#A0A0A0' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#FFB86C', width: 8, height: 8, borderRadius: 4 }]} />
-                    <View style={[styles.dot, { backgroundColor: '#E0E0E0' }]} />
-                </View>
             </View>
 
             <NeoShadowWrapper borderRadius={30} offset={6} containerStyle={{ marginHorizontal: 24, marginBottom: 30 }} style={styles.controlBox}>
@@ -332,7 +306,13 @@ const styles = StyleSheet.create({
     headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
     btnOrange: { backgroundColor: '#FFB86C' },
     btnWhite: { backgroundColor: '#FFF' },
-    headerCenter: { alignItems: 'center' },
+    headerCenter: {
+        flex: 1, // BẮT BUỘC: Để container chiếm hết khoảng trống ở giữa
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 10,
+        overflow: 'hidden', // Đảm bảo chữ chạy ra ngoài là biến mất luôn
+    },
     playingFrom: { fontSize: 10, fontWeight: '700', color: '#A0A0A0', letterSpacing: 1, marginBottom: 2 },
     playlistName: { fontSize: 14, fontWeight: '800', color: '#1A1A1A' },
 
@@ -342,7 +322,7 @@ const styles = StyleSheet.create({
 
     trackDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10, marginBottom: 30, paddingHorizontal: 24 },
     trackTextContainer: { flex: 1 },
-    trackTitle: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
+    trackTitle: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
     trackArtist: { fontSize: 14, color: '#666', fontWeight: '600' },
     paginationDots: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4 },
     dot: { width: 6, height: 6, borderRadius: 3 },

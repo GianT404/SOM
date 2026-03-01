@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import ImageColors from 'react-native-image-colors';
-import { COLORS, SPACING, RETRO_BORDER } from '../theme';
+import { COLORS, SPACING, cardShadow } from '../theme';
 
 interface MusicCardProps {
     id: string;
@@ -10,13 +10,18 @@ interface MusicCardProps {
     thumbnail: string;
     duration: number;
     uploader: string;
+    showDeleteBtn?: boolean;
     onPress: () => void;
+    onLongPress?: () => void;
+    onDeletePress?: () => void;
 }
 
-const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({ title, thumbnail, duration, onPress, id }) => {
+const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
+    title, thumbnail, duration, onPress, onLongPress, onDeletePress, showDeleteBtn, id, uploader
+}) => {
     const [accentColor, setAccentColor] = useState(COLORS.primary);
 
-    // Trích xuất màu từ thumbnail để làm bóng đổ nội bộ
+    // Trích xuất màu từ thumbnail để làm bóng đổ khối (Neo-Brutalism shadow)
     useEffect(() => {
         if (thumbnail) {
             ImageColors.getColors(thumbnail, {
@@ -26,6 +31,8 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({ title, thumb
             }).then((colors) => {
                 if (colors.platform === 'android') {
                     setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                } else if (colors.platform === 'ios') {
+                    setAccentColor(colors.primary || colors.background || COLORS.primary);
                 }
             });
         }
@@ -38,91 +45,112 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({ title, thumb
     };
 
     return (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={onPress}
-            activeOpacity={0.9}
-        >
-            {/* Ảnh Thumbnail */}
-            <View style={styles.imageWrapper}>
-                <Image source={{ uri: thumbnail }} style={styles.image} resizeMode="cover" />
-            </View>
+        <View style={styles.container}>
+            <View style={[cardShadow, { backgroundColor: accentColor }]} />
 
-            <View style={styles.content}>
-                <Text style={styles.duration}>{formatDuration(duration)}</Text>
-
-                {/* Phần Title  */}
-                <View style={styles.titleContainer}>
-                    <Text style={styles.title} numberOfLines={1}>{title}</Text>
+            {/* Thân Card chính */}
+            <TouchableOpacity
+                style={styles.card}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                activeOpacity={0.9}
+            >
+                {/* Ảnh Thumbnail */}
+                <View style={styles.imageWrapper}>
+                    <Image source={{ uri: thumbnail }} style={styles.image} resizeMode="cover" />
                 </View>
-            </View>
-            <View style={[styles.bottomBar, { backgroundColor: accentColor }]} />
-        </TouchableOpacity>
+
+                <View style={styles.content}>
+                    <Text style={styles.duration}>{formatDuration(duration)}</Text>
+
+                    {/* Phần Title */}
+                    <View style={styles.titleContainer}>
+                        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                    </View>
+
+                    {/* Uploader (giữ nguyên logic) */}
+                    <Text style={styles.uploader} numberOfLines={1}>{uploader}</Text>
+                </View>
+
+                {/* Nút Xóa */}
+                {showDeleteBtn && (
+                    <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={onDeletePress}
+                        activeOpacity={0.8}
+                    >
+                        <MaterialIcons name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                )}
+            </TouchableOpacity>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    card: {
+    container: {
         width: '47%',
+        marginBottom: SPACING.lg,
+        position: 'relative',
+    },
+
+    card: {
+        width: '100%',
         backgroundColor: COLORS.card,
         borderRadius: 20,
-        ...RETRO_BORDER,
-        marginBottom: SPACING.lg,
-        padding: 10,
+        borderWidth: 2,
+        borderColor: '#1A1A1A',
+        padding: 8,
         overflow: 'hidden',
-        position: 'relative',
     },
     imageWrapper: {
         width: '100%',
-        height: 120,
+        height: 110,
         borderRadius: 15,
-        ...RETRO_BORDER,
+        borderWidth: 2,
+        borderColor: '#1A1A1A',
         overflow: 'hidden',
     },
-    image: { width: '100%', height: '100%' },
-    content: { marginTop: 10, paddingBottom: 5 },
-    duration: { fontSize: 12, fontWeight: '900', color: COLORS.textMuted, marginBottom: 4 },
+    image: {
+        width: '100%',
+        height: '100%'
+    },
+    content: {
+        marginTop: 8,
+        paddingBottom: 2
+    },
+    duration: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: COLORS.textMuted,
+        marginBottom: 2
+    },
     titleContainer: {
-        position: 'relative',
-        marginBottom: 3,
+        marginBottom: 2,
     },
     title: {
         fontSize: 14,
         fontWeight: '900',
         color: COLORS.textDark,
-        zIndex: 2,
     },
-    titleShadow: {
+    uploader: {
+        fontSize: 10,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+    },
+    deleteBtn: {
         position: 'absolute',
-        bottom: -2,
-        left: 0,
-        width: '60%',
-        height: 6,
-        opacity: 0.6,
-        zIndex: 1,
-    },
-
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 5,
-    },
-    uploader: { fontSize: 10, color: COLORS.textMuted, flex: 1 },
-    playIconBox: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: COLORS.textDark,
+        top: 6,
+        right: 6,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: COLORS.red,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 5,
+        zIndex: 10,
+        borderWidth: 1.5,
+        borderColor: '#1A1A1A',
     }
 });
 

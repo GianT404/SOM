@@ -8,17 +8,26 @@ import { usePlayer } from '../contexts/PlayerContext';
 import MusicCard from '../components/MusicCard';
 import MiniPlayer from '../components/MiniPlayer';
 
-import { getPlaylist, OfflineTrack } from '../services/playlistStore';
+import { getPlaylist, getDeletedPlaylist, softDeleteTrack, restoreTrack, permanentlyDeleteTrack, OfflineTrack } from '../services/playlistStore';
 import { useFocusEffect } from '@react-navigation/native';
 
 const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { play, currentTrack } = usePlayer();
     const [tracks, setTracks] = useState<OfflineTrack[]>([]);
+    const [deletedTracks, setDeletedTracks] = useState<OfflineTrack[]>([]);
+    const [activeTab, setActiveTab] = useState<'playlist' | 'deleted'>('playlist');
+    const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
+
+    const loadTracks = useCallback(() => {
+        getPlaylist().then(setTracks);
+        getDeletedPlaylist().then(setDeletedTracks);
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
-            getPlaylist().then(setTracks);
-        }, [])
+            loadTracks();
+            setIsDeleteMode(false);
+        }, [loadTracks])
     );
 
     const handlePlay = useCallback((track: OfflineTrack) => {
@@ -26,8 +35,31 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         navigation.navigate('NowPlaying');
     }, [play, navigation]);
 
+    const handleSoftDelete = async (id: string) => {
+        await softDeleteTrack(id);
+        loadTracks();
+        setIsDeleteMode(false);
+    };
+
+    const handleRestore = async (id: string) => {
+        await restoreTrack(id);
+        loadTracks();
+        setIsDeleteMode(false);
+    };
+
+    const handlePermanentDelete = async (id: string) => {
+        await permanentlyDeleteTrack(id);
+        loadTracks();
+        setIsDeleteMode(false);
+    };
+
+    const renderTracks = activeTab === 'playlist' ? tracks : deletedTracks;
+
     return (
-        <View style={styles.container}>
+        <View style={styles.container} onStartShouldSetResponder={() => {
+            if (isDeleteMode) setIsDeleteMode(false);
+            return false;
+        }}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header */}
@@ -47,7 +79,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
                 {/* Hero Text */}
                 <View style={styles.hero}>
-                    <Text style={styles.heroTitle}>Listening Everyday</Text>
+                    <Text style={styles.heroTitle}>Listening Eveeryday</Text>
                     <Text style={styles.heroSubtitle}>Explore millions of music according to your taste</Text>
                 </View>
 
@@ -66,30 +98,56 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
                 {/* Tab Row */}
                 <View style={styles.tabRow}>
-                    <View style={styles.tabActive}>
-                        <Text style={styles.tabActiveText}>Overview</Text>
-                        <View style={styles.tabUnderline} />
-                    </View>
-                    <Text style={styles.tabText}>Songs</Text>
-                    <Text style={styles.tabText}>Album</Text>
-                    <Text style={styles.tabText}>Artist</Text>
+                    <TouchableOpacity
+                        style={activeTab === 'playlist' ? styles.tabActive : undefined}
+                        onPress={() => { setActiveTab('playlist'); setIsDeleteMode(false); }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={activeTab === 'playlist' ? styles.tabActiveText : styles.tabText}>Playlist</Text>
+                        {activeTab === 'playlist' && <View style={styles.tabUnderline} />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={activeTab === 'deleted' ? styles.tabActive : undefined}
+                        onPress={() => { setActiveTab('deleted'); setIsDeleteMode(false); }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={activeTab === 'deleted' ? styles.tabActiveText : styles.tabText}>Đã xóa</Text>
+                        {activeTab === 'deleted' && <View style={styles.tabUnderline} />}
+                    </TouchableOpacity>
                 </View>
 
                 {/* Music Card Grid — 2 columns */}
-                {tracks.length === 0 ? (
+                {renderTracks.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <MaterialIcons name="music-note" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.emptyText}>Trống như đường tình bạn vậy?</Text>
-                        <Text style={styles.emptySubtext}>Tìm kiếm, thêm nhạc, chill thôi nào.</Text>
+                        <MaterialIcons name={activeTab === 'playlist' ? "music-note" : "delete-outline"} size={48} color={COLORS.textMuted} />
+                        <Text style={styles.emptyText}>{activeTab === 'playlist' ? 'Trống như đường tình bạn vậy?' : 'Thùng rác trống'}</Text>
+                        <Text style={styles.emptySubtext}>{activeTab === 'playlist' ? 'Tìm kiếm, thêm nhạc, chill thôi nào.' : 'Không có bài hát nào bị xóa'}</Text>
                     </View>
                 ) : (
                     <View style={styles.gridContainer}>
-                        {tracks.map((track: OfflineTrack, i: number) => (
+                        {renderTracks.map((track: OfflineTrack, i: number) => (
                             <MusicCard
                                 key={track.id}
                                 {...track}
                                 index={i}
-                                onPress={() => handlePlay(track)}
+                                showDeleteBtn={isDeleteMode}
+                                onPress={() => {
+                                    if (isDeleteMode) {
+                                        setIsDeleteMode(false);
+                                    } else {
+                                        handlePlay(track);
+                                    }
+                                }}
+                                onLongPress={() => {
+                                    setIsDeleteMode(true);
+                                }}
+                                onDeletePress={() => {
+                                    if (activeTab === 'playlist') {
+                                        handleSoftDelete(track.id);
+                                    } else {
+                                        handleRestore(track.id);
+                                    }
+                                }}
                             />
                         ))}
                     </View>
@@ -117,9 +175,6 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     container: { flex: 1, backgroundColor: COLORS.background },
-
-
-
     headerRight: {
         minWidth: 44,
         alignItems: 'flex-end',
