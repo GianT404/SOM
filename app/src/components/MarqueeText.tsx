@@ -78,7 +78,7 @@ const MarqueeText: React.FC<MarqueeTextProps> = ({ text, style, speed = 0.05 }) 
                     {/* Text gốc */}
                     <Text
                         onLayout={(e) => setTextWidth(Math.floor(e.nativeEvent.layout.width))}
-                        style={[style, styles.textBase]}
+                        style={[style, styles.textBase, !shouldScroll && { textAlign: 'center', width: containerWidth || '100%' }]}
                         numberOfLines={1}
                     >
                         {text}

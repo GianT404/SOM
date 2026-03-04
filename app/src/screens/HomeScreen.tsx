@@ -87,7 +87,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
                 <View style={headerTitleContainer}>
-                    <Text style={headerTitle}>Home1</Text>
+                    <Text style={headerTitle}>Home</Text>
                 </View>
             </View>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -165,7 +165,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                                     if (activeTab === 'playlist') {
                                         handleSoftDelete(track.id);
                                     } else {
-                                        handleRestore(track.id);
+                                        handlePermanentDelete(track.id);
                                     }
                                 }}
                             />

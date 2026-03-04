@@ -163,6 +163,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                     <MarqueeText
                         text={currentTrack.title}
                         style={styles.trackTitle}
+
                     />
                     <Text style={styles.trackArtist}>{currentTrack.uploader || "Unknown Artist"}</Text>
                 </View>
@@ -192,7 +193,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                                 <MaterialIcons name="share" size={24} color="#1A1A1A" />
                                 <Text style={styles.menuItemText}>Chia sẻ</Text>
                             </TouchableOpacity> */}
-                            {availableLanguages.length > 0 && <View style={{ height: 1, backgroundColor: '#E0E0E0', marginVertical: 4 }} />}
+                            {/* {availableLanguages.length > 0 && <View style={{ height: 1, backgroundColor: '#E0E0E0', marginVertical: 4 }} />}
                             {availableLanguages.map(lang => (
                                 <TouchableOpacity
                                     key={lang}
@@ -209,7 +210,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                                     />
                                     <Text style={styles.menuItemText}>Lyric: {lang.toUpperCase()}</Text>
                                 </TouchableOpacity>
-                            ))}
+                            ))} */}
                         </NeoShadowWrapper>
                     </View>
                 </TouchableWithoutFeedback>
@@ -339,7 +340,7 @@ const styles = StyleSheet.create({
 
     trackDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10, marginBottom: 30, paddingHorizontal: 24 },
     trackTextContainer: { flex: 1 },
-    trackTitle: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
+    trackTitle: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginBottom: 4, },
     trackArtist: { fontSize: 14, color: '#666', fontWeight: '600' },
     paginationDots: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4 },
     dot: { width: 6, height: 6, borderRadius: RADIUS.sm },
