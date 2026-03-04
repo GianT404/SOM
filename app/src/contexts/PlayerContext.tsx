@@ -4,6 +4,7 @@ import { SearchResult } from '../services/api';
 import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPlaylist, OfflineTrack } from '../services/playlistStore';
+import { getAudioSettings, AudioSettings, getBufferSamples, getSampleRateHz } from '../services/audioSettings';
 
 interface Track {
     id: string;
@@ -67,6 +68,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Keep a cached copy of the playlist for skip operations
     const playlistCacheRef = useRef<OfflineTrack[]>([]);
 
+    // Audio engine settings (loaded from AsyncStorage)
+    const audioSettingsRef = useRef<AudioSettings>({ bufferSize: 'balanced', sampleRate: 'auto' });
+
     // Refresh playlist cache periodically and on track change
     const refreshPlaylistCache = useCallback(async () => {
         try {
@@ -82,6 +86,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             allowsRecordingIOS: false,
             staysActiveInBackground: true,
             playsInSilentModeIOS: true,
+        });
+
+        // Load audio engine settings
+        getAudioSettings().then(settings => {
+            audioSettingsRef.current = settings;
+            console.log('[PlayerContext] Audio settings loaded:', settings);
         });
 
         // Initial cache load
@@ -233,9 +243,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return;
             }
 
+            // Reload audio engine settings from AsyncStorage before each play
+            const settings = await getAudioSettings();
+            audioSettingsRef.current = settings;
+
             const { sound } = await Audio.Sound.createAsync(
                 { uri: audioUri },
-                { shouldPlay: true },
+                {
+                    shouldPlay: true,
+                    progressUpdateIntervalMillis: 250,
+                    androidImplementation: 'MediaPlayer',
+                },
                 onPlaybackStatusUpdate
             );
 
