@@ -193,7 +193,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                                 <MaterialIcons name="share" size={24} color="#1A1A1A" />
                                 <Text style={styles.menuItemText}>Chia sẻ</Text>
                             </TouchableOpacity> */}
-                            {/* {availableLanguages.length > 0 && <View style={{ height: 1, backgroundColor: '#E0E0E0', marginVertical: 4 }} />}
+                            {availableLanguages.length > 0 && <View style={{ height: 1, backgroundColor: '#E0E0E0', marginVertical: 4 }} />}
                             {availableLanguages.map(lang => (
                                 <TouchableOpacity
                                     key={lang}
@@ -210,7 +210,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                                     />
                                     <Text style={styles.menuItemText}>Lyric: {lang.toUpperCase()}</Text>
                                 </TouchableOpacity>
-                            ))} */}
+                            ))}
                         </NeoShadowWrapper>
                     </View>
                 </TouchableWithoutFeedback>

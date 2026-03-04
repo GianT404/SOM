@@ -30,7 +30,7 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
                 key: id,
             }).then((colors) => {
                 if (colors.platform === 'android') {
-                    setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                    setAccentColor(colors.dominant || colors.vibrant || COLORS.primary);
                 } else if (colors.platform === 'ios') {
                     setAccentColor(colors.primary || colors.background || COLORS.primary);
                 }

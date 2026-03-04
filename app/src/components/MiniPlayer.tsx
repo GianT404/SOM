@@ -23,7 +23,7 @@ const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
                 key: currentTrack.id,
             }).then((colors) => {
                 if (colors.platform === 'android') {
-                    setMainColor(colors.vibrant || colors.dominant);
+                    setMainColor(colors.dominant || colors.vibrant);
                 } else if (colors.platform === 'ios') {
                     setMainColor(colors.primary || colors.background);
                 }
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0, 0, 0, 0.75)',
         textShadowOffset: { width: -1, height: 1 },
         textShadowRadius: 10,
-        flexWrap: 'nowrap',
+        flexWrap: 'wrap',
     },
     artist: {
         color: 'rgba(255,255,255,0.8)',

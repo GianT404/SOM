@@ -96,7 +96,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 {/* Hero Text */}
                 <View style={styles.hero}>
                     {/* <Text style={styles.heroTitle}>Listening Everyday</Text> */}
-                    <Text style={styles.heroSubtitle}>Explore millions of music according to your taste</Text>
+                    {/* <Text style={styles.heroSubtitle}>Explore millions of music according to your taste</Text> */}
                 </View>
                 <View style={styles.searchWrapper}>
                     <View style={[
@@ -123,7 +123,8 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         onPress={() => { setActiveTab('playlist'); setIsDeleteMode(false); }}
                         activeOpacity={0.8}
                     >
-                        <Text style={activeTab === 'playlist' ? styles.tabActiveText : styles.tabText}>Playlist</Text>
+                        <Text style={activeTab === 'playlist' ? styles.tabActiveText : styles.tabText}>Playlist (<Text style={styles.countText}>{tracks.length}</Text>)</Text>
+
                         {activeTab === 'playlist' && <View style={styles.tabUnderline} />}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -192,7 +193,7 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.lg,
         position: 'relative',
     },
-    hero: { paddingHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.lg },
+    hero: { paddingHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.sm },
     heroTitle: { fontSize: 26, fontWeight: '900', color: COLORS.textDark },
     heroSubtitle: {
         fontSize: FONT_SIZE.sm, color: COLORS.textMuted, fontWeight: '400', marginTop: SPACING.xs,
@@ -206,9 +207,10 @@ const styles = StyleSheet.create({
         fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.textDark, marginBottom: 4,
     },
     tabUnderline: {
-        width: '100%' as any, height: 2, backgroundColor: COLORS.textDark, borderRadius: 1,
+        width: '100%' as any, height: 2, backgroundColor: COLORS.primary, borderRadius: 1,
     },
     tabText: { fontSize: FONT_SIZE.md, fontWeight: '400', color: COLORS.textMuted },
+    countText: { fontSize: FONT_SIZE.md, fontWeight: '400', color: COLORS.textDark },
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',

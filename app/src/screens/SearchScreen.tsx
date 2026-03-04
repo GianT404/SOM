@@ -151,6 +151,7 @@ const styles = StyleSheet.create({
     searchWrapper: {
         marginHorizontal: SPACING.lg,
         marginBottom: SPACING.lg,
+        marginTop: SPACING.md,
         position: 'relative',
     },
     sectionHeader: {

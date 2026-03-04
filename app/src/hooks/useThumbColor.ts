@@ -62,13 +62,13 @@ export function useThumbColor(thumbnailUrl?: string, id?: string): string {
             let picked: string | undefined;
 
             if (result.platform === 'android') {
-                // Prefer light / vibrant colours; dominant is the last resort
+                // Prefer dominant (most displayed colour in the thumbnail)
                 picked =
-                    result.lightVibrant ||
+                    result.dominant ||
                     result.vibrant ||
                     result.muted ||
+                    result.lightVibrant ||
                     result.lightMuted ||
-                    result.dominant ||
                     undefined;
             } else if (result.platform === 'ios') {
                 picked =
