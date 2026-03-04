@@ -3,6 +3,7 @@ import { Audio } from 'expo-av';
 import { SearchResult } from '../services/api';
 import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
+import { getPlaylist, OfflineTrack } from '../services/playlistStore';
 
 interface Track {
     id: string;
@@ -14,12 +15,16 @@ interface Track {
     lyrics?: any;      // offline saved lyrics
 }
 
+type RepeatMode = 'off' | 'all' | 'one';
+
 interface PlayerState {
     currentTrack: Track | null;
     isPlaying: boolean;
     position: number;    // milliseconds
     duration: number;    // milliseconds
     isLoading: boolean;
+    isShuffle: boolean;
+    repeatMode: RepeatMode;
 }
 
 interface PlayerContextType extends PlayerState {
@@ -28,6 +33,10 @@ interface PlayerContextType extends PlayerState {
     resume: () => Promise<void>;
     seekTo: (position: number) => Promise<void>;
     stop: () => Promise<void>;
+    skipToNext: () => Promise<void>;
+    skipToPrevious: () => Promise<void>;
+    toggleShuffle: () => void;
+    toggleRepeat: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -47,7 +56,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         position: 0,
         duration: 0,
         isLoading: false,
+        isShuffle: false,
+        repeatMode: 'off',
     });
+
+    // Refs to access latest state in callbacks without stale closures
+    const stateRef = useRef(state);
+    stateRef.current = state;
+
+    // Keep a cached copy of the playlist for skip operations
+    const playlistCacheRef = useRef<OfflineTrack[]>([]);
+
+    // Refresh playlist cache periodically and on track change
+    const refreshPlaylistCache = useCallback(async () => {
+        try {
+            const list = await getPlaylist();
+            playlistCacheRef.current = list;
+        } catch (e) {
+            console.warn('[PlayerContext] Failed to refresh playlist cache:', e);
+        }
+    }, []);
 
     useEffect(() => {
         Audio.setAudioModeAsync({
@@ -56,12 +84,104 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             playsInSilentModeIOS: true,
         });
 
+        // Initial cache load
+        refreshPlaylistCache();
+
         return () => {
             soundRef.current?.unloadAsync();
         };
+    }, [refreshPlaylistCache]);
+
+    // Refresh cache when current track changes
+    useEffect(() => {
+        refreshPlaylistCache();
+    }, [state.currentTrack?.id, refreshPlaylistCache]);
+
+    // --- Get next track based on current playlist, shuffle, and repeat ---
+    const getNextTrackFromQueue = useCallback((currentId: string): Track | null => {
+        const list = playlistCacheRef.current;
+        if (list.length === 0) return null;
+
+        const currentIndex = list.findIndex(t => t.id === currentId);
+
+        if (stateRef.current.isShuffle) {
+            // Pick a random track that's not the current one
+            if (list.length <= 1) return list[0] || null;
+            let randomIndex: number;
+            do {
+                randomIndex = Math.floor(Math.random() * list.length);
+            } while (randomIndex === currentIndex && list.length > 1);
+            return list[randomIndex];
+        }
+
+        // Sequential: next track
+        const nextIndex = currentIndex + 1;
+        if (nextIndex >= list.length) {
+            // End of list
+            if (stateRef.current.repeatMode === 'all') {
+                return list[0]; // Loop back to first
+            }
+            return null; // No more tracks
+        }
+        return list[nextIndex];
     }, []);
 
-    const onPlaybackStatusUpdate = useCallback((status: any) => {
+    const getPrevTrackFromQueue = useCallback((currentId: string): Track | null => {
+        const list = playlistCacheRef.current;
+        if (list.length === 0) return null;
+
+        const currentIndex = list.findIndex(t => t.id === currentId);
+
+        if (stateRef.current.isShuffle) {
+            // Pick a random track that's not the current one
+            if (list.length <= 1) return list[0] || null;
+            let randomIndex: number;
+            do {
+                randomIndex = Math.floor(Math.random() * list.length);
+            } while (randomIndex === currentIndex && list.length > 1);
+            return list[randomIndex];
+        }
+
+        // Sequential: previous track
+        const prevIndex = currentIndex - 1;
+        if (prevIndex < 0) {
+            if (stateRef.current.repeatMode === 'all') {
+                return list[list.length - 1]; // Loop to last
+            }
+            return null;
+        }
+        return list[prevIndex];
+    }, []);
+
+    // --- Ref to hold playInternal for use in onPlaybackStatusUpdate ---
+    const playInternalRef = useRef<(track: Track) => Promise<void>>(async () => { });
+
+    // --- Handle track ending (uses refs to avoid stale closures) ---
+    const handleTrackFinishedRef = useRef(async () => { });
+    handleTrackFinishedRef.current = async () => {
+        const current = stateRef.current;
+        if (!current.currentTrack) return;
+
+        // Repeat One: replay same track
+        if (current.repeatMode === 'one') {
+            await soundRef.current?.setPositionAsync(0);
+            await soundRef.current?.playAsync();
+            return;
+        }
+
+        // Try to get next track
+        const nextTrack = getNextTrackFromQueue(current.currentTrack.id);
+        if (nextTrack) {
+            await playInternalRef.current(nextTrack);
+        } else {
+            // No more tracks, stop
+            setState(prev => ({ ...prev, isPlaying: false }));
+        }
+    };
+
+    // --- Playback status callback (stable, delegates via refs) ---
+    const onPlaybackStatusUpdateRef = useRef((status: any) => { });
+    onPlaybackStatusUpdateRef.current = (status: any) => {
         if (status.isLoaded) {
             setState(prev => ({
                 ...prev,
@@ -70,10 +190,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 duration: status.durationMillis || 0,
                 isLoading: status.isBuffering,
             }));
+
+            // Auto-advance when track finishes
+            if (status.didJustFinish && !status.isLooping) {
+                handleTrackFinishedRef.current();
+            }
         }
+    };
+
+    // Stable callback function that never changes identity
+    const onPlaybackStatusUpdate = useCallback((status: any) => {
+        onPlaybackStatusUpdateRef.current(status);
     }, []);
 
-    const play = useCallback(async (track: Track) => {
+    // --- Internal play (used by play, skipToNext, skipToPrevious) ---
+    const playInternal = useCallback(async (track: Track) => {
         try {
             const playId = ++currentPlayIdRef.current;
 
@@ -120,6 +251,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, [onPlaybackStatusUpdate]);
 
+    // Keep playInternalRef in sync
+    playInternalRef.current = playInternal;
+
+    // --- Public API ---
+    const play = useCallback(async (track: Track) => {
+        await playInternal(track);
+    }, [playInternal]);
+
     const pause = useCallback(async () => {
         await soundRef.current?.pauseAsync();
     }, []);
@@ -136,17 +275,64 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         await soundRef.current?.stopAsync();
         await soundRef.current?.unloadAsync();
         soundRef.current = null;
-        setState({
+        setState(prev => ({
+            ...prev,
             currentTrack: null,
             isPlaying: false,
             position: 0,
             duration: 0,
             isLoading: false,
+        }));
+    }, []);
+
+    const skipToNext = useCallback(async () => {
+        const current = stateRef.current;
+        if (!current.currentTrack) return;
+
+        const nextTrack = getNextTrackFromQueue(current.currentTrack.id);
+        if (nextTrack) {
+            await playInternal(nextTrack);
+        }
+    }, [getNextTrackFromQueue, playInternal]);
+
+    const skipToPrevious = useCallback(async () => {
+        const current = stateRef.current;
+        if (!current.currentTrack) return;
+
+        // If we're more than 3 seconds in, restart the current track instead
+        if (current.position > 3000) {
+            await soundRef.current?.setPositionAsync(0);
+            return;
+        }
+
+        const prevTrack = getPrevTrackFromQueue(current.currentTrack.id);
+        if (prevTrack) {
+            await playInternal(prevTrack);
+        } else {
+            // No previous track, restart current
+            await soundRef.current?.setPositionAsync(0);
+        }
+    }, [getPrevTrackFromQueue, playInternal]);
+
+    const toggleShuffle = useCallback(() => {
+        setState(prev => ({ ...prev, isShuffle: !prev.isShuffle }));
+    }, []);
+
+    const toggleRepeat = useCallback(() => {
+        setState(prev => {
+            const modes: RepeatMode[] = ['off', 'all', 'one'];
+            const currentIdx = modes.indexOf(prev.repeatMode);
+            const nextMode = modes[(currentIdx + 1) % modes.length];
+            return { ...prev, repeatMode: nextMode };
         });
     }, []);
 
     return (
-        <PlayerContext.Provider value={{ ...state, play, pause, resume, seekTo, stop }}>
+        <PlayerContext.Provider value={{
+            ...state,
+            play, pause, resume, seekTo, stop,
+            skipToNext, skipToPrevious, toggleShuffle, toggleRepeat,
+        }}>
             {children}
         </PlayerContext.Provider>
     );

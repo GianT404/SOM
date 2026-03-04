@@ -23,7 +23,7 @@ interface NeoShadowWrapperProps {
 }
 
 const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
-    const { currentTrack, isPlaying, pause, resume, isLoading, position, duration, seekTo } = usePlayer() as any;
+    const { currentTrack, isPlaying, pause, resume, isLoading, position, duration, seekTo, skipToNext, skipToPrevious, isShuffle, toggleShuffle, repeatMode, toggleRepeat } = usePlayer();
 
     const [showMenu, setShowMenu] = useState<boolean>(false);
     const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
@@ -214,7 +214,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                     </View>
                 </TouchableWithoutFeedback>
             </Modal>
-
+            {/* thumbnail */}
             <View style={styles.artContainer}>
                 <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ flex: 1, width: SCREEN_WIDTH }}>
                     <View style={{ width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
@@ -274,8 +274,13 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                 </View>
 
                 <View style={styles.mainControls}>
-                    <TouchableOpacity><Ionicons name="shuffle" size={24} color="#A0A0A0" /></TouchableOpacity>
-                    <TouchableOpacity><MaterialIcons name="skip-previous" size={32} color="#1A1A1A" /></TouchableOpacity>
+                    <TouchableOpacity onPress={toggleShuffle} activeOpacity={0.7}>
+                        <Ionicons name="shuffle" size={24} color={isShuffle ? COLORS.primary : "#A0A0A0"} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={skipToPrevious} activeOpacity={0.7}>
+                        <MaterialIcons name="skip-previous" size={32} color="#1A1A1A" />
+                    </TouchableOpacity>
 
                     <TouchableOpacity onPress={isPlaying ? pause : resume} activeOpacity={0.8}>
                         <NeoShadowWrapper borderRadius={RADIUS.sm} offset={4} style={styles.playPauseBtn}>
@@ -286,9 +291,17 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                             )}
                         </NeoShadowWrapper>
                     </TouchableOpacity>
+                    <TouchableOpacity onPress={skipToNext} activeOpacity={0.7}>
+                        <MaterialIcons name="skip-next" size={32} color="#1A1A1A" />
+                    </TouchableOpacity>
 
-                    <TouchableOpacity><MaterialIcons name="skip-next" size={32} color="#1A1A1A" /></TouchableOpacity>
-                    <TouchableOpacity><Feather name="repeat" size={20} color="#9D72FF" /></TouchableOpacity>
+                    <TouchableOpacity onPress={toggleRepeat} activeOpacity={0.7}>
+                        {repeatMode === 'one' ? (
+                            <MaterialIcons name="repeat-one" size={22} color="#9D72FF" />
+                        ) : (
+                            <Feather name="repeat" size={20} color={repeatMode === 'all' ? "#9D72FF" : "#A0A0A0"} />
+                        )}
+                    </TouchableOpacity>
                 </View>
             </NeoShadowWrapper>
 

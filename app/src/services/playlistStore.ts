@@ -189,3 +189,43 @@ export const downloadAndAdd = async (
 
     return offlineTrack;
 };
+
+// ---------- Navigation & Logic ----------
+
+/**
+ * Lấy bài hát tiếp theo trong danh sách
+ */
+export const getNextTrack = async (currentId: string): Promise<OfflineTrack | null> => {
+    const list = await getPlaylist();
+    if (list.length === 0) return null;
+
+    const currentIndex = list.findIndex(t => t.id === currentId);
+    // Nếu không tìm thấy hoặc là bài cuối cùng -> quay về bài đầu (Loop Queue)
+    const nextIndex = (currentIndex + 1) % list.length;
+    return list[nextIndex];
+};
+
+/**
+ * Lấy bài hát trước đó
+ */
+export const getPreviousTrack = async (currentId: string): Promise<OfflineTrack | null> => {
+    const list = await getPlaylist();
+    if (list.length === 0) return null;
+
+    const currentIndex = list.findIndex(t => t.id === currentId);
+    // Nếu là bài đầu tiên -> nhảy xuống bài cuối cùng
+    const prevIndex = (currentIndex - 1 + list.length) % list.length;
+    return list[prevIndex];
+};
+
+/**
+ * Trộn danh sách bài hát (Shuffle)
+ */
+export const shuffleTracks = (list: OfflineTrack[]): OfflineTrack[] => {
+    const shuffled = [...list];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+};

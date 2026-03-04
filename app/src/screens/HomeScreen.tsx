@@ -87,7 +87,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
                 <View style={headerTitleContainer}>
-                    <Text style={headerTitle}>Home</Text>
+                    <Text style={headerTitle}>Home1</Text>
                 </View>
             </View>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
