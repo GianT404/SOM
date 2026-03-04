@@ -176,7 +176,7 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <NeoShadowWrapper borderRadius={RADIUS.sm} offset={4} style={styles.profileCard}>
                         <Image source={require('../../assets/logo.png')} style={styles.profileAvatar} />
                         <View style={styles.profileInfo}>
-                            <Text style={styles.profileName}>GianT</Text>
+                            <Text style={styles.profileName}>Gian</Text>
                             <View style={styles.badgeRow}>
                                 <View style={styles.badge}>
                                     <MaterialIcons name="star" size={12} color={COLORS.primary} />
