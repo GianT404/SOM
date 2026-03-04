@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-    View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, StatusBar,
+    View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, StatusBar, Image
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
@@ -79,12 +79,13 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={HEADER}>
-                    <View style={headerLeft}>
+                    <View style={[headerLeft, { zIndex: 1 }]}>
                         <TouchableOpacity
                             style={[avatar]}
                             onPress={() => navigation.navigate('Settings')}
+                            activeOpacity={0.8}
                         >
-                            <MaterialIcons name="person" size={22} color={COLORS.textDark} />
+                            <Image source={require('../../assets/logo.png')} style={avatar} />
                         </TouchableOpacity>
                     </View>
                     <View style={headerTitleContainer}>

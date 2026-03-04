@@ -5,7 +5,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW, RETRO_SHADOW_SM } from '../theme';
 import { usePlayer } from '../contexts/PlayerContext';
-import { getPlaylist, removeFromPlaylist, OfflineTrack } from '../services/playlistStore';
+import { getPlaylist, OfflineTrack, removeFromPlaylist } from '../services/playlistStore';
 import { useFocusEffect } from '@react-navigation/native';
 
 const formatDuration = (sec: number) => {

@@ -84,6 +84,13 @@ export const restoreTrack = async (id: string) => {
     }
 };
 
+//add removeFromPlaylist
+export const removeFromPlaylist = async (id: string) => {
+    const list = await getPlaylist();
+    await savePlaylist(list.filter(t => t.id !== id));
+};
+
+
 export const permanentlyDeleteTrack = async (id: string) => {
     const list = await getDeletedPlaylist();
     const track = list.find(t => t.id === id);
@@ -112,26 +119,35 @@ export const downloadAndAdd = async (
     const found = existing.find(t => t.id === track.id);
     if (found) return found;
 
-    const url = api.getStreamUrl(track.id);
     const localUri = `${DOWNLOAD_DIR}${track.id}.m4a`;
 
-    let lyricsData = null;
-    try {
-        lyricsData = await api.getLyrics(track.id);
-    } catch (e) {
-        console.warn("No lyrics found for", track.id);
-    }
+    // Signal "preparing" while server runs yt-dlp (before any bytes flow)
+    onProgress?.({ totalBytesWritten: 0, totalBytesExpectedToWrite: -1 });
 
-    // Download with progress
+    // Fetch lyrics in parallel with the download (pass metadata for LRCLib)
+    const lyricsPromise = api.getLyrics(track.id, {
+        title: track.title,
+        artist: track.uploader,
+        duration: track.duration,
+    }).catch((e) => {
+        console.warn('[downloadAndAdd] No lyrics:', e?.message);
+        return null;
+    });
+
+    // Download via server /stream endpoint — yt-dlp handles n-parameter throttle
+    // decryption internally, so we get full CDN speed (vs ~30KB/s on raw URL).
+    const streamUrl = api.getStreamUrl(track.id);
+    console.log('[downloadAndAdd] Downloading via /stream for', track.id);
+
     const downloadResumable = FileSystem.createDownloadResumable(
-        url,
+        streamUrl,
         localUri,
         {},
         (downloadProgress: any) => {
-            onProgress?.({
-                totalBytesWritten: downloadProgress.totalBytesWritten,
-                totalBytesExpectedToWrite: downloadProgress.totalBytesExpectedToWrite,
-            });
+            const written = downloadProgress.totalBytesWritten;
+            const total = downloadProgress.totalBytesExpectedToWrite;
+            console.log('[downloadAndAdd] Progress:', written, '/', total);
+            onProgress?.({ totalBytesWritten: written, totalBytesExpectedToWrite: total });
         }
     );
 
@@ -139,6 +155,8 @@ export const downloadAndAdd = async (
     if (!result || !result.uri) {
         throw new Error('Download failed');
     }
+
+    const lyricsData = await lyricsPromise;
 
     // Save to playlist
     const offlineTrack: OfflineTrack = {

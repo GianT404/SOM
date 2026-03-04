@@ -96,7 +96,7 @@ export const headerTitleContainer = {
 } as const;
 
 export const avatar = {
-    width: 44, height: 44, borderRadius: 22, ...RETRO_BORDER,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: COLORS.primary + '30', justifyContent: 'center', alignItems: 'center',
 } as const;
 

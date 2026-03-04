@@ -111,17 +111,21 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
     const handleDownload = useCallback(async () => {
         if (!currentTrack || dlState !== 'idle') return;
         setDlState('downloading');
-        setDlProgressText('0%');
+        setDlProgressText('Đang chuẩn bị...');
         setShowMenu(false);
 
         try {
             await downloadAndAdd(currentTrack, (p: DownloadProgress) => {
-                if (p.totalBytesExpectedToWrite > 0) {
+                if (p.totalBytesExpectedToWrite === -1) {
+                    // Server is still running yt-dlp — no bytes yet
+                    setDlProgressText('Đang chuẩn bị...');
+                } else if (p.totalBytesExpectedToWrite > 0) {
                     const pct = Math.round((p.totalBytesWritten / p.totalBytesExpectedToWrite) * 100);
                     setDlProgressText(`${pct}%`);
                 } else {
+                    // Content-Length unknown — show bytes transferred
                     const mb = (p.totalBytesWritten / 1024 / 1024).toFixed(1);
-                    setDlProgressText(`${mb}MB`);
+                    setDlProgressText(`${mb} MB`);
                 }
             });
             setDlState('done');
@@ -184,10 +188,10 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                                     {dlState === 'done' ? 'Đã tải' : dlState === 'downloading' ? `Đang tải ${dlProgressText}` : 'Lưu bài hát'}
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.menuItem}>
+                            {/* <TouchableOpacity style={styles.menuItem}>
                                 <MaterialIcons name="share" size={24} color="#1A1A1A" />
                                 <Text style={styles.menuItemText}>Chia sẻ</Text>
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                             {availableLanguages.length > 0 && <View style={{ height: 1, backgroundColor: '#E0E0E0', marginVertical: 4 }} />}
                             {availableLanguages.map(lang => (
                                 <TouchableOpacity

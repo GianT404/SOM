@@ -22,7 +22,7 @@ const SyncedLyrics: React.FC<Props> = ({ track, position, selectedLanguage, onLa
     const lineLayouts = useRef<{ [key: number]: { y: number; height: number } }>({});
 
     const scrollViewRef = useRef<ScrollView>(null);
-    const currentSec = position / 1000;
+    const currentSec = position / 1000 + 0.5; // 0.8s ahead of audio
 
     useEffect(() => {
         if (!track) return;
@@ -45,7 +45,11 @@ const SyncedLyrics: React.FC<Props> = ({ track, position, selectedLanguage, onLa
 
         setLoading(true);
         setError('');
-        api.getLyrics(track.id)
+        api.getLyrics(track.id, {
+            title: track.title,
+            artist: track.uploader,
+            duration: track.duration, // seconds
+        })
             .then(data => handleData(data || []))
             .catch((e: Error) => {
                 let msg = 'No lyrics available';

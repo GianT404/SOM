@@ -1,4 +1,4 @@
-const BASE_URL = 'http://192.168.1.6:8080';
+const BASE_URL = 'http://192.168.2.29:8080';
 
 export interface SearchResult {
     id: string;
@@ -40,16 +40,28 @@ class ApiService {
         return `${this.baseUrl}/api/v1/stream?id=${encodeURIComponent(videoId)}`;
     }
 
-    async getLyrics(videoId: string): Promise<LyricsData[]> {
-        const res = await fetch(`${this.baseUrl}/api/v1/lyrics?id=${encodeURIComponent(videoId)}`);
+    async resolveUrl(videoId: string): Promise<{ url: string; title: string; safeName: string }> {
+        const res = await fetch(`${this.baseUrl}/api/v1/resolve?id=${encodeURIComponent(videoId)}`);
+        if (!res.ok) throw new Error(`Resolve failed: ${res.status}`);
+        return res.json();
+    }
+
+    async getLyrics(
+        videoId: string,
+        meta?: { title?: string; artist?: string; duration?: number }
+    ): Promise<LyricsData[]> {
+        const params = new URLSearchParams({ id: videoId });
+        if (meta?.title) params.set('title', meta.title);
+        if (meta?.artist) params.set('artist', meta.artist);
+        if (meta?.duration) params.set('duration', String(Math.round(meta.duration)));
+
+        const res = await fetch(`${this.baseUrl}/api/v1/lyrics?${params.toString()}`);
         if (!res.ok) {
             let errorMessage = `Lyrics failed: ${res.status}`;
             try {
                 const errData = await res.json();
                 if (errData.error) errorMessage = errData.error;
-            } catch (e) {
-                // ignore JSON parse error
-            }
+            } catch (e) { /* ignore */ }
             throw new Error(errorMessage);
         }
         return res.json();
