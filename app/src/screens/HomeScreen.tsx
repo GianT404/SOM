@@ -95,7 +95,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             >
                 {/* Hero Text */}
                 <View style={styles.hero}>
-                    <Text style={styles.heroTitle}>Listening Everyday</Text>
+                    {/* <Text style={styles.heroTitle}>Listening Everyday</Text> */}
                     <Text style={styles.heroSubtitle}>Explore millions of music according to your taste</Text>
                 </View>
                 <View style={styles.searchWrapper}>
