@@ -34,6 +34,7 @@ func main() {
 	searchH := &handler.SearchHandler{Scraper: sc}
 	streamH := handler.NewStreamHandler(sc)
 	lyricsH := &handler.LyricsHandler{Scraper: sc}
+	resolveH := &handler.ResolveHandler{Scraper: sc}
 
 	// Build the chi router.
 	r := chi.NewRouter()
@@ -41,7 +42,7 @@ func main() {
 	// Middleware stack.
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(middleware.Timeout(3 * time.Minute))
 	r.Use(corsMiddleware)
 
 	// Health check.
@@ -55,6 +56,7 @@ func main() {
 		r.Get("/search", searchH.ServeHTTP)
 		r.Get("/stream", streamH.ServeHTTP)
 		r.Get("/lyrics", lyricsH.ServeHTTP)
+		r.Get("/resolve", resolveH.ServeHTTP)
 	})
 
 	// Create the HTTP server.
@@ -77,6 +79,7 @@ func main() {
 		log.Println("     GET /api/v1/search?q={keyword}")
 		log.Println("     GET /api/v1/stream?id={video_id}")
 		log.Println("     GET /api/v1/lyrics?id={video_id}")
+		log.Println("     GET /api/v1/resolve?id={video_id}")
 		log.Println("     GET /health")
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

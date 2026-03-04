@@ -75,24 +75,24 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             if (isDeleteMode) setIsDeleteMode(false);
             return false;
         }}>
-            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View style={HEADER}>
-                    <View style={[headerLeft, { zIndex: 1 }]}>
-                        <TouchableOpacity
-                            style={[avatar]}
-                            onPress={() => navigation.navigate('Settings')}
-                            activeOpacity={0.8}
-                        >
-                            <Image source={require('../../assets/logo.png')} style={avatar} />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={headerTitleContainer}>
-                        <Text style={headerTitle}>Home</Text>
-                    </View>
+            {/* Header */}
+            <View style={[HEADER, { backgroundColor: COLORS.background }]}>
+                <View style={[headerLeft, { zIndex: 1 }]}>
+                    <TouchableOpacity
+                        style={[avatar]}
+                        onPress={() => navigation.navigate('Settings')}
+                        activeOpacity={0.8}
+                    >
+                        <Image source={require('../../assets/logo.png')} style={avatar} />
+                    </TouchableOpacity>
                 </View>
-
+                <View style={headerTitleContainer}>
+                    <Text style={headerTitle}>Home</Text>
+                </View>
+            </View>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <ScrollView showsVerticalScrollIndicator={false}
+            >
                 {/* Hero Text */}
                 <View style={styles.hero}>
                     <Text style={styles.heroTitle}>Listening Everyday</Text>

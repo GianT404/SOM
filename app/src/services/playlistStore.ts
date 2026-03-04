@@ -156,9 +156,8 @@ export const downloadAndAdd = async (
         throw new Error('Download failed');
     }
 
-    const lyricsData = await lyricsPromise;
-
-    // Save to playlist
+    // Save track immediately so it appears in playlist right away.
+    // We do NOT wait for lyrics here — they will be patched in the background.
     const offlineTrack: OfflineTrack = {
         id: track.id,
         title: track.title,
@@ -167,11 +166,26 @@ export const downloadAndAdd = async (
         duration: track.duration,
         localUri: result.uri,
         downloadedAt: Date.now(),
-        lyrics: lyricsData || undefined,
+        lyrics: undefined, // filled in below once lyrics resolve
     };
 
     const updated = [...existing, offlineTrack];
     await savePlaylist(updated);
+
+    // Patch lyrics in the background — doesn't block the caller.
+    lyricsPromise.then(async (lyricsData) => {
+        if (!lyricsData) return;
+        try {
+            const current = await getPlaylist();
+            const patched = current.map(t =>
+                t.id === track.id ? { ...t, lyrics: lyricsData } : t
+            );
+            await savePlaylist(patched);
+            console.log('[downloadAndAdd] Lyrics patched for', track.id);
+        } catch (e) {
+            console.warn('[downloadAndAdd] Failed to patch lyrics:', e);
+        }
+    });
 
     return offlineTrack;
 };
