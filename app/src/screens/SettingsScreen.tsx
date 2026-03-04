@@ -14,6 +14,7 @@ import {
     BUFFER_SIZE_OPTIONS, SAMPLE_RATE_OPTIONS,
     getAudioSettings, saveAudioSettings,
 } from '../services/audioSettings';
+import Constants from 'expo-constants';
 
 // ─── Reusable Setting Row ──────────────────────────────────────────
 interface SettingRowProps {
@@ -204,7 +205,7 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                                 <MaterialIcons name="memory" size={20} color={COLORS.emerald} />
                             </View>
                             <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                                <Text style={styles.engineLabel}>Buffer Size</Text>
+                                <Text style={styles.engineLabel}>Buffer Sizee</Text>
                                 <Text style={styles.engineDesc}>
                                     {BUFFER_SIZE_OPTIONS.find(o => o.key === audioSettings.bufferSize)?.samples} samples
                                 </Text>
@@ -255,7 +256,9 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 </View>
 
                 {/* Version */}
-                <Text style={styles.version}>SOM • Version 4.2.0</Text>
+                <Text style={styles.version}>
+                    SOM • Version {Constants.expoConfig?.version || "1.0.10"}
+                </Text>
             </ScrollView>
 
             {/* ═══ Tooltip Modal ═══ */}

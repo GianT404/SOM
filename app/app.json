@@ -2,7 +2,7 @@
   "expo": {
     "name": "SOM",
     "slug": "app",
-    "version": "1.0.0",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -10,6 +10,9 @@
       "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
+    },
+    "scripts": {
+      "bump-version": "npm version patch --no-git-tag-version"
     },
     "ios": {
       "supportsTablet": true
