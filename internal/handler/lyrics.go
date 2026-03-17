@@ -9,11 +9,11 @@ import (
 )
 
 // LyricsHandler handles GET /api/v1/lyrics?id={video_id}&title={title}&artist={artist}&duration={seconds}.
-// Uses LRCLib exclusively. If no lyrics are found, returns an empty array.
+// Uses LRCLib exclusively. If title is not provided, fetches it from the video metadata.
+// If no lyrics are found, returns an empty array.
 type LyricsHandler struct {
-	Scraper scraper.Scraper // kept for interface compatibility, no longer used
+	Scraper scraper.Scraper // Dùng để lấy tiêu đề video khi không được cung cấp
 }
-
 func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -29,21 +29,28 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		duration, _ = strconv.ParseFloat(durationStr, 64)
 	}
 
-	if title == "" {
-		// No metadata to search with — report no lyrics immediately.
-		log.Printf("lyrics: no title provided for %s, returning empty", id)
+	// 1. Thử gọi LRCLib trước nếu có title
+	if title != "" {
+		log.Printf("lyrics: LRCLib search for %q by %q", title, artist)
+		data, err := scraper.GetLRCLibLyrics(r.Context(), title, artist, duration)
+		// Nếu có dữ liệu hợp lệ từ LRCLib thì trả về luôn
+		if err == nil && len(data) > 0 {
+			log.Printf("lyrics: LRCLib OK for %s", id)
+			writeJSON(w, http.StatusOK, data)
+			return
+		}
+	}
+
+	// 2. PHƯƠNG ÁN DỰ PHÒNG: Cào trực tiếp phụ đề từ YouTube
+	log.Printf("lyrics: LRCLib failed or no title, falling back to YouTube captions for %s", id)
+	fallbackData, err := h.Scraper.Lyrics(r.Context(), id)
+	
+	if err != nil || len(fallbackData) == 0 {
+		log.Printf("lyrics: fallback YouTube CC also failed for %s: %v", id, err)
 		writeJSON(w, http.StatusOK, []scraper.LyricsData{})
 		return
 	}
 
-	log.Printf("lyrics: LRCLib search for %q by %q (%.0fs)", title, artist, duration)
-	data, err := scraper.GetLRCLibLyrics(r.Context(), title, artist, duration)
-	if err != nil || len(data) == 0 {
-		log.Printf("lyrics: no LRCLib results for %q: %v", title, err)
-		writeJSON(w, http.StatusOK, []scraper.LyricsData{})
-		return
-	}
-
-	log.Printf("lyrics: LRCLib OK for %s", id)
-	writeJSON(w, http.StatusOK, data)
+	log.Printf("lyrics: YouTube CC fallback OK for %s", id)
+	writeJSON(w, http.StatusOK, fallbackData)
 }
