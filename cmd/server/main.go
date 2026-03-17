@@ -73,6 +73,16 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
+		log.Println(`
+ ________       ________      _____ ______      
+|\   ____\     |\   __  \    |\   _ \  _   \    
+\ \  \___|_    \ \  \|\  \   \ \  \\\__\ \  \   
+ \ \_____  \    \ \  \\\  \   \ \  \\|__| \  \  
+  \|____|\  \    \ \  \\\  \   \ \  \    \ \  \ 
+    ____\_\  \    \ \_______\   \ \__\    \ \__\
+   |\_________\    \|_______|    \|__|     \|__|
+   \|_________|                                                                  
+`)
 		log.Printf("Dm4a server starting on :%s", port)
 		log.Printf("   yt-dlp binary: %s", ytdlpPath)
 		log.Println("   Endpoints:")

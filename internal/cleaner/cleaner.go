@@ -19,6 +19,8 @@ var (
 	regexFeaturingTag = regexp.MustCompile(`(?i)\s+(ft|feat)\.\s+[^\[\(\|]*`)
 	
 	regexExtraSpaces = regexp.MustCompile(`\s+`)
+	regexSeparator = regexp.MustCompile(`\s*\|\s*|\s+-\s+`)
+	
 )
 
 // Danh sách từ khóa rác để kiểm tra trong ngoặc
@@ -68,7 +70,7 @@ func CleanYouTubeTitle(rawTitle string) string {
 		return match
 	})
 
-	// 2. Loại bỏ cụm từ trong ngoặc vuông nếu chứa từ khóa rác
+	// 2. Loại bỏ cụm từ trong ngoặc vuông
 	result = regexSquareBrackets.ReplaceAllStringFunc(result, func(match string) string {
 		if containsTrashKeyword(match) {
 			return ""
@@ -76,7 +78,7 @@ func CleanYouTubeTitle(rawTitle string) string {
 		return match
 	})
 
-	// 3. Loại bỏ cụm từ trong ngoặc kép góc nếu chứa từ khóa rác
+	// 3. Loại bỏ cụm từ trong ngoặc kép góc
 	result = regexAngleBrackets.ReplaceAllStringFunc(result, func(match string) string {
 		if containsTrashKeyword(match) {
 			return ""
@@ -84,17 +86,24 @@ func CleanYouTubeTitle(rawTitle string) string {
 		return match
 	})
 
-	// 4. Loại bỏ cụm từ "ft. XXX hoặc "feat. XXX" (featured artist tag)
+	// 4. Loại bỏ tag featuring
 	result = regexFeaturingTag.ReplaceAllString(result, "")
 
-	// 5. Loại bỏ từ khóa rác đứng riêng (case-insensitive)
+	// 5. Loại bỏ từ khóa rác đứng riêng
 	result = regexTrashKeywords.ReplaceAllString(result, "")
 
-	// 6. Làm sạch khoảng trắng thừa
-	result = regexExtraSpaces.ReplaceAllString(result, " ")
-	result = strings.TrimSpace(result)
+	// 6. TUYỆT KỸ CẮT ĐUÔI (Băm nhỏ và bỏ phần dư)
+	parts := regexSeparator.Split(result, -1)
+	if len(parts) > 2 {
+		// Nếu có từ 3 phần trở lên (VD: Bài hát | Ca sĩ | Tên Kênh), chỉ lấy 2 phần đầu
+		result = parts[0] + " " + parts[1]
+	} else {
+		// Nếu có 1 hoặc 2 phần, gom lại bằng khoảng trắng cho sạch dấu phân cách
+		result = strings.Join(parts, " ")
+	}
 
-	// 7. Loại bỏ ký tự đặc biệt thừa ở đầu và cuối: -, |, ,
+	// 7. Dọn dẹp chiến trường: Làm sạch khoảng trắng và ký tự đặc biệt rớt lại
+	result = regexExtraSpaces.ReplaceAllString(result, " ")
 	result = strings.Trim(result, " -|,")
 	result = strings.TrimSpace(result)
 

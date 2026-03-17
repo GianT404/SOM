@@ -4,6 +4,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import ImageColors from 'react-native-image-colors';
 import { COLORS, SPACING, NEO_BRUTALISM, RADIUS } from '../theme';
 
+// Định nghĩa type cho ImageColors response
+interface ImageColorsResult {
+    platform: 'android' | 'web' | 'ios';
+    vibrant?: string;
+    dominant?: string;
+    primary?: string;
+    background?: string;
+}
+
 interface MusicCardProps {
     id: string;
     title: string;
@@ -22,18 +31,30 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
     const [accentColor, setAccentColor] = useState(COLORS.primary);
 
     // Trích xuất màu từ thumbnail để làm bóng đổ khối (Neo-Brutalism shadow)
+    // Ưu tiên màu rực rỡ (vibrant) để UI nổi bật, fallback sang màu dominant (chiếm diện tích)
+    // Cache được bật để lưu kết quả tính toán, không tốn CPU lần tải tiếp theo
     useEffect(() => {
         if (thumbnail) {
             ImageColors.getColors(thumbnail, {
                 fallback: COLORS.primary,
-                cache: true,
+                cache: true,  // Lưu cache để tránh tính toán lại CPU
                 key: id,
-            }).then((colors) => {
-                if (colors.platform === 'android') {
-                    setAccentColor(colors.dominant || colors.vibrant || COLORS.primary);
-                } else if (colors.platform === 'ios') {
+            }).then((colors: ImageColorsResult) => {
+                // Android & Web: Ưu tiên vibrant (màu rực rỡ), fallback sang dominant (màu chiếm diện tích)
+                if (colors.platform === 'android' || colors.platform === 'web') {
+                    setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                }
+                // iOS: Sử dụng primary hoặc background
+                else if (colors.platform === 'ios') {
                     setAccentColor(colors.primary || colors.background || COLORS.primary);
                 }
+                // Fallback cho platform khác
+                else {
+                    setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                }
+            }).catch(() => {
+                // Nếu lỗi xảy ra, dùng màu default
+                setAccentColor(COLORS.primary);
             });
         }
     }, [thumbnail, id]);

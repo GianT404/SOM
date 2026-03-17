@@ -9,24 +9,45 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW_SM } fro
 import { usePlayer } from '../contexts/PlayerContext';
 import MarqueeText from './MarqueeText';
 
+// Type định nghĩa cho ImageColors response
+interface ImageColorsResult {
+    platform: 'android' | 'web' | 'ios';
+    vibrant?: string;
+    dominant?: string;
+    primary?: string;
+    background?: string;
+}
+
 // --- Component chính: MiniPlayer ---
 const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     const { currentTrack, isPlaying, isLoading, pause, resume, position, duration } = usePlayer();
     const [mainColor, setMainColor] = useState(COLORS.secondary);
 
     // Logic trích xuất màu từ Thumbnail
+    // Ưu tiên màu rực rỡ (vibrant) để UI nổi bật, fallback sang màu dominant (chiếm diện tích)
+    // Cache được bật để lưu kết quả tính toán, không tốn CPU lần tải tiếp theo
     useEffect(() => {
         if (currentTrack?.thumbnail) {
             ImageColors.getColors(currentTrack.thumbnail, {
                 fallback: COLORS.secondary,
-                cache: true,
+                cache: true,  // Lưu cache để tránh tính toán lại CPU
                 key: currentTrack.id,
-            }).then((colors) => {
-                if (colors.platform === 'android') {
-                    setMainColor(colors.dominant || colors.vibrant);
-                } else if (colors.platform === 'ios') {
-                    setMainColor(colors.primary || colors.background);
+            }).then((colors: ImageColorsResult) => {
+                // Android & Web: Ưu tiên vibrant (màu rực rỡ), fallback sang dominant (màu chiếm diện tích)
+                if (colors.platform === 'android' || colors.platform === 'web') {
+                    setMainColor(colors.vibrant || colors.dominant || COLORS.secondary);
+                } 
+                // iOS: Sử dụng primary hoặc background
+                else if (colors.platform === 'ios') {
+                    setMainColor(colors.primary || colors.background || COLORS.secondary);
+                } 
+                // Fallback cho platform khác
+                else {
+                    setMainColor(colors.vibrant || colors.dominant || COLORS.secondary);
                 }
+            }).catch(() => {
+                // Nếu lỗi xảy ra, dùng màu default
+                setMainColor(COLORS.secondary);
             });
         }
     }, [currentTrack?.thumbnail]);

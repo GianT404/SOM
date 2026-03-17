@@ -229,6 +229,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                             position={displayPosition}
                             selectedLanguage={selectedLanguage}
                             onLanguagesLoaded={setAvailableLanguages}
+                            isOfflineTrack={!!(currentTrack.localUri && currentTrack.lyrics)}
                         />
                     </View>
                 </ScrollView>
