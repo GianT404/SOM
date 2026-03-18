@@ -42,7 +42,7 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
             }).then((colors: ImageColorsResult) => {
                 // Android & Web: Ưu tiên vibrant (màu rực rỡ), fallback sang dominant (màu chiếm diện tích)
                 if (colors.platform === 'android' || colors.platform === 'web') {
-                    setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                    setAccentColor(colors.dominant || colors.vibrant || COLORS.primary);
                 }
                 // iOS: Sử dụng primary hoặc background
                 else if (colors.platform === 'ios') {
@@ -50,7 +50,7 @@ const MusicCard: React.FC<MusicCardProps & { index?: number }> = ({
                 }
                 // Fallback cho platform khác
                 else {
-                    setAccentColor(colors.vibrant || colors.dominant || COLORS.primary);
+                    setAccentColor(colors.dominant || colors.vibrant || COLORS.primary);
                 }
             }).catch(() => {
                 // Nếu lỗi xảy ra, dùng màu default

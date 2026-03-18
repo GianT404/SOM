@@ -5,6 +5,13 @@ import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPlaylist, OfflineTrack } from '../services/playlistStore';
 import { getAudioSettings, AudioSettings, getBufferSamples, getSampleRateHz } from '../services/audioSettings';
+import {
+    initMediaControls,
+    updateNowPlaying,
+    updatePlayback,
+    setupEventListener,
+    cleanupMediaControls,
+} from '../services/mediaControls';
 
 interface Track {
     id: string;
@@ -81,6 +88,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, []);
 
+    // --- Refs cho media control callbacks (tránh stale closure) ---
+    const mediaCallbacksRef = useRef({
+        onPlay: () => { },
+        onPause: () => { },
+        onStop: () => { },
+        onNextTrack: () => { },
+        onPreviousTrack: () => { },
+        onSeek: (_posMs: number) => { },
+    });
+
     useEffect(() => {
         Audio.setAudioModeAsync({
             allowsRecordingIOS: false,
@@ -97,8 +114,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Initial cache load
         refreshPlaylistCache();
 
+        // Khởi tạo media controls cho notification / lock screen
+        initMediaControls();
+
+        // Đăng ký listener cho các nút trên notification/lock screen
+        // Dùng ref wrapper để luôn gọi đúng hàm mới nhất
+        const removeListener = setupEventListener({
+            onPlay: () => mediaCallbacksRef.current.onPlay(),
+            onPause: () => mediaCallbacksRef.current.onPause(),
+            onStop: () => mediaCallbacksRef.current.onStop(),
+            onNextTrack: () => mediaCallbacksRef.current.onNextTrack(),
+            onPreviousTrack: () => mediaCallbacksRef.current.onPreviousTrack(),
+            onSeek: (posMs) => mediaCallbacksRef.current.onSeek(posMs),
+        });
+
         return () => {
             soundRef.current?.unloadAsync();
+            removeListener();
+            cleanupMediaControls();
         };
     }, [refreshPlaylistCache]);
 
@@ -201,6 +234,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 isLoading: status.isBuffering,
             }));
 
+            // Cập nhật trạng thái playback lên notification/lock screen
+            const positionSec = (status.positionMillis || 0) / 1000;
+            if (status.isBuffering) {
+                updatePlayback('buffering', positionSec);
+            } else if (status.isPlaying) {
+                updatePlayback('playing', positionSec);
+            } else {
+                updatePlayback('paused', positionSec);
+            }
+
             // Auto-advance when track finishes
             if (status.didJustFinish && !status.isLooping) {
                 handleTrackFinishedRef.current();
@@ -225,6 +268,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
 
             setState(prev => ({ ...prev, currentTrack: track, isLoading: true, isPlaying: false }));
+
+            // Cập nhật metadata lên notification/lock screen
+            const durationSec = (track.duration || 0);
+            updateNowPlaying(
+                track.title,
+                track.uploader || 'Unknown Artist',
+                track.thumbnail,
+                durationSec
+            );
+            updatePlayback('buffering', 0);
 
             // Use local downloaded file if available, otherwise cache to temp file
             let audioUri = track.localUri;
@@ -301,6 +354,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             duration: 0,
             isLoading: false,
         }));
+        updatePlayback('stopped', 0);
     }, []);
 
     const skipToNext = useCallback(async () => {
@@ -345,6 +399,30 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, []);
 
+    const updateCurrentTrackLyrics = useCallback((newLyrics: any) => {
+        setState(prev => {
+            if (!prev.currentTrack) return prev;
+            return {
+                ...prev,
+                currentTrack: {
+                    ...prev.currentTrack,
+                    lyrics: newLyrics
+                }
+            };
+        });
+    }, []);
+
+    // Cập nhật media control callbacks ref mỗi khi các hàm thay đổi
+    useEffect(() => {
+        mediaCallbacksRef.current = {
+            onPlay: () => { soundRef.current?.playAsync(); },
+            onPause: () => { soundRef.current?.pauseAsync(); },
+            onStop: stop,
+            onNextTrack: skipToNext,
+            onPreviousTrack: skipToPrevious,
+            onSeek: (posMs) => { soundRef.current?.setPositionAsync(posMs); },
+        };
+    }, [stop, skipToNext, skipToPrevious]);
     return (
         <PlayerContext.Provider value={{
             ...state,

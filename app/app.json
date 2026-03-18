@@ -11,10 +11,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
+"ios": {
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
+      "permissions": [
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/logo.png",
@@ -26,6 +32,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-media-control",
+        {
+          "enableBackgroundAudio": true,
+          "audioSessionCategory": "playback"
+        }
+      ]
+    ]
   }
 }

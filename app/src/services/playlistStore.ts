@@ -6,6 +6,26 @@ const PLAYLIST_KEY = 'dm4a_offline_playlist';
 const DELETED_PLAYLIST_KEY = 'dm4a_deleted_playlist';
 const DOWNLOAD_DIR = `${FileSystem.documentDirectory}dm4a_downloads/`;
 
+export const saveCustomLyrics = async (trackId: string, customLyrics: string): Promise<boolean> => {
+    try {
+        const data = await AsyncStorage.getItem(PLAYLIST_KEY);
+        if (!data) return false;
+
+        const playlist = JSON.parse(data);
+        const trackIndex = playlist.findIndex((t: any) => t.id === trackId);
+
+        if (trackIndex !== -1) {
+            // Ghi đè lời bài hát thủ công vào object track
+            playlist[trackIndex].lyrics = customLyrics;
+            await AsyncStorage.setItem(PLAYLIST_KEY, JSON.stringify(playlist));
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('[Store] Lỗi khi lưu lời bài hát thủ công:', error);
+        return false;
+    }
+};
 export interface OfflineTrack {
     id: string;
     title: string;

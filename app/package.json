@@ -22,6 +22,7 @@
     "expo-file-system": "~55.0.10",
     "expo-font": "~55.0.4",
     "expo-linear-gradient": "~55.0.8",
+    "expo-media-control": "^1.0.12",
     "expo-status-bar": "~55.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -29,7 +30,6 @@
     "react-native-image-colors": "^2.5.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.23.0",
-    "react-native-track-player": "^4.1.2",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {

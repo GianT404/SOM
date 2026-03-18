@@ -35,7 +35,7 @@ const MiniPlayer: React.FC<{ onPress: () => void }> = ({ onPress }) => {
             }).then((colors: ImageColorsResult) => {
                 // Android & Web: Ưu tiên vibrant (màu rực rỡ), fallback sang dominant (màu chiếm diện tích)
                 if (colors.platform === 'android' || colors.platform === 'web') {
-                    setMainColor(colors.vibrant || colors.dominant || COLORS.secondary);
+                    setMainColor(colors.dominant || colors.vibrant || COLORS.secondary);
                 } 
                 // iOS: Sử dụng primary hoặc background
                 else if (colors.platform === 'ios') {

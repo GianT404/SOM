@@ -55,8 +55,7 @@ function lighten(hex: string, factor: number = 0.5): string {
 
 /** Fallback palette used when the image returns no usable colour. */
 const FALLBACK_PALETTE = [
-    '#FBBF24', '#F472B6', '#34D399', '#60A5FA',
-    '#A78BFA', '#F97316', '#10B981', '#818CF8',
+    '#7e7171',
 ];
 
 function hashFallback(id: string): string {
@@ -84,10 +83,10 @@ useEffect(() => {
             if (result.platform === 'android') {
                 // Tôn trọng triết lý: Rực rỡ (Vibrant) lên ngôi, màu chủ đạo (Dominant - dễ bị dính viền đen) xuống bét.
                 candidates = [
-                    result.vibrant,
+                    result.dominant,
                     result.lightVibrant,
                     result.muted,
-                    result.dominant
+                    result.vibrant
                 ];
             } else if (result.platform === 'ios') {
                 // iOS: Detail thường là màu nhấn rực rỡ, Secondary là màu phụ, Primary hay bị dính màu nền.

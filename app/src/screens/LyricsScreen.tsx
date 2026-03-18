@@ -1,17 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator,
+    Button,
+    TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, RETRO_BORDER, RETRO_SHADOW } from '../theme';
 import { usePlayer } from '../contexts/PlayerContext';
 import api, { LyricLine, LyricsData } from '../services/api';
+import { saveCustomLyrics } from 'src/services/playlistStore';
 
 const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
     return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 };
+export const ManualLyricsInput = () => {
+    const { currentTrack } = usePlayer();
+    const [inputText, setInputText] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
 
+    const handleSave = async () => {
+        if (!currentTrack || !inputText.trim()) return;
+        
+        const success = await saveCustomLyrics(currentTrack.id, inputText);
+        if (success) {
+            // Tạm thời báo log, thực tế bro nên có một Toast thông báo thành công
+            console.log('Đã lưu lời bài hát thành công!');
+            setIsEditing(false);
+            
+            // LƯU Ý: Chỗ này cần reload lại state currentTrack 
+            // để màn hình cập nhật lời bài hát mới ngay lập tức.
+        }
+    };
+
+    if (!isEditing) {
+        return <Button title="Thêm lời bài hát" onPress={() => setIsEditing(true)} />;
+    }
+
+    return (
+        <View style={{ padding: 20 }}>
+            <TextInput
+                style={{ 
+                    height: 200, 
+                    borderColor: 'gray', 
+                    borderWidth: 1, 
+                    textAlignVertical: 'top',
+                    padding: 10,
+                    color: 'black'
+                }}
+                multiline
+                placeholder="Dán lời bài hát vào đây (Hỗ trợ định dạng LRC nếu muốn chạy chữ)"
+                value={inputText}
+                onChangeText={setInputText}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
+                <Button title="Hủy" onPress={() => setIsEditing(false)} color="red" />
+                <Button title="Lưu lại" onPress={handleSave} />
+            </View>
+        </View>
+    );
+};
 const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { currentTrack, position, isPlaying, pause, resume, duration } = usePlayer();
     const [lyricsData, setLyricsData] = useState<LyricsData[]>([]);
