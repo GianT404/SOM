@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
     View, Text, Image, TouchableOpacity, StyleSheet, StatusBar, Alert, Modal,
     TouchableWithoutFeedback, ScrollView, Dimensions,
-    StyleProp, ViewStyle, GestureResponderEvent, Animated
+    StyleProp, ViewStyle, GestureResponderEvent
 } from 'react-native';
 import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
 import { usePlayer } from '../contexts/PlayerContext';
@@ -40,50 +40,7 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
     const displayPosition = isSeeking ? seekProgress * duration : position;
 
     // --- LOGIC ANIMATION WAVEFORM GIẢ LẬP HIỆU NĂNG CAO ---
-    const waveBarsCount = 30;
-    const animatedScales = useRef(
-        Array.from({ length: waveBarsCount }).map(() => new Animated.Value(0.2))
-    ).current;
-
-    useEffect(() => {
-        let isAnimating = isPlaying;
-
-        const animateBars = () => {
-            if (!isAnimating) return;
-            const animations = animatedScales.map(anim => {
-                return Animated.sequence([
-                    Animated.timing(anim, {
-                        toValue: Math.random() * 0.8 + 0.2,
-                        duration: Math.random() * 250 + 150,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(anim, {
-                        toValue: Math.random() * 0.4 + 0.2,
-                        duration: Math.random() * 250 + 150,
-                        useNativeDriver: true,
-                    })
-                ]);
-            });
-
-            Animated.parallel(animations).start(({ finished }) => {
-                if (finished && isAnimating) animateBars();
-            });
-        };
-
-        if (isPlaying) {
-            animateBars();
-        } else {
-            isAnimating = false;
-            animatedScales.forEach(anim => anim.stopAnimation());
-            Animated.parallel(
-                animatedScales.map(anim => Animated.timing(anim, {
-                    toValue: 0.2, duration: 300, useNativeDriver: true
-                }))
-            ).start();
-        }
-
-        return () => { isAnimating = false; };
-    }, [isPlaying, animatedScales]);
+    // (Removed: replaced with simple progress bar)
 
 
     const formatTime = (ms: number) => {
@@ -254,21 +211,9 @@ const NowPlayingScreen = ({ navigation }: { navigation: any }) => {
                             if (finalProgress !== undefined && seekTo) seekTo(finalProgress * duration);
                         }}
                     >
-                        <View style={styles.waveformBarsWrapper} pointerEvents="none">
-                            {animatedScales.map((animScale, index) => {
-                                const isActive = (index / waveBarsCount) <= displayProgress;
-                                return (
-                                    <View key={index} style={styles.waveBarContainer}>
-                                        <Animated.View
-                                            style={[
-                                                styles.waveBar,
-                                                isActive ? styles.waveActive : styles.waveInactive,
-                                                { transform: [{ scaleY: animScale }] }
-                                            ]}
-                                        />
-                                    </View>
-                                );
-                            })}
+                        <View style={styles.progressTrack} pointerEvents="none">
+                            <View style={[styles.progressFill, { width: `${displayProgress * 100}%` }]} />
+                            <View style={styles.progressKnob} />
                         </View>
                     </View>
 
@@ -350,12 +295,29 @@ const styles = StyleSheet.create({
     waveformRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
     timeText: { fontSize: 11, fontWeight: '700', color: '#1A1A1A', width: 40, textAlign: 'center' },
 
-    waveformTouchArea: { flex: 1, height: 40, justifyContent: 'center', paddingHorizontal: 10 },
-    waveformBarsWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 24 },
-    waveBarContainer: { height: 24, justifyContent: 'center' },
-    waveBar: { width: 3, height: '100%', borderRadius: 2 },
-    waveActive: { backgroundColor: '#FFB86C' },
-    waveInactive: { backgroundColor: '#E0E0E0' },
+    waveformTouchArea: { flex: 1, height: 40, justifyContent: 'center', paddingHorizontal: 4 },
+    progressTrack: {
+        height: 6,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
+        overflow: 'visible',
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: '#FFB86C',
+        borderRadius: 3,
+    },
+    progressKnob: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#1A1A1A',
+        marginLeft: -8,
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
 
     mainControls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10 },
     playPauseBtn: { width: 64, height: 64, backgroundColor: '#FFB86C', justifyContent: 'center', alignItems: 'center' },
