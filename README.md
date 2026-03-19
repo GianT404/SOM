@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Expo-55-000020?logo=expo&logoColor=white" />
   <img src="https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white" />
 </p>
----
+
 <p align="center">
   <img src="app/assets/thumbnail.png" alt="SOM Logo" width="100%" />
 </p>
