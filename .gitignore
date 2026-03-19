@@ -42,4 +42,5 @@ app/ios/*.xcworkspace/xcuserdata/
 
 # Project specific
 cookies.txt
-.md
+*.md
+!README.md
