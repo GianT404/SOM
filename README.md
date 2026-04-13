@@ -5,7 +5,7 @@
 <h1 align="center">SOM</h1>
 
 <p align="center">
-  <b>Stream music from YouTube — free, offline-capable, and beautiful.</b>
+  <b>Stream music from YouTube — free, offline-capable, and beautiful..</b>
 </p>
 
 <p align="center">
