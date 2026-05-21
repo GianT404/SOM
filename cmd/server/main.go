@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +22,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	host := os.Getenv("HOST")
 
 	ytdlpPath := os.Getenv("YTDLP_PATH")
 	if ytdlpPath == "" {
@@ -61,7 +63,7 @@ func main() {
 
 	// Create the HTTP server.
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         serverAddr(host, port),
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 5 * time.Minute, // long enough for audio proxy streaming
@@ -73,7 +75,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Println(`
+		log.Print(`
  ________       ________      _____ ______      
 |\   ____\     |\   __  \    |\   _ \  _   \    
 \ \  \___|_    \ \  \|\  \   \ \  \\\__\ \  \   
@@ -83,7 +85,7 @@ func main() {
    |\_________\    \|_______|    \|__|     \|__|
    \|_________|                                                                  
 `)
-		log.Printf("Dm4a server starting on :%s", port)
+		log.Printf("Dm4a server starting on %s", srv.Addr)
 		log.Printf("   yt-dlp binary: %s", ytdlpPath)
 		log.Println("   Endpoints:")
 		log.Println("     GET /api/v1/search?q={keyword}")
@@ -108,6 +110,13 @@ func main() {
 	}
 
 	log.Println("Server stopped gracefully")
+}
+
+func serverAddr(host string, port string) string {
+	if host == "" {
+		return ":" + port
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // corsMiddleware adds CORS headers for the mobile app.

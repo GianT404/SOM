@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SOM",
+  "version": "0.1.0",
+  "identifier": "com.giant404.som",
+  "build": {
+    "beforeDevCommand": "npm run build:sidecar:linux && npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "SOM",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**"]
+      },
+      "csp": "default-src 'self'; connect-src ipc: http://127.0.0.1:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:* https: data:; media-src 'self' asset: http://asset.localhost http://127.0.0.1:* https: data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["appimage", "deb", "nsis"],
+    "externalBin": ["binaries/som-backend"],
+    "resources": [],
+    "copyright": "",
+    "category": "Music",
+    "shortDescription": "SOM desktop music player",
+    "longDescription": "SOM desktop app with a local Go backend sidecar."
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

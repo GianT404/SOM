@@ -44,3 +44,11 @@ app/ios/*.xcworkspace/xcuserdata/
 cookies.txt
 *.md
 !README.md
+!docs/
+!docs/*.md
+
+# Desktop generated artifacts
+desktop/dist/
+desktop/src-tauri/gen/
+desktop/src-tauri/target/
+desktop/src-tauri/binaries/som-backend-*

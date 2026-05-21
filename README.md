@@ -32,6 +32,7 @@
 |  **Shuffle & Repeat** | Shuffle, repeat-all, and repeat-one modes |
 |  **Dynamic Theming** | Album art-based color extraction for immersive UI |
 |  **Audio Settings** | Configurable buffer size and sample rate |
+|  **Desktop App** | Tauri desktop shell for Linux and Windows with the existing Go backend as a sidecar |
 
 ---
 
@@ -62,6 +63,9 @@ SOM/
 │   │   ├── navigation/  # React Navigation setup
 │   │   └── theme/       # Colors, typography
 │   └── assets/          # App icons, splash screen
+├── desktop/             # Tauri v2 desktop app (React + Vite + TypeScript)
+├── docs/
+│   └── DESKTOP.md       # Desktop setup, build, and troubleshooting
 └── go.mod               # Go module definition
 ```
 
@@ -118,6 +122,16 @@ Then press `a` to open on Android emulator, or scan the QR code with **Expo Go**
 ```bash
 cd app
 npx expo run:android
+```
+
+### Desktop App
+
+See [`docs/DESKTOP.md`](docs/DESKTOP.md) for Linux/Windows desktop setup.
+
+```bash
+npm install
+npm run desktop:dev
+npm run desktop:build:linux
 ```
 
 ---

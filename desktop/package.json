@@ -1,0 +1,32 @@
+{
+  "name": "som-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "npm run tauri:build:linux",
+    "tauri:build:linux": "npm run build:sidecar:linux && tauri build --bundles deb",
+    "tauri:build:linux:appimage": "npm run build:sidecar:linux && tauri build --bundles appimage,deb",
+    "tauri:build:windows": "npm run build:sidecar:windows && tauri build --bundles nsis",
+    "build:sidecar:linux": "node ../scripts/build-desktop-sidecar.mjs linux",
+    "build:sidecar:windows": "node ../scripts/build-desktop-sidecar.mjs windows"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

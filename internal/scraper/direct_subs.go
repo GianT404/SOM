@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kkdai/youtube/v2"
@@ -99,7 +100,8 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 		return fmt.Errorf("no audio formats found")
 	}
 
-	// Try to find m4a format 140 or highest quality first
+	// Only write MP4/AAC audio to the .m4a cache path. WebM/Opus bytes with a
+	// .m4a extension fail in WebKit's audio element.
 	formats.Sort()
 	var bestFormat *youtube.Format
 	for i := range formats {
@@ -109,7 +111,15 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 		}
 	}
 	if bestFormat == nil {
-		bestFormat = &formats[0] // fallback to any
+		for i := range formats {
+			if strings.Contains(formats[i].MimeType, "audio/mp4") {
+				bestFormat = &formats[i]
+				break
+			}
+		}
+	}
+	if bestFormat == nil {
+		return fmt.Errorf("no m4a audio format found")
 	}
 
 	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)

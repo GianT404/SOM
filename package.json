@@ -1,0 +1,20 @@
+{
+  "name": "som",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "desktop:dev": "npm --prefix desktop run tauri:dev",
+    "desktop:build": "npm --prefix desktop run tauri:build",
+    "desktop:build:linux": "npm --prefix desktop run tauri:build:linux",
+    "desktop:build:linux:appimage": "npm --prefix desktop run tauri:build:linux:appimage",
+    "desktop:build:windows": "npm --prefix desktop run tauri:build:windows",
+    "desktop:build:frontend": "npm --prefix desktop run build",
+    "desktop:build:sidecar:linux": "node scripts/build-desktop-sidecar.mjs linux",
+    "desktop:build:sidecar:windows": "node scripts/build-desktop-sidecar.mjs windows",
+    "desktop:build:sidecar:all": "node scripts/build-desktop-sidecar.mjs all",
+    "mobile:start": "npm --prefix app run start"
+  },
+  "workspaces": [
+    "desktop"
+  ]
+}

@@ -213,10 +213,12 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
 	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dm4a_%s.m4a", videoID))
 
-	// If it already exists and is fully downloaded, reuse it.
-	if info, err := os.Stat(tempFile); err == nil && info.Size() > 0 {
+	// If it already exists and is a valid MP4/M4A file, reuse it. Older builds
+	// could leave partial or wrong-container bytes at this path.
+	if isM4AFile(tempFile) {
 		return tempFile, nil
 	}
+	_ = os.Remove(tempFile)
 
 	// Try direct download to bypass yt-dlp
 	err := GetDirectAudio(ctx, videoID, tempFile)
@@ -225,7 +227,7 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	}
 	// Fallback to yt-dlp below...
 	cmd := exec.CommandContext(ctx, y.BinPath,
-		"-f", "ba[ext=m4a]/ba",
+		"-f", "ba[ext=m4a]",
 		"-o", tempFile,
 		"--no-warnings",
 		"--no-check-certificates",
@@ -242,8 +244,28 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("yt-dlp download: %w: %s", err, stderr.String())
 	}
+	if !isM4AFile(tempFile) {
+		_ = os.Remove(tempFile)
+		return "", fmt.Errorf("yt-dlp download: output is not a playable m4a file")
+	}
 
 	return tempFile, nil
+}
+
+func isM4AFile(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	header := make([]byte, 12)
+	n, err := file.Read(header)
+	if err != nil || n < len(header) {
+		return false
+	}
+
+	return string(header[4:8]) == "ftyp"
 }
 
 // VideoTitle returns the title of the video.

@@ -22,8 +22,8 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 30-second timeout for the search operation.
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	// yt-dlp search can be slow on first run or on restricted networks.
+	ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
 	defer cancel()
 
 	results, err := h.Scraper.Search(ctx, q)
