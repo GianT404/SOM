@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import type { OfflineTrack, ViewKey } from '../lib/types';
 import { getDeletedPlaylist, getPlaylist, restoreTrack, softDeleteTrack } from '../lib/storage';
 import { usePlayer } from '../stores/playerStore';
-import { TrackGrid } from './TrackGrid';
+import { TrackTable } from './TrackTable';
 
 export function HomePage({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
   const { play, currentTrack } = usePlayer();
@@ -25,24 +25,9 @@ export function HomePage({ onNavigate }: { onNavigate: (view: ViewKey) => void }
 
   return (
     <section className="page home-page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Listening Everyday</p>
-          <h1>Home</h1>
-        </div>
-        <button className="avatar-button" onClick={() => onNavigate('settings')}>
-          <img src="/logo.png" alt="SOM" />
-        </button>
-      </header>
-
-      <button className="search-hero neo-card shadow-sm" onClick={() => onNavigate('search')}>
-        <span>Muốn gì!?</span>
-        <Search size={22} />
-      </button>
-
       <div className="tab-row">
         <button className={tab === 'playlist' ? 'active' : ''} onClick={() => setTab('playlist')}>
-          Playlist <span>{tracks.length}</span>
+          Songs <span>{tracks.length}</span>
         </button>
         <button className={tab === 'deleted' ? 'active' : ''} onClick={() => setTab('deleted')}>
           Đã xóa
@@ -56,10 +41,11 @@ export function HomePage({ onNavigate }: { onNavigate: (view: ViewKey) => void }
           <p>{tab === 'playlist' ? 'Tìm kiếm, thêm nhạc, chill thôi nào.' : 'Không có bài hát nào bị xóa.'}</p>
         </div>
       ) : (
-        <TrackGrid
+        <TrackTable
           tracks={visible}
           currentId={currentTrack?.id}
           onPlay={(track) => void play(track, tracks)}
+          sourceLabel={() => (tab === 'playlist' ? 'SOM Downloads' : 'Recently Deleted')}
           onDelete={tab === 'playlist' ? softDeleteTrack : undefined}
           onRestore={tab === 'deleted' ? restoreTrack : undefined}
         />
@@ -67,4 +53,3 @@ export function HomePage({ onNavigate }: { onNavigate: (view: ViewKey) => void }
     </section>
   );
 }
-

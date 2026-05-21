@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../lib/api';
 import type { SearchResult, ViewKey } from '../lib/types';
 import { usePlayer } from '../stores/playerStore';
-import { SongRow } from './SongRow';
+import { TrackTable } from './TrackTable';
 
 export function SearchPage({
   backendReady,
@@ -40,14 +40,8 @@ export function SearchPage({
 
   return (
     <section className="page search-page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">YouTube search</p>
-          <h1>Tìm kiếm</h1>
-        </div>
-      </header>
       <form
-        className="search-box neo-card shadow-sm"
+        className="search-box"
         onSubmit={(event) => {
           event.preventDefault();
           void runSearch();
@@ -57,7 +51,7 @@ export function SearchPage({
           id="desktop-search-input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Artists, songs, or podcasts"
+          placeholder="Muốn tìm gì?"
         />
         <button type="button" onClick={() => (query ? (setQuery(''), setResults([]), setSearched(false)) : void runSearch())}>
           {query ? <X size={20} /> : <Search size={20} />}
@@ -91,18 +85,14 @@ export function SearchPage({
         </div>
       )}
       {backendReady && !loading && results.length > 0 && (
-        <div className="song-list">
-          {results.map((track) => (
-            <SongRow
-              key={track.id}
-              track={track}
-              onPlay={() => {
-                void play(track, results);
-                onNavigate('lyrics');
-              }}
-            />
-          ))}
-        </div>
+        <TrackTable
+          tracks={results}
+          sourceLabel={() => 'YouTube'}
+          onPlay={(track) => {
+            void play(track, results);
+            onNavigate('lyrics');
+          }}
+        />
       )}
     </section>
   );

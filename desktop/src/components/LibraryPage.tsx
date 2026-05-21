@@ -1,9 +1,9 @@
-import { FolderDown, Trash2 } from 'lucide-react';
+import { FolderDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getPlaylist, permanentlyDeleteTrack, softDeleteTrack } from '../lib/storage';
 import type { OfflineTrack } from '../lib/types';
 import { usePlayer } from '../stores/playerStore';
-import { SongRow } from './SongRow';
+import { TrackTable } from './TrackTable';
 
 export function LibraryPage() {
   const { play } = usePlayer();
@@ -18,12 +18,6 @@ export function LibraryPage() {
 
   return (
     <section className="page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">{tracks.length} downloaded tracks</p>
-          <h1>My Playlist</h1>
-        </div>
-      </header>
       {tracks.length === 0 ? (
         <div className="empty-state">
           <FolderDown size={52} />
@@ -31,25 +25,16 @@ export function LibraryPage() {
           <p>Download songs from the player menu to listen offline.</p>
         </div>
       ) : (
-        <div className="song-list">
-          {tracks.map((track) => (
-            <div className="library-row" key={track.id}>
-              <SongRow track={track} onPlay={() => void play(track, tracks)} />
-              <button
-                className="square-button danger"
-                onClick={() => {
-                  softDeleteTrack(track.id);
-                  permanentlyDeleteTrack(track.id);
-                }}
-                aria-label="Remove download"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <TrackTable
+          tracks={tracks}
+          onPlay={(track) => void play(track, tracks)}
+          sourceLabel={() => 'SOM Downloads'}
+          onDelete={(id) => {
+            softDeleteTrack(id);
+            permanentlyDeleteTrack(id);
+          }}
+        />
       )}
     </section>
   );
 }
-

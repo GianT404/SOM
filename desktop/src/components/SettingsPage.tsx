@@ -7,22 +7,8 @@ export function SettingsPage({ backendReady, backendUrl }: { backendReady: boole
 
   return (
     <section className="page settings-page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Desktop</p>
-          <h1>Settings</h1>
-        </div>
-      </header>
       <div className="settings-grid">
-        <article className="settings-card neo-card shadow-sm">
-          <Server size={24} />
-          <div>
-            <h2>Backend sidecar</h2>
-            <p>{backendUrl}</p>
-          </div>
-          {backendReady ? <CheckCircle2 className="ok" /> : <XCircle className="bad" />}
-        </article>
-        <article className="settings-card neo-card shadow-sm">
+        <article className="settings-card">
           <FolderDown size={24} />
           <div>
             <h2>Offline downloads</h2>
@@ -41,4 +27,3 @@ export function SettingsPage({ backendReady, backendUrl }: { backendReady: boole
     </section>
   );
 }
-

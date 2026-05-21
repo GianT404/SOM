@@ -52,10 +52,8 @@ export function PlayerBar() {
     };
   }, [player]);
 
-  if (!track) return null;
-
   const download = async () => {
-    if (downloadState !== 'idle') return;
+    if (!track || downloadState !== 'idle') return;
     setDownloadState('downloading');
     setDownloadError('');
     try {
@@ -85,42 +83,52 @@ export function PlayerBar() {
   };
 
   return (
-    <footer className="player-bar">
-      <div className="player-track">
-        <img src={track.thumbnail} alt="" />
-        <div>
-          <strong>{track.title}</strong>
-          <small>{track.uploader || 'Unknown Artist'}</small>
-        </div>
+    <footer className="player-bar frame">
+      <span className="frame-label">Playing</span>
+      <div className={`player-track ${track ? '' : 'empty'}`}>
+        {track ? (
+          <>
+            <div>
+              <strong>{track.title}</strong>
+              <small>{track.uploader || 'Không bít'}</small>
+            </div>
+          </>
+        ) : (
+          <div>
+            <strong>No track playing</strong>
+            <small>Select a song from the list</small>
+          </div>
+        )}
       </div>
       <div className="player-center">
         <div className="control-row">
-          <button className={player.isShuffle ? 'active icon-button' : 'icon-button'} onClick={player.toggleShuffle} aria-label="Shuffle">
+          <button className={player.isShuffle ? 'active icon-button' : 'icon-button'} onClick={player.toggleShuffle} disabled={!track} aria-label="Shuffle">
             <Shuffle size={18} />
           </button>
-          <button className="icon-button" onClick={player.skipToPrevious} aria-label="Previous">
+          <button className="icon-button" onClick={player.skipToPrevious} disabled={!track} aria-label="Previous">
             <SkipBack size={22} />
           </button>
-          <button className="play-button" onClick={player.togglePlay} aria-label={player.isPlaying ? 'Pause' : 'Play'}>
+          <button className="play-button" onClick={player.togglePlay} disabled={!track} aria-label={player.isPlaying ? 'Pause' : 'Play'}>
             {player.isLoading ? <Loader2 className="spin" size={24} /> : player.isPlaying ? <Pause size={26} /> : <Play size={26} />}
           </button>
-          <button className="icon-button" onClick={player.skipToNext} aria-label="Next">
+          <button className="icon-button" onClick={player.skipToNext} disabled={!track} aria-label="Next">
             <SkipForward size={22} />
           </button>
-          <button className={player.repeatMode !== 'off' ? 'active icon-button' : 'icon-button'} onClick={player.toggleRepeat} aria-label="Repeat">
+          <button className={player.repeatMode !== 'off' ? 'active icon-button' : 'icon-button'} onClick={player.toggleRepeat} disabled={!track} aria-label="Repeat">
             {player.repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
           </button>
         </div>
         <div className="seek-row">
           <span>{formatDuration(player.position)}</span>
           <input
-            type="range"
-            min={0}
-            max={player.duration || 0}
-            value={player.position}
-            onChange={(event) => player.seekTo(Number(event.currentTarget.value))}
-            style={{ ['--progress' as string]: `${progress * 100}%` }}
-          />
+          type="range"
+          min={0}
+          max={player.duration || 0}
+          value={player.position}
+          disabled={!track}
+          onChange={(event) => player.seekTo(Number(event.currentTarget.value))}
+          style={{ ['--progress' as string]: `${progress * 100}%` }}
+        />
           <span>{formatDuration(player.duration)}</span>
         </div>
       </div>
@@ -128,7 +136,7 @@ export function PlayerBar() {
         <button
           className={`icon-button ${downloadState === 'done' ? 'active' : ''}`}
           onClick={() => void download()}
-          disabled={downloadState !== 'idle'}
+          disabled={!track || downloadState !== 'idle'}
           title={downloadError || (downloadState === 'done' ? 'Downloaded' : 'Download')}
           aria-label="Download track"
         >
@@ -161,4 +169,3 @@ function normalizeDownload(response: DownloadResponse, track: Track): OfflineTra
     lyrics: response.lyrics,
   };
 }
-
