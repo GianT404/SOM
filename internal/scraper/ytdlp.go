@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // YtdlpScraper implements Scraper using the yt-dlp CLI tool.
@@ -298,13 +299,24 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 // It attempts to use direct Innertube fetching first to prevent IP blocking.
 // If direct fetching fails, it falls back to yt-dlp downloads.
 func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData, error) {
-	// Try the new direct approach first
-	directData, err := GetDirectSubtitles(ctx, videoID)
+	// Budget time separately for each strategy so one slow step can't starve
+	// the other of its turn. Without this, GetDirectSubtitles can eat the
+	// entire parent deadline before failing, leaving yt-dlp 0s to run and
+	// causing it to be killed mid-request instead of failing cleanly.
+	directCtx, directCancel := context.WithTimeout(ctx, 4*time.Second)
+	directData, err := GetDirectSubtitles(directCtx, videoID)
+	directCancel()
 	if err == nil && len(directData) > 0 {
 		return directData, nil
 	}
 
-	// Fallback to yt-dlp if direct fetch fails
+	// Fallback to yt-dlp if direct fetch fails. Give it its own bounded
+	// window (independent of how much of the parent ctx is left, but still
+	// capped by it) so it always gets a fair, predictable amount of time to
+	// either succeed or fail on its own rather than being SIGKILLed mid-run.
+	ytdlpCtx, ytdlpCancel := context.WithTimeout(ctx, 6*time.Second)
+	defer ytdlpCancel()
+
 	tmpDir := os.TempDir()
 	outTmpl := filepath.Join(tmpDir, fmt.Sprintf("dm4a_subs_%s", videoID))
 
@@ -314,13 +326,17 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		_ = os.Remove(f)
 	}
 
-	cmd := exec.CommandContext(ctx, y.BinPath,
+	cmd := exec.CommandContext(ytdlpCtx, y.BinPath,
 		"--write-subs",
 		"--write-auto-subs",
 		"--skip-download",
 		"--sub-format", "vtt",
 		// Restrict to common languages to prevent yt-dlp 429 Too Many Requests from YT.
 		"--sub-langs", "en,vi,ja,ko,zh-Hans,zh-Hant",
+		// Bound each individual network operation so yt-dlp fails fast and
+		// cleanly on a slow/stuck connection instead of stalling until the
+		// outer context kills the whole process.
+		"--socket-timeout", "5",
 		"-o", outTmpl,
 		"--no-warnings",
 		"--no-check-certificates",
@@ -332,6 +348,9 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 	cmd.Stderr = &stderr
 
 	dlErr := cmd.Run()
+	if ytdlpCtx.Err() != nil {
+		dlErr = fmt.Errorf("yt-dlp timed out after 6s: %w", ytdlpCtx.Err())
+	}
 
 	// Find all downloaded VTT files
 	vttFiles, _ := filepath.Glob(outTmpl + "*.vtt")

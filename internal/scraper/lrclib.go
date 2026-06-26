@@ -72,7 +72,10 @@ func parseLRC(lrc string) []LyricLine {
 }
 
 // lrclibHTTPClient is shared to reuse connections.
-var lrclibHTTPClient = &http.Client{Timeout: 15 * time.Second}
+// Timeout is kept short because lyrics are a secondary feature — we don't
+// want a slow/unresponsive LRCLib to hold up the whole request for 30s,
+// especially since we may call it twice (get + search) per request.
+var lrclibHTTPClient = &http.Client{Timeout: 6 * time.Second}
 
 // GetLRCLibLyrics fetches synced lyrics from lrclib.net.
 // It first tries the exact /api/get endpoint (requires duration),
@@ -81,6 +84,13 @@ var lrclibHTTPClient = &http.Client{Timeout: 15 * time.Second}
 // trackName and artistName come from video metadata (title / uploader).
 // durationSec is the video duration in seconds (used to pick the best result).
 func GetLRCLibLyrics(ctx context.Context, trackName, artistName string, durationSec float64) ([]LyricsData, error) {
+	// Cap total time spent across both strategies (get + search) so this
+	// secondary feature can't stall the parent request for too long. The
+	// caller (handler) also enforces its own overall deadline; this is a
+	// tighter inner bound so LRCLib alone never eats the whole budget.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	// ---- Strategy 1: exact match via /api/get ----
 	if durationSec > 0 {
 		params := url.Values{

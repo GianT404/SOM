@@ -4,6 +4,11 @@ import (
 	"context"
 )
 
+type MusicMetadata struct {
+	Track  string
+	Artist string
+}
+
 // SearchResult represents a single video search result.
 type SearchResult struct {
 	ID        string `json:"id"`
