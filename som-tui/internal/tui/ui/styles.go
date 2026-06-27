@@ -1,0 +1,174 @@
+// internal/tui/ui/styles.go
+package ui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	colorAccent  = lipgloss.Color("#E8593C")
+	colorSubtle  = lipgloss.Color("#4A4A4A")
+	colorSubtle2 = lipgloss.NoColor{}
+	colorWhite   = lipgloss.Color("#E8E8E8")
+	colorDark    = lipgloss.NoColor{}
+	colorDark2   = lipgloss.NoColor{}
+	colorGreen   = lipgloss.Color("#3DCFA0")
+	colorRed     = lipgloss.Color("#E24B4A")
+	colorYellow  = lipgloss.Color("#EF9F27")
+	colorBorder  = lipgloss.Color("#2E2E2E")
+	colorBorderF = lipgloss.Color("#E8593C")
+
+	// ── App shell ───────────────────────────────────────────────────────────────
+
+	AppStyle = lipgloss.NewStyle().
+			Background(colorDark)
+
+	HeaderSubStyle = lipgloss.NewStyle().
+			Foreground(colorSubtle2).
+			Background(colorDark).
+			Italic(true)
+
+	// ── Panel containers ────────────────────────────────────────────────────────
+
+	PanelStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorBorder).
+			Background(colorDark2)
+
+	PanelFocusedStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(colorBorderF).
+				Background(colorDark2)
+
+	PanelTitleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorWhite).
+			Background(colorDark2).
+			Padding(0, 1)
+
+	PanelTitleFocusedStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colorAccent).
+				Background(colorDark2).
+				Padding(0, 1)
+
+	// ── Search input ────────────────────────────────────────────────────────────
+
+	InputPromptStyle = lipgloss.NewStyle().
+				Foreground(colorAccent).
+				Bold(true)
+
+	// ── Track list ──────────────────────────────────────────────────────────────
+
+	SelectedItemStyle = lipgloss.NewStyle().
+				Foreground(colorDark).
+				Background(colorAccent).
+				Bold(true)
+
+	NormalItemStyle = lipgloss.NewStyle().
+			Foreground(colorWhite)
+
+	DimItemStyle = lipgloss.NewStyle().
+			Foreground(colorSubtle2)
+
+	LocalFileStyle = lipgloss.NewStyle().
+			Foreground(colorAccent)
+
+	LocalFileSelectedStyle = lipgloss.NewStyle().
+				Foreground(colorDark).
+				Background(colorAccent).
+				Bold(true)
+
+	// ── Lyrics ──────────────────────────────────────────────────────────────────
+
+	LyricHighlightStyle = lipgloss.NewStyle().
+				Foreground(colorAccent).
+				Bold(true)
+
+	LyricNormalStyle = lipgloss.NewStyle().
+				Foreground(colorSubtle2)
+
+	// ── Progress bar ────────────────────────────────────────────────────────────
+
+	ProgressBarFill  = lipgloss.NewStyle().Background(colorAccent).Foreground(colorAccent)
+	ProgressBarEmpty = lipgloss.NewStyle().Background(colorSubtle).Foreground(colorSubtle)
+
+	ProgressLabelStyle = lipgloss.NewStyle().
+				Foreground(colorWhite).
+				Bold(true)
+
+	ProgressTimeStyle = lipgloss.NewStyle().
+				Foreground(colorSubtle2)
+
+	// ── Now-playing ─────────────────────────────────────────────────────────────
+
+	NowPlayingStyle = lipgloss.NewStyle().
+			Background(colorDark).
+			Foreground(colorWhite).
+			Bold(true).
+			Padding(0, 1)
+
+	PlayingIconStyle = lipgloss.NewStyle().Foreground(colorGreen)
+	PausedIconStyle  = lipgloss.NewStyle().Foreground(colorYellow)
+
+	// ── Status / Help ────────────────────────────────────────────────────────────
+
+	StatusOKStyle  = lipgloss.NewStyle().Foreground(colorGreen)
+	StatusErrStyle = lipgloss.NewStyle().Foreground(colorRed)
+	StatusMsgStyle = lipgloss.NewStyle().Foreground(colorYellow)
+	HelpStyle      = lipgloss.NewStyle().Foreground(colorSubtle2)
+
+	SubtitleStyle = lipgloss.NewStyle().
+			Foreground(colorSubtle2).
+			Italic(true)
+)
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+func FormatDuration(sec int) string {
+	if sec <= 0 {
+		return "--:--"
+	}
+	return fmt.Sprintf("%02d:%02d", sec/60, sec%60)
+}
+
+func truncate(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max-1]) + "…"
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func RenderProgressBar(width int, percent float64) string {
+	if width <= 0 {
+		return ""
+	}
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 1 {
+		percent = 1
+	}
+	filled := int(float64(width) * percent)
+	empty := width - filled
+	return ProgressBarFill.Render(strings.Repeat("█", filled)) +
+		ProgressBarEmpty.Render(strings.Repeat("░", empty))
+}

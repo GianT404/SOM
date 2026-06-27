@@ -1,4 +1,4 @@
-module github.com/GianT404/SOM/tui
+module som-tui
 
 go 1.21
 
