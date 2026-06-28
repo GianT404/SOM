@@ -1,4 +1,3 @@
-// internal/tui/ui/styles.go
 package ui
 
 import (
@@ -155,6 +154,45 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func wordWrap(text string, maxW int) []string {
+	if maxW < 1 {
+		maxW = 1
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+	var lines []string
+	current := ""
+	for _, w := range words {
+		wr := []rune(w)
+		if len(wr) > maxW {
+			if current != "" {
+				lines = append(lines, current)
+				current = ""
+			}
+			for len(wr) > maxW {
+				lines = append(lines, string(wr[:maxW]))
+				wr = wr[maxW:]
+			}
+			current = string(wr)
+			continue
+		}
+		if current == "" {
+			current = w
+		} else if len([]rune(current))+1+len(wr) <= maxW {
+			current += " " + w
+		} else {
+			lines = append(lines, current)
+			current = w
+		}
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return lines
 }
 
 func RenderProgressBar(width int, percent float64) string {

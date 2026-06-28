@@ -53,6 +53,14 @@ func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 	r.offset = 0
 }
 
+func (r *RightPanel) SeekBy(d time.Duration) {
+	r.elapsed += d
+	if r.elapsed < 0 {
+		r.elapsed = 0
+	}
+	r.playedAt = r.playedAt.Add(-d)
+}
+
 func (r *RightPanel) TickAt(now time.Time) {
 	state := r.player.State()
 	if state == player.Playing {
@@ -256,24 +264,28 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				written++
 				continue
 			}
-			var rendered string
-			textW := len([]rune(text)) + 2
-			padLeft := (innerW - textW) / 2
-			if padLeft < 0 {
-				padLeft = 0
+			maxTextW := innerW - 4
+			if maxTextW < 10 {
+				maxTextW = 10
 			}
-			prefix := strings.Repeat(" ", padLeft)
-			if i == r.curLine {
-				rendered = LyricHighlightStyle.Render(prefix + "▸ " + text)
-			} else {
-				rendered = LyricNormalStyle.Render(prefix + "  " + text)
-			}
-			subLines := strings.Split(rendered, "\n")
-			for _, sl := range subLines {
+			segments := wordWrap(text, maxTextW)
+			for _, seg := range segments {
 				if written >= lyrH {
 					break
 				}
-				b.WriteString(sl + "\n")
+				textW := len([]rune(seg)) + 2
+				padLeft := (innerW - textW) / 2
+				if padLeft < 0 {
+					padLeft = 0
+				}
+				prefix := strings.Repeat(" ", padLeft)
+				var rendered string
+				if i == r.curLine {
+					rendered = LyricHighlightStyle.Render(prefix + "▸ " + seg)
+				} else {
+					rendered = LyricNormalStyle.Render(prefix + "  " + seg)
+				}
+				b.WriteString(rendered + "\n")
 				written++
 			}
 		}
@@ -344,16 +356,18 @@ func (r RightPanel) renderProgress(innerW int) string {
 	elapsedStr := FormatDuration(elapsedSec)
 	totalStr := FormatDuration(totalSec)
 
-	// ── Bar: ━━━━━━━━━━━━─────────────────── ─────────────────────────────────
 	barW := innerW - 2
 	if barW < 4 {
 		barW = 4
 	}
 	filled := int(float64(barW) * pct)
+	if filled > barW {
+		filled = barW
+	}
 	empty := barW - filled
+	bar := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("█", filled)) +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A")).Render(strings.Repeat("█", empty))
 
-	bar := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("━", filled)) +
-		lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("─", empty))
 	gap := barW - len([]rune(elapsedStr)) - len([]rune(totalStr))
 	if gap < 1 {
 		gap = 1

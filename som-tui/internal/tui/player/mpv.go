@@ -84,6 +84,21 @@ func (p *Player) Stop() {
 	p.state = Stopped
 	_ = os.Remove(socketPath)
 }
+func (p *Player) SeekBy(seconds int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.cmd == nil || p.cmd.Process == nil || p.state == Stopped {
+		return
+	}
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	_, _ = conn.Write([]byte(fmt.Sprintf("seek %d relative\n", seconds)))
+}
+
 func (p *Player) TogglePause() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

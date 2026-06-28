@@ -73,8 +73,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.left.input.Focused() {
 				break
 			}
-
 			a.player.TogglePause()
+
+		case "right":
+			if a.left.input.Focused() {
+				break
+			}
+			a.player.SeekBy(5)
+			a.right.SeekBy(5 * time.Second)
+
+		case "left":
+			if a.left.input.Focused() {
+				break
+			}
+			a.player.SeekBy(-5)
+			a.right.SeekBy(-5 * time.Second)
 		}
 
 	case PlayStartedMsg:
