@@ -123,7 +123,7 @@ import (
 	"sync"
 	"time"
 
-	"dm4a/internal/scraper"
+	"som/internal/scraper"
 )
 
 // StreamHandler handles GET /api/v1/stream?id={video_id}.

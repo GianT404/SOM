@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"dm4a/internal/scraper"
+	"som/internal/scraper"
 )
 
 // LyricsHandler handles GET /api/v1/lyrics?id={video_id}&title={title}&artist={artist}&duration={seconds}.

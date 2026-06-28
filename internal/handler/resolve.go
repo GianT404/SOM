@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"dm4a/internal/scraper"
+	"som/internal/scraper"
 )
 
 // ResolveHandler handles GET /api/v1/resolve?id={video_id}.

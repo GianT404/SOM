@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"dm4a/internal/scraper"
+	"som/internal/scraper"
 )
 
 // SearchHandler handles GET /api/v1/search?q={keyword}.

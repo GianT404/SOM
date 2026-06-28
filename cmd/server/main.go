@@ -13,8 +13,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"dm4a/internal/handler"
-	"dm4a/internal/scraper"
+	"som/internal/handler"
+	"som/internal/scraper"
 )
 
 func main() {
