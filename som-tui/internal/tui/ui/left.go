@@ -179,6 +179,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		case "/":
 			p.input.Focus()
 			p.input.SetValue("")
+			return p, nil
 		}
 
 	case SearchResultMsg:
@@ -417,7 +418,7 @@ func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 		path, err := c.DownloadM4A(t.ID, t.Title, destDir)
 
 		if err == nil {
-			lr, errLyr := c.Lyrics(t.ID)
+			lr, errLyr := c.Lyrics(t.ID, t.Title, t.Duration)
 			if errLyr == nil {
 				jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
 

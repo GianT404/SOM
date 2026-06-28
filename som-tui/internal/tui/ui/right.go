@@ -1,4 +1,3 @@
-// internal/tui/ui/right.go
 package ui
 
 import (
@@ -13,7 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const progressBarHeight = 4
+const playerBoxContentH = 4
 
 type RightPanel struct {
 	lyrics  api.LyricsResp
@@ -23,10 +22,12 @@ type RightPanel struct {
 	width   int
 	height  int
 
-	player   *player.Player
-	nowPlay  *api.Track
-	playedAt time.Time
-	elapsed  time.Duration
+	player    *player.Player
+	nowPlay   *api.Track
+	playedAt  time.Time
+	elapsed   time.Duration
+	pausedAt  time.Time
+	pausedDur time.Duration
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
@@ -39,6 +40,8 @@ func (r *RightPanel) SetTrack(t *api.Track, playedAt time.Time) {
 	r.nowPlay = t
 	r.playedAt = time.Now()
 	r.elapsed = 0
+	r.pausedAt = time.Time{}
+	r.pausedDur = 0
 	r.curLine = 0
 	r.offset = 0
 }
@@ -51,8 +54,17 @@ func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 }
 
 func (r *RightPanel) TickAt(now time.Time) {
-	if r.player.State() == player.Playing {
-		r.elapsed = time.Since(r.playedAt)
+	state := r.player.State()
+	if state == player.Playing {
+		if !r.pausedAt.IsZero() {
+			r.pausedDur += time.Since(r.pausedAt)
+			r.pausedAt = time.Time{}
+		}
+		r.elapsed = time.Since(r.playedAt) - r.pausedDur
+	} else if state == player.Paused {
+		if r.pausedAt.IsZero() {
+			r.pausedAt = time.Now()
+		}
 	}
 
 	if !r.loaded || len(r.lyrics.Synced) == 0 {
@@ -86,7 +98,7 @@ func (r *RightPanel) TickAt(now time.Time) {
 }
 
 func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
-	if key, ok := msg.(tea.KeyMsg); ok && focused {
+	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "pgup", "ctrl+u":
 			if r.offset > 0 {
@@ -95,14 +107,12 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		case "pgdown", "ctrl+d":
 			maxOff := 0
 			lyrH := r.lyricsHeight()
-
 			if len(r.lyrics.Synced) > 0 {
 				maxOff = len(r.lyrics.Synced) - lyrH
 			} else if r.lyrics.Plain != "" {
 				lines := strings.Split(strings.ReplaceAll(r.lyrics.Plain, "\r\n", "\n"), "\n")
 				maxOff = len(lines) - lyrH
 			}
-
 			if maxOff < 0 {
 				maxOff = 0
 			}
@@ -115,52 +125,104 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 }
 
 func (r RightPanel) View(focused bool) string {
+	borderColor := colorBorder
+	if focused {
+		borderColor = colorBorderF
+	}
+	lyricsBox := r.renderLyricsBox(focused, borderColor)
+	playerBox := r.renderPlayerBox(focused, borderColor)
+	return lipgloss.JoinVertical(lipgloss.Left, lyricsBox, playerBox)
+}
+
+func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalColor) string {
 	innerW := r.width - 4
 	if innerW < 10 {
 		innerW = 10
 	}
 
-	var b strings.Builder
-
-	b.WriteString(r.renderLyrics(innerW))
-
-	b.WriteString(DimItemStyle.Render(strings.Repeat("─", innerW)))
-	b.WriteString("\n")
-
-	b.WriteString(r.renderProgress(innerW))
+	content := r.renderLyrics(innerW)
 
 	style := PanelStyle.Copy().BorderTop(false)
-	borderColor := colorBorder
 	titleStyle := PanelTitleStyle
 
 	if focused {
 		style = PanelFocusedStyle.Copy().BorderTop(false)
-		borderColor = colorBorderF
 		titleStyle = PanelTitleFocusedStyle
 	}
 
 	contentBox := style.
 		Width(r.width - 2).
-		Height(r.height - 2).
-		Render(b.String())
-
+		Height(r.lyricsHeight() + 1).
+		Render(content)
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
-	titleText := "Lyrics"
-	titleRendered := titleStyle.Render(titleText)
+	titleRendered := titleStyle.Render("Lyrics")
 	titleW := lipgloss.Width(titleRendered)
-
-	leftLineCount := 1
-	rightLineCount := r.width - titleW - leftLineCount - 2
-
+	prefixBorderL := borderChar.Render("╭─")
+	prefixWL := lipgloss.Width(prefixBorderL)
+	rightLineCount := r.width - prefixWL - titleW - 1
 	if rightLineCount < 0 {
 		rightLineCount = 0
 	}
-
-	topBorder := borderChar.Render("╭"+strings.Repeat("─", leftLineCount)) +
+	topBorder := prefixBorderL +
 		titleRendered +
 		borderChar.Render(strings.Repeat("─", rightLineCount)+"╮")
 
 	return lipgloss.JoinVertical(lipgloss.Left, topBorder, contentBox)
+}
+
+func (r RightPanel) renderPlayerBox(focused bool, borderColor lipgloss.TerminalColor) string {
+	innerW := r.width - 4
+	if innerW < 10 {
+		innerW = 10
+	}
+
+	content := r.renderProgress(innerW)
+
+	var style lipgloss.Style
+	if focused {
+		style = PanelFocusedStyle.Copy().BorderTop(false)
+	} else {
+		style = PanelStyle.Copy().BorderTop(false)
+	}
+
+	contentBox := style.
+		Width(r.width - 2).
+		Height(playerBoxContentH).
+		Render(content)
+
+	borderChar := lipgloss.NewStyle().Foreground(borderColor)
+	titleRendered := r.playerBorderTitle(r.width - 6)
+	titleW := lipgloss.Width(titleRendered)
+	prefixBorder := borderChar.Render("╭─")
+	prefixW := lipgloss.Width(prefixBorder)
+	rightLineCount := r.width - prefixW - titleW - 1
+	if rightLineCount < 0 {
+		rightLineCount = 0
+	}
+	topBorder := prefixBorder +
+		titleRendered +
+		borderChar.Render(strings.Repeat("─", rightLineCount)+"╮")
+
+	return lipgloss.JoinVertical(lipgloss.Left, topBorder, contentBox)
+}
+
+func (r RightPanel) playerBorderTitle(maxW int) string {
+	if r.nowPlay == nil {
+		return DimItemStyle.Render(" Nothing playing ")
+	}
+
+	icon := PlayingIconStyle.Render("▶")
+	if r.player.State() == player.Paused {
+		icon = PausedIconStyle.Render("||")
+	}
+
+	titleMax := maxW - 4
+	if titleMax < 4 {
+		titleMax = 4
+	}
+	title := truncate(r.nowPlay.Title, titleMax)
+
+	return fmt.Sprintf(" %s  %s ", icon, title)
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {
@@ -172,7 +234,12 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		for i := 0; i < pad; i++ {
 			b.WriteString("\n")
 		}
-		b.WriteString(DimItemStyle.Render("Play a track to load lyrics…"))
+		placeholder := "Play a track to load lyrics…"
+		padLeft := (innerW - len([]rune(placeholder))) / 2
+		if padLeft < 0 {
+			padLeft = 0
+		}
+		b.WriteString(DimItemStyle.Render(strings.Repeat(" ", padLeft) + placeholder))
 		b.WriteString("\n")
 		for i := pad + 1; i < lyrH; i++ {
 			b.WriteString("\n")
@@ -182,7 +249,6 @@ func (r RightPanel) renderLyrics(innerW int) string {
 
 	if len(r.lyrics.Synced) > 0 {
 		written := 0
-
 		for i := r.offset; i < len(r.lyrics.Synced) && written < lyrH; i++ {
 			text := r.lyrics.Synced[i].Text
 			if text == "" {
@@ -190,14 +256,18 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				written++
 				continue
 			}
-
 			var rendered string
-			if i == r.curLine {
-				rendered = LyricHighlightStyle.Width(innerW).Render("▸ " + text)
-			} else {
-				rendered = LyricNormalStyle.Width(innerW).Render("  " + text)
+			textW := len([]rune(text)) + 2
+			padLeft := (innerW - textW) / 2
+			if padLeft < 0 {
+				padLeft = 0
 			}
-
+			prefix := strings.Repeat(" ", padLeft)
+			if i == r.curLine {
+				rendered = LyricHighlightStyle.Render(prefix + "▸ " + text)
+			} else {
+				rendered = LyricNormalStyle.Render(prefix + "  " + text)
+			}
 			subLines := strings.Split(rendered, "\n")
 			for _, sl := range subLines {
 				if written >= lyrH {
@@ -207,7 +277,6 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				written++
 			}
 		}
-
 		for written < lyrH {
 			b.WriteString("\n")
 			written++
@@ -216,9 +285,10 @@ func (r RightPanel) renderLyrics(innerW int) string {
 	}
 
 	if r.lyrics.Plain != "" {
-		plainWrapped := LyricNormalStyle.Width(innerW).Render(strings.ReplaceAll(r.lyrics.Plain, "\r\n", "\n"))
+		plainWrapped := LyricNormalStyle.Width(innerW).Render(
+			strings.ReplaceAll(r.lyrics.Plain, "\r\n", "\n"),
+		)
 		lines := strings.Split(plainWrapped, "\n")
-
 		written := 0
 		end := r.offset + lyrH
 		if end > len(lines) {
@@ -234,35 +304,32 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		}
 		return b.String()
 	}
+
 	for i := 0; i < lyrH; i++ {
 		if i == lyrH/2 {
-			b.WriteString(DimItemStyle.Render("  (no lyrics available)"))
+			noLyr := "(no lyrics available)"
+			padLeft := (innerW - len([]rune(noLyr))) / 2
+			if padLeft < 0 {
+				padLeft = 0
+			}
+			b.WriteString(DimItemStyle.Render(strings.Repeat(" ", padLeft) + noLyr))
 		}
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
+// ─── Progress bar (redesigned) ────────────────────────────────────────────────
+
 func (r RightPanel) renderProgress(innerW int) string {
 	var b strings.Builder
 
 	if r.nowPlay == nil {
-		b.WriteString(DimItemStyle.Render("Nothing playing"))
-		b.WriteString("\n\n")
+		for i := 0; i < playerBoxContentH; i++ {
+			b.WriteString("\n")
+		}
 		return b.String()
 	}
-
-	icon := PlayingIconStyle.Render("▶")
-	if r.player.State() == player.Paused {
-		icon = PausedIconStyle.Render("⏸")
-	}
-	trackInfo := fmt.Sprintf(" %s  %s — %s",
-		icon,
-		truncate(r.nowPlay.Artist, 20),
-		truncate(r.nowPlay.Title, innerW-32),
-	)
-	b.WriteString(ProgressLabelStyle.Width(innerW).Render(trackInfo))
-	b.WriteString("\n")
 
 	elapsedSec := int(r.elapsed.Seconds())
 	totalSec := r.nowPlay.Duration
@@ -274,24 +341,39 @@ func (r RightPanel) renderProgress(innerW int) string {
 		pct = 1
 	}
 
-	timeLeft := fmt.Sprintf(" %s / %s ", FormatDuration(elapsedSec), FormatDuration(totalSec))
-	barW := innerW - len([]rune(timeLeft)) - 1
+	elapsedStr := FormatDuration(elapsedSec)
+	totalStr := FormatDuration(totalSec)
+
+	// ── Bar: ━━━━━━━━━━━━─────────────────── ─────────────────────────────────
+	barW := innerW - 2
 	if barW < 4 {
 		barW = 4
 	}
+	filled := int(float64(barW) * pct)
+	empty := barW - filled
 
-	b.WriteString(" ")
-	b.WriteString(RenderProgressBar(barW, pct))
-	b.WriteString(ProgressTimeStyle.Render(timeLeft))
+	bar := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("━", filled)) +
+		lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("─", empty))
+	gap := barW - len([]rune(elapsedStr)) - len([]rune(totalStr))
+	if gap < 1 {
+		gap = 1
+	}
+	timeRow := ProgressTimeStyle.Render(elapsedStr) +
+		strings.Repeat(" ", gap) +
+		ProgressTimeStyle.Render(totalStr)
+
 	b.WriteString("\n")
+	b.WriteString(" " + bar + "\n")
+	b.WriteString(" " + timeRow + "\n")
 
 	return b.String()
 }
 
 func (r RightPanel) lyricsHeight() int {
-	h := r.height - 2 - 1 - progressBarHeight
-	if h < 3 {
-		return 3
+	playerTotal := playerBoxContentH + 2
+	h := r.height - playerTotal - 2
+	if h < 5 {
+		return 5
 	}
 	return h
 }

@@ -88,9 +88,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right.SetTrack(&t, a.playedAt)
 			a.setStatus(StatusOKStyle.Render("▶  " + t.Title))
 		}
-		c, id := a.client, t.ID
+		c, id, title, dur := a.client, t.ID, t.Title, t.Duration
 		cmds = append(cmds, func() tea.Msg {
-			lr, err := c.Lyrics(id)
+			lr, err := c.Lyrics(id, title, dur)
 			return LyricsLoadedMsg{Lyrics: lr, Err: err}
 		})
 	case PlayLocalMsg:

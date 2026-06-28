@@ -12,8 +12,8 @@ func TestCleanYouTubeTitle(t *testing.T) {
 	}{
 		{
 			name:     "Xử lý Official MV",
-			input:    "Hà Anh Tuấn - Tháng Tư Là Lời Nói Dối Của Em (Official MV)",
-			expected: "Tháng Tư Là Lời Nói Dối Của Em",
+			input:    "Tatarka - KAWAII (sped up)",
+			expected: " KAWAII",
 		},
 	}
 

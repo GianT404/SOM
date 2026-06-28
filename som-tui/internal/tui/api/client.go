@@ -111,8 +111,15 @@ func (c *Client) StreamURL(id string) string {
 
 // ─── Lyrics ──────────────────────────────────────────────────────────────────
 
-func (c *Client) Lyrics(id string) (LyricsResp, error) {
-	resp, err := c.getShort("/api/v1/lyrics", url.Values{"id": {id}})
+func (c *Client) Lyrics(id, title string, duration int) (LyricsResp, error) {
+	params := url.Values{"id": {id}}
+	if title != "" {
+		params.Set("title", title)
+	}
+	if duration > 0 {
+		params.Set("duration", fmt.Sprintf("%d", duration))
+	}
+	resp, err := c.getShort("/api/v1/lyrics", params)
 	if err != nil {
 		return LyricsResp{}, fmt.Errorf("lyrics request: %w", err)
 	}
