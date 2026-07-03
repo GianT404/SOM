@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"time"
 
@@ -18,6 +20,9 @@ func main() {
 	if ytdlpPath == "" {
 		ytdlpPath = "yt-dlp"
 	}
+
+	// Silence backend logs in TUI mode.
+	log.SetOutput(io.Discard)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

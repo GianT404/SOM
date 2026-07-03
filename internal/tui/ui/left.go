@@ -417,10 +417,9 @@ func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 		path, err := c.DownloadM4A(t.ID, t.Title, destDir)
 
 		if err == nil {
-			lr, errLyr := c.Lyrics(t.ID, t.Title, t.Duration)
+			lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
 			if errLyr == nil {
 				jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
-
 				data, _ := json.MarshalIndent(lr, "", "  ")
 				_ = os.WriteFile(jsonPath, data, 0644)
 			}

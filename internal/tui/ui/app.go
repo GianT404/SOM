@@ -89,7 +89,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right.SeekBy(-5 * time.Second)
 		}
 
-	case PlayStartedMsg:
+		case PlayStartedMsg:
 		t := msg.Track
 		a.nowPlay = &t
 		streamURL := a.client.StreamURL(t.ID)
@@ -100,9 +100,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right.SetTrack(&t, a.playedAt)
 			a.setStatus(StatusOKStyle.Render("▶  " + t.Title))
 		}
-		c, id, title, dur := a.client, t.ID, t.Title, t.Duration
+		c, id, title, artist, dur := a.client, t.ID, t.Title, t.Artist, t.Duration
 		cmds = append(cmds, func() tea.Msg {
-			lr, err := c.Lyrics(id, title, dur)
+			lr, err := c.Lyrics(id, title, artist, dur)
 			return LyricsLoadedMsg{Lyrics: lr, Err: err}
 		})
 	case PlayLocalMsg:

@@ -16,6 +16,7 @@ type SearchResult struct {
 	Thumbnail string `json:"thumbnail"`
 	Duration  int    `json:"duration"`
 	Uploader  string `json:"uploader"`
+	Artist    string `json:"artist"`
 }
 
 // LyricLine represents a single line of lyrics with timing info.

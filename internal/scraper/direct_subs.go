@@ -21,7 +21,7 @@ func GetDirectSubtitles(ctx context.Context, videoID string) ([]LyricsData, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not get video info: %w", err)
 	}
-
+ 
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}

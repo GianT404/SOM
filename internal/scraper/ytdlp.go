@@ -106,6 +106,7 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 				Thumbnail: thumb,
 				Duration:  int(item.Duration),
 				Uploader:  item.Uploader,
+				Artist:    item.Uploader,
 			}
 		}
 		if err := scanner.Err(); err != nil {

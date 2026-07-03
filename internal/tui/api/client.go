@@ -111,10 +111,13 @@ func (c *Client) StreamURL(id string) string {
 
 // ─── Lyrics ──────────────────────────────────────────────────────────────────
 
-func (c *Client) Lyrics(id, title string, duration int) (LyricsResp, error) {
+func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, error) {
 	params := url.Values{"id": {id}}
 	if title != "" {
 		params.Set("title", title)
+	}
+	if artist != "" {
+		params.Set("artist", artist)
 	}
 	if duration > 0 {
 		params.Set("duration", fmt.Sprintf("%d", duration))
