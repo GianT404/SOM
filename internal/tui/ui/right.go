@@ -392,9 +392,11 @@ func (r RightPanel) renderProgress(innerW int) string {
 	var ctrl strings.Builder
 	ctrl.WriteString(ProgressTimeStyle.Render("\uf048"))
 	ctrl.WriteString(strings.Repeat(" ", 1))
-	ctrl.WriteString(ProgressTimeStyle.Render("\uf04d"))
-	ctrl.WriteString(strings.Repeat(" ", 1))
-	ctrl.WriteString(ProgressTimeStyle.Render("\uf04b"))
+	if r.player.State() == player.Playing {
+		ctrl.WriteString(ProgressTimeStyle.Render("\uf04d"))
+	} else {
+		ctrl.WriteString(ProgressTimeStyle.Render("\uf04b"))
+	}
 	ctrl.WriteString(strings.Repeat(" ", 1))
 	ctrl.WriteString(ProgressTimeStyle.Render("\uf051"))
 	if r.random {
