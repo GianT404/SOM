@@ -226,6 +226,17 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	a.nowPlay = &t
 	a.syncPlaylistState()
 
+	if idx >= 0 {
+		a.left.cursor = idx
+		vis := a.left.visibleRows()
+		if a.left.cursor < a.left.offset {
+			a.left.offset = a.left.cursor
+		}
+		if a.left.cursor >= a.left.offset+vis {
+			a.left.offset = a.left.cursor - vis + 1
+		}
+	}
+
 	if strings.HasPrefix(t.ID, "local:") {
 		path := strings.TrimPrefix(t.ID, "local:")
 		if err := a.player.Play(path); err != nil {
