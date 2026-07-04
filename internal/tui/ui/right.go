@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const playerBoxContentH = 4
+const playerBoxContentH = 5
 
 type RightPanel struct {
 	lyrics  api.LyricsResp
@@ -28,6 +28,10 @@ type RightPanel struct {
 	elapsed   time.Duration
 	pausedAt  time.Time
 	pausedDur time.Duration
+
+	playlistPos   int
+	playlistTotal int
+	random        bool
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
@@ -51,6 +55,12 @@ func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 	r.loaded = true
 	r.curLine = 0
 	r.offset = 0
+}
+
+func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
+	r.playlistPos = pos
+	r.playlistTotal = total
+	r.random = random
 }
 
 func (r *RightPanel) SeekBy(d time.Duration) {
@@ -165,7 +175,7 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 	titleRendered := titleStyle.Render("Lyrics")
 	titleW := lipgloss.Width(titleRendered)
-	prefixBorderL := borderChar.Render("╭─")
+	prefixBorderL := borderChar.Render("\u256d\u2500")
 	prefixWL := lipgloss.Width(prefixBorderL)
 	rightLineCount := r.width - prefixWL - titleW - 1
 	if rightLineCount < 0 {
@@ -173,7 +183,7 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 	}
 	topBorder := prefixBorderL +
 		titleRendered +
-		borderChar.Render(strings.Repeat("─", rightLineCount)+"╮")
+		borderChar.Render(strings.Repeat("\u2500", rightLineCount)+"\u256e")
 
 	return lipgloss.JoinVertical(lipgloss.Left, topBorder, contentBox)
 }
@@ -201,7 +211,7 @@ func (r RightPanel) renderPlayerBox(focused bool, borderColor lipgloss.TerminalC
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 	titleRendered := r.playerBorderTitle(r.width - 6)
 	titleW := lipgloss.Width(titleRendered)
-	prefixBorder := borderChar.Render("╭─")
+	prefixBorder := borderChar.Render("\u256d\u2500")
 	prefixW := lipgloss.Width(prefixBorder)
 	rightLineCount := r.width - prefixW - titleW - 1
 	if rightLineCount < 0 {
@@ -209,7 +219,7 @@ func (r RightPanel) renderPlayerBox(focused bool, borderColor lipgloss.TerminalC
 	}
 	topBorder := prefixBorder +
 		titleRendered +
-		borderChar.Render(strings.Repeat("─", rightLineCount)+"╮")
+		borderChar.Render(strings.Repeat("\u2500", rightLineCount)+"\u256e")
 
 	return lipgloss.JoinVertical(lipgloss.Left, topBorder, contentBox)
 }
@@ -219,18 +229,13 @@ func (r RightPanel) playerBorderTitle(maxW int) string {
 		return DimItemStyle.Render(" Nothing playing ")
 	}
 
-	icon := PlayingIconStyle.Render("▶")
-	if r.player.State() == player.Paused {
-		icon = PausedIconStyle.Render("||")
-	}
-
-	titleMax := maxW - 4
+	titleMax := maxW - 2
 	if titleMax < 4 {
 		titleMax = 4
 	}
 	title := truncate(r.nowPlay.Title, titleMax)
 
-	return fmt.Sprintf(" %s  %s ", icon, title)
+	return fmt.Sprintf(" %s ", title)
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {
@@ -242,7 +247,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		for i := 0; i < pad; i++ {
 			b.WriteString("\n")
 		}
-		placeholder := "Play a track to load lyrics…"
+		placeholder := "Play a track to load lyrics..."
 		padLeft := (innerW - len([]rune(placeholder))) / 2
 		if padLeft < 0 {
 			padLeft = 0
@@ -281,7 +286,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				prefix := strings.Repeat(" ", padLeft)
 				var rendered string
 				if i == r.curLine {
-					rendered = LyricHighlightStyle.Render(prefix + "▸ " + seg)
+					rendered = LyricHighlightStyle.Render(prefix + "\u25b8 " + seg)
 				} else {
 					rendered = LyricNormalStyle.Render(prefix + "  " + seg)
 				}
@@ -331,7 +336,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 	return b.String()
 }
 
-// ─── Progress bar (redesigned) ────────────────────────────────────────────────
+// --- Progress bar ---------------------------------------------------------------
 
 func (r RightPanel) renderProgress(innerW int) string {
 	var b strings.Builder
@@ -365,8 +370,8 @@ func (r RightPanel) renderProgress(innerW int) string {
 		filled = barW
 	}
 	empty := barW - filled
-	bar := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A")).Render(strings.Repeat("█", empty))
+	bar := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("\u2588", filled)) +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#3A3A3A")).Render(strings.Repeat("\u2588", empty))
 
 	gap := barW - len([]rune(elapsedStr)) - len([]rune(totalStr))
 	if gap < 1 {
@@ -379,6 +384,29 @@ func (r RightPanel) renderProgress(innerW int) string {
 	b.WriteString("\n")
 	b.WriteString(" " + bar + "\n")
 	b.WriteString(" " + timeRow + "\n")
+
+	ctrlW := innerW - 2
+	if ctrlW < 10 {
+		ctrlW = 10
+	}
+	var ctrl strings.Builder
+	ctrl.WriteString(ProgressTimeStyle.Render("\uf048"))
+	ctrl.WriteString(strings.Repeat(" ", 1))
+	ctrl.WriteString(ProgressTimeStyle.Render("\uf04d"))
+	ctrl.WriteString(strings.Repeat(" ", 1))
+	ctrl.WriteString(ProgressTimeStyle.Render("\uf04b"))
+	ctrl.WriteString(strings.Repeat(" ", 1))
+	ctrl.WriteString(ProgressTimeStyle.Render("\uf051"))
+	if r.random {
+		ctrl.WriteString(strings.Repeat(" ", 2))
+		ctrl.WriteString(StatusOKStyle.Render("\uf074"))
+	}
+	ctrlStr := ctrl.String()
+	padLeft := (innerW - lipgloss.Width(ctrlStr)) / 2
+	if padLeft < 0 {
+		padLeft = 0
+	}
+	b.WriteString(strings.Repeat(" ", padLeft) + ctrlStr + "\n")
 
 	return b.String()
 }

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
 	"som/internal/tui/api"
 	"som/internal/tui/player"
@@ -31,6 +32,10 @@ type App struct {
 	playedAt  time.Time
 	statusMsg string
 	statusAt  time.Time
+
+	playlist   []api.Track
+	currentIdx int
+	random     bool
 }
 
 func NewApp(serverURL string) *App {
@@ -60,6 +65,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		a.right.TickAt(a.playedAt)
+		if a.player.State() == player.Stopped && a.nowPlay != nil {
+			a.nowPlay = nil
+			cmds = append(cmds, a.playNext())
+		}
 		cmds = append(cmds, tick())
 
 	case tea.KeyMsg:
@@ -87,49 +96,71 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.player.SeekBy(-5)
 			a.right.SeekBy(-5 * time.Second)
-		}
 
-		case PlayStartedMsg:
-		t := msg.Track
-		a.nowPlay = &t
-		streamURL := a.client.StreamURL(t.ID)
-		if err := a.player.Play(streamURL); err != nil {
-			a.setStatus(StatusErrStyle.Render("✗ " + err.Error()))
-		} else {
-			a.playedAt = time.Now()
-			a.right.SetTrack(&t, a.playedAt)
-			a.setStatus(StatusOKStyle.Render("▶  " + t.Title))
-		}
-		c, id, title, artist, dur := a.client, t.ID, t.Title, t.Artist, t.Duration
-		cmds = append(cmds, func() tea.Msg {
-			lr, err := c.Lyrics(id, title, artist, dur)
-			return LyricsLoadedMsg{Lyrics: lr, Err: err}
-		})
-	case PlayLocalMsg:
-		t := api.Track{
-			ID:       "local",
-			Title:    msg.Title,
-			Duration: 0,
-		}
-		a.nowPlay = &t
-
-		if err := a.player.Play(msg.Path); err != nil {
-			a.setStatus(StatusErrStyle.Render("✗ " + err.Error()))
-		} else {
-			a.playedAt = time.Now()
-			a.right.SetTrack(&t, a.playedAt)
-			a.setStatus(StatusOKStyle.Render("▶  " + t.Title))
-		}
-		jsonPath := strings.TrimSuffix(msg.Path, ".m4a") + ".json"
-		data, err := os.ReadFile(jsonPath)
-		if err == nil {
-			var lr api.LyricsResp
-			if json.Unmarshal(data, &lr) == nil {
-				a.right.SetLyrics(lr, a.playedAt)
+		case "n":
+			if a.left.input.Focused() {
+				break
 			}
-		} else {
-			a.right.SetLyrics(api.LyricsResp{Plain: "(No lyrics available)"}, a.playedAt)
+			cmds = append(cmds, a.playNext())
+
+		case "p":
+			if a.left.input.Focused() {
+				break
+			}
+			cmds = append(cmds, a.playPrev())
+
+		case "r":
+			if a.left.input.Focused() {
+				break
+			}
+			a.random = !a.random
+			a.syncPlaylistState()
 		}
+
+	case SearchResultMsg:
+		if msg.Err == nil {
+			a.playlist = msg.Tracks
+		}
+
+	case PlayStartedMsg:
+		t := msg.Track
+		if len(a.left.tracks) > 0 && a.left.tab == TabSearch {
+			a.playlist = a.left.tracks
+		}
+		idx := -1
+		for i, tr := range a.playlist {
+			if tr.ID == t.ID {
+				idx = i
+				break
+			}
+		}
+		cmds = append(cmds, a.playTrackAt(idx, t))
+
+	case PlayLocalMsg:
+		locals := a.left.getFilteredLocals()
+		if len(locals) == 0 {
+			locals = a.left.locals
+		}
+		if len(locals) == 0 {
+			a.setStatus(StatusErrStyle.Render("X No local files found"))
+			break
+		}
+		a.playlist = make([]api.Track, len(locals))
+		idx := -1
+		for i, lf := range locals {
+			a.playlist[i] = api.Track{
+				ID:    "local:" + lf.Path,
+				Title: lf.Name,
+			}
+			if lf.Name == msg.Title {
+				idx = i
+			}
+		}
+		if idx < 0 {
+			idx = len(a.playlist) - 1
+		}
+		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
+
 	case LyricsLoadedMsg:
 		if msg.Err != nil {
 			a.right.SetLyrics(api.LyricsResp{Plain: "(no lyrics available)"}, a.playedAt)
@@ -156,7 +187,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a *App) View() string {
 	if a.width == 0 {
-		return "Loading…"
+		return "Loading..."
 	}
 
 	leftW, rightW := a.panelWidths()
@@ -175,9 +206,8 @@ func (a *App) View() string {
 		status = "  " + a.statusMsg
 	}
 
-	// Help bar
 	help := HelpStyle.Render(
-		"  tab:switch pane shift+tab: switch tab  enter:search/play  ↑↓/jk:nav  d:download  space:pause  /:search  q:quit",
+		"  tab:switch pane  enter:play /:search up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  q:quit",
 	)
 
 	var b strings.Builder
@@ -191,7 +221,88 @@ func (a *App) View() string {
 	return b.String()
 }
 
-// ─── Layout helpers ───────────────────────────────────────────────────────────
+func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
+	a.currentIdx = idx
+	a.nowPlay = &t
+	a.syncPlaylistState()
+
+	if strings.HasPrefix(t.ID, "local:") {
+		path := strings.TrimPrefix(t.ID, "local:")
+		if err := a.player.Play(path); err != nil {
+			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
+			return nil
+		}
+		a.playedAt = time.Now()
+		a.right.SetTrack(&t, a.playedAt)
+		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+		jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
+		data, err := os.ReadFile(jsonPath)
+		if err == nil {
+			var lr api.LyricsResp
+			if json.Unmarshal(data, &lr) == nil {
+				a.right.SetLyrics(lr, a.playedAt)
+			}
+		} else {
+			a.right.SetLyrics(api.LyricsResp{Plain: "(No lyrics available)"}, a.playedAt)
+		}
+		return nil
+	}
+
+	streamURL := a.client.StreamURL(t.ID)
+	if err := a.player.Play(streamURL); err != nil {
+		a.setStatus(StatusErrStyle.Render("X " + err.Error()))
+		return nil
+	}
+	a.playedAt = time.Now()
+	a.right.SetTrack(&t, a.playedAt)
+	a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+	return func() tea.Msg {
+		lr, err := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+		return LyricsLoadedMsg{Lyrics: lr, Err: err}
+	}
+}
+
+func (a *App) playNext() tea.Cmd {
+	if len(a.playlist) == 0 {
+		return nil
+	}
+	next := a.currentIdx + 1
+	if a.random {
+		next = rand.Intn(len(a.playlist))
+		for next == a.currentIdx && len(a.playlist) > 1 {
+			next = rand.Intn(len(a.playlist))
+		}
+	}
+	if next >= len(a.playlist) {
+		return nil
+	}
+	return a.playTrackAt(next, a.playlist[next])
+}
+
+func (a *App) playPrev() tea.Cmd {
+	if len(a.playlist) == 0 {
+		return nil
+	}
+	prev := a.currentIdx - 1
+	if a.random {
+		prev = rand.Intn(len(a.playlist))
+		for prev == a.currentIdx && len(a.playlist) > 1 {
+			prev = rand.Intn(len(a.playlist))
+		}
+	}
+	if prev < 0 {
+		return nil
+	}
+	return a.playTrackAt(prev, a.playlist[prev])
+}
+
+func (a *App) syncPlaylistState() {
+	if a.playlist != nil {
+		a.right.SetPlaylistState(a.currentIdx, len(a.playlist), a.random)
+	}
+}
+
+// --- Layout helpers ------------------------------------------------------------
 
 func (a *App) panelWidths() (left, right int) {
 	total := a.width

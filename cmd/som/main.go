@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"som/internal/backend"
 	"som/internal/tui/ui"
@@ -21,8 +22,14 @@ func main() {
 		ytdlpPath = "yt-dlp"
 	}
 
-	// Silence backend logs in TUI mode.
+	// Silence all backend logs in TUI mode.
 	log.SetOutput(io.Discard)
+	middleware.DefaultLogger = middleware.RequestLogger(
+		&middleware.DefaultLogFormatter{
+			Logger:  log.New(io.Discard, "", 0),
+			NoColor: true,
+		},
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
