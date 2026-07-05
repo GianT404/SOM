@@ -33,10 +33,21 @@ func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 		if err == nil {
 			lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
 			if errLyr == nil {
-				jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
-				data, _ := json.MarshalIndent(lr, "", "  ")
-				_ = os.WriteFile(jsonPath, data, 0644)
+				if lr.Artist == "" {
+					lr.Artist = t.Artist
+				}
+				if lr.Title == "" {
+					lr.Title = t.Title
+				}
+			} else {
+				lr = api.LyricsResp{
+					Artist: t.Artist,
+					Title:  t.Title,
+				}
 			}
+			jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
+			data, _ := json.MarshalIndent(lr, "", "  ")
+			_ = os.WriteFile(jsonPath, data, 0644)
 		}
 		return DownloadDoneMsg{Path: path, Err: err}
 	}

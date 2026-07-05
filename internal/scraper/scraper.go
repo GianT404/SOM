@@ -36,6 +36,9 @@ type StreamInfo struct {
 type LyricsData struct {
 	Language string      `json:"language"`
 	Lines    []LyricLine `json:"lines"`
+
+	TrackName  string `json:"trackName,omitempty"`
+	ArtistName string `json:"artistName,omitempty"`
 }
 
 // Scraper abstracts the video/audio data source.

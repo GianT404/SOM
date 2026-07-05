@@ -34,6 +34,9 @@ type LyricsResp struct {
 	Lrclib *struct {
 		Synced []LyricLine `json:"synced"`
 	} `json:"lrclib,omitempty"`
+
+	Artist string `json:"artist,omitempty"`
+	Title  string `json:"title,omitempty"`
 }
 
 func (l *LyricsResp) Normalize() {
@@ -49,6 +52,8 @@ type ServerLyricTrack struct {
 		End   float64 `json:"end"`
 		Text  string  `json:"text"`
 	} `json:"lines"`
+	TrackName  string `json:"trackName"`
+	ArtistName string `json:"artistName"`
 }
 
 // ─── Client ──────────────────────────────────────────────────────────────────
@@ -158,6 +163,12 @@ func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, err
 					End:  line.End,
 					Text: line.Text,
 				})
+			}
+			if selected.TrackName != "" {
+				lr.Title = selected.TrackName
+			}
+			if selected.ArtistName != "" {
+				lr.Artist = selected.ArtistName
 			}
 		}
 		return lr, nil

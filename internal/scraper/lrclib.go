@@ -196,8 +196,10 @@ func lrclibTrackToLyricsData(t lrclibTrack) []LyricsData {
 		lines := parseLRC(t.SyncedLyrics)
 		if len(lines) > 0 {
 			result = append(result, LyricsData{
-				Language: "lrclib",
-				Lines:    lines,
+				Language:   "lrclib",
+				Lines:      lines,
+				TrackName:  t.TrackName,
+				ArtistName: t.ArtistName,
 			})
 		}
 	}
@@ -213,8 +215,10 @@ func lrclibTrackToLyricsData(t lrclibTrack) []LyricsData {
 		}
 		if len(lines) > 0 {
 			result = append(result, LyricsData{
-				Language: "lrclib",
-				Lines:    lines,
+				Language:   "lrclib",
+				Lines:      lines,
+				TrackName:  t.TrackName,
+				ArtistName: t.ArtistName,
 			})
 		}
 	}

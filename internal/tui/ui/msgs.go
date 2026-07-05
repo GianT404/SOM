@@ -26,8 +26,9 @@ type LocalFilesMsg struct {
 }
 
 type LocalFile struct {
-	Name string
-	Path string
+	Name   string
+	Path   string
+	Artist string
 }
 
 type Pane int

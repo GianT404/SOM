@@ -5,14 +5,15 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 var (
 	colorAccent  = lipgloss.Color("#E8593C")
 	colorSubtle  = lipgloss.Color("#4A4A4A")
 	colorSubtle2 = lipgloss.NoColor{}
-	colorWhite   = lipgloss.Color("#E8E8E8")
-	colorDark    = lipgloss.NoColor{}
+	colorWhite   = lipgloss.Color("#7c7986")
+	colorDark    = lipgloss.Color("#fff")
 	colorDark2   = lipgloss.NoColor{}
 	colorGreen   = lipgloss.Color("#3DCFA0")
 	colorRed     = lipgloss.Color("#E24B4A")
@@ -74,7 +75,7 @@ var (
 			Foreground(colorSubtle2)
 
 	LocalFileStyle = lipgloss.NewStyle().
-			Foreground(colorAccent)
+			Foreground(colorWhite)
 
 	LocalFileSelectedStyle = lipgloss.NewStyle().
 				Foreground(colorDark).
@@ -92,8 +93,8 @@ var (
 
 	// ── Progress bar ────────────────────────────────────────────────────────────
 
-	ProgressBarFill  = lipgloss.NewStyle().Background(colorAccent).Foreground(colorAccent)
-	ProgressBarEmpty = lipgloss.NewStyle().Background(colorSubtle).Foreground(colorSubtle)
+	ProgressBarFill  = lipgloss.NewStyle().Foreground(colorAccent)
+	ProgressBarEmpty = lipgloss.NewStyle().Foreground(colorSubtle)
 
 	ProgressLabelStyle = lipgloss.NewStyle().
 				Foreground(colorWhite).
@@ -135,11 +136,21 @@ func FormatDuration(sec int) string {
 }
 
 func truncate(s string, max int) string {
-	r := []rune(s)
-	if len(r) <= max {
+	if runewidth.StringWidth(s) <= max {
 		return s
 	}
-	return string(r[:max-1]) + "…"
+	w := 0
+	var b strings.Builder
+	for _, r := range s {
+		rw := runewidth.RuneWidth(r)
+		if w+rw > max-1 {
+			break
+		}
+		b.WriteRune(r)
+		w += rw
+	}
+	b.WriteRune('…')
+	return b.String()
 }
 
 func minInt(a, b int) int {

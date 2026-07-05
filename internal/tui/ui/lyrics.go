@@ -14,32 +14,10 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 
 	content := r.renderLyrics(innerW)
 
-	style := PanelStyle.Copy().BorderTop(false)
-	titleStyle := PanelTitleStyle
-
-	if focused {
-		style = PanelFocusedStyle.Copy().BorderTop(false)
-		titleStyle = PanelTitleFocusedStyle
+	if content == "" {
+		return renderBox(r.width, "Lyrics", "\n", borderColor)
 	}
-
-	contentBox := style.
-		Width(r.width - 2).
-		Height(r.lyricsHeight() + 1).
-		Render(content)
-	borderChar := lipgloss.NewStyle().Foreground(borderColor)
-	titleRendered := titleStyle.Render("Lyrics")
-	titleW := lipgloss.Width(titleRendered)
-	prefixBorderL := borderChar.Render("\u256d\u2500")
-	prefixWL := lipgloss.Width(prefixBorderL)
-	rightLineCount := r.width - prefixWL - titleW - 1
-	if rightLineCount < 0 {
-		rightLineCount = 0
-	}
-	topBorder := prefixBorderL +
-		titleRendered +
-		borderChar.Render(strings.Repeat("\u2500", rightLineCount)+"\u256e")
-
-	return lipgloss.JoinVertical(lipgloss.Left, topBorder, contentBox)
+	return renderBox(r.width, "Lyrics", content, borderColor)
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {
@@ -141,7 +119,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 }
 
 func (r RightPanel) lyricsHeight() int {
-	playerTotal := playerBoxContentH + 2
+	playerTotal := 7
 	h := r.height - playerTotal - 2
 	if h < 5 {
 		return 5
