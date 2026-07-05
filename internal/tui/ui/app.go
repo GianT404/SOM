@@ -154,7 +154,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-		cmds = append(cmds, a.playTrackAt(idx, t))
+		a.left.loadingStream = true
+		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(idx, t))
 
 	case PlayLocalMsg:
 		locals := a.left.getFilteredLocals()
@@ -182,12 +183,23 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
 
-	case LyricsLoadedMsg:
+	case StreamStartedMsg:
+		a.left.loadingStream = false
 		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+			break
+		}
+		a.playedAt = msg.PlayedAt
+		a.nowPlay = &msg.Track
+		a.right.SetTrack(&msg.Track, a.playedAt)
+		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
+		if msg.LyricsErr != nil {
 			a.right.SetLyrics(api.LyricsResp{Plain: "(no lyrics available)"}, a.playedAt)
 		} else {
 			a.right.SetLyrics(msg.Lyrics, a.playedAt)
 		}
+		// start lyrics spinner
+		cmds = append(cmds, a.right.spinner.Tick)
 
 	case DownloadDoneMsg:
 		if msg.Err != nil {
@@ -199,11 +211,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads
-	var cmd tea.Cmd
-	a.left, cmd = a.left.Update(msg, focusedContent)
-	cmds = append(cmds, cmd)
+	var leftCmd tea.Cmd
+	a.left, leftCmd = a.left.Update(msg, focusedContent)
+	cmds = append(cmds, leftCmd)
 
-	a.right, _ = a.right.Update(msg, a.sidebarActive == SideLyrics)
+	var rightCmd tea.Cmd
+	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
+	cmds = append(cmds, rightCmd)
 
 	return a, tea.Batch(cmds...)
 }
@@ -213,13 +227,12 @@ func (a *App) View() string {
 		return "Loading..."
 	}
 
-	// Layout: SOM + separator + sidebar|content + process + status + help
-	processH := 5 // border(2) + progress bar + time + controls
+	// Layout: SOM + separator + sidebar|content + status + help
 	statusH := 0
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		statusH = 1
 	}
-	overhead := 7 + 1 + processH + statusH + 1 // SOM(6) + sep + process + status + help
+	overhead := 7 + 1 + statusH + 1 // SOM(6) + sep + status + help
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -251,9 +264,6 @@ func (a *App) View() string {
 	}
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
-	// Process bar (height ~4: border + content)
-	procView := a.renderProcessBar(a.width)
-
 	// Status
 	status := ""
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
@@ -269,11 +279,9 @@ func (a *App) View() string {
 	b.WriteString(somRow + "\n")
 	b.WriteString(sep + "\n")
 	b.WriteString(contentRow + "\n")
-	b.WriteString(procView)
 	if status != "" {
-		b.WriteString("\n" + status)
+		b.WriteString(status + "\n")
 	}
-	b.WriteString("\n")
 	b.WriteString(help)
 
 	return b.String()
@@ -292,84 +300,6 @@ func (a *App) renderLyricsView(w, h int) string {
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 
-func (a *App) renderProcessBar(w int) string {
-	innerW := w - 4
-	if innerW < 10 {
-		innerW = 10
-	}
-
-	content := renderProcessContent(a.right, innerW)
-
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorBorder).
-		Background(colorDark2).
-		Width(w - 2).
-		Render(content)
-}
-
-func renderProcessContent(rp RightPanel, innerW int) string {
-	if rp.nowPlay == nil {
-		return "\n\n"
-	}
-
-	elapsedSec := int(rp.elapsed.Seconds())
-	totalSec := rp.nowPlay.Duration
-	elapsedStr := FormatDuration(elapsedSec)
-	totalStr := FormatDuration(totalSec)
-	if totalSec <= 0 {
-		totalStr = "--:--"
-	}
-
-	// Progress bar
-	var progressBar string
-	if totalSec > 0 {
-		percent := float64(elapsedSec) / float64(totalSec)
-		filled := int(float64(innerW) * percent)
-		if filled > innerW {
-			filled = innerW
-		}
-		empty := innerW - filled
-		fillStr := lipgloss.NewStyle().Foreground(colorAccent).Render(strings.Repeat("█", filled))
-		emptyStr := lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("░", empty))
-		progressBar = fillStr + emptyStr
-	} else {
-		progressBar = lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("░", innerW))
-	}
-
-	// Time row — centered time
-	timeStr := elapsedStr + "  " + totalStr
-	timeRunes := []rune(timeStr)
-	timeStart := (innerW - len(timeRunes)) / 2
-	if timeStart < 0 {
-		timeStart = 0
-	}
-	timeLine := strings.Repeat(" ", timeStart) + ProgressTimeStyle.Render(timeStr)
-
-	// Controls row
-	var ctrl strings.Builder
-	ctrl.WriteString(ProgressTimeStyle.Render("\uf048"))
-	ctrl.WriteString("  ")
-	if rp.player.State() == player.Playing {
-		ctrl.WriteString(ProgressTimeStyle.Render("\uf04d"))
-	} else {
-		ctrl.WriteString(ProgressTimeStyle.Render("\uf04b"))
-	}
-	ctrl.WriteString("  ")
-	ctrl.WriteString(ProgressTimeStyle.Render("\uf051"))
-	if rp.random {
-		ctrl.WriteString("  ")
-		ctrl.WriteString(StatusOKStyle.Render("\uf074"))
-	}
-	ctrlStr := ctrl.String()
-	padLeft := (innerW - lipgloss.Width(ctrlStr)) / 2
-	if padLeft < 0 {
-		padLeft = 0
-	}
-	ctrlLine := strings.Repeat(" ", padLeft) + ctrlStr
-
-	return timeLine + "\n" + progressBar + "\n" + ctrlLine + "\n"
-}
 
 func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	a.currentIdx = idx
@@ -409,17 +339,18 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 		return nil
 	}
 
-	streamURL := a.client.StreamURL(t.ID)
-	if err := a.player.Play(streamURL); err != nil {
-		a.setStatus(StatusErrStyle.Render("X " + err.Error()))
-		return nil
-	}
-	a.playedAt = time.Now()
-	a.right.SetTrack(&t, a.playedAt)
-	a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 	return func() tea.Msg {
-		lr, err := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
-		return LyricsLoadedMsg{Lyrics: lr, Err: err}
+		streamURL := a.client.StreamURL(t.ID)
+		if err := a.player.Play(streamURL); err != nil {
+			return StreamStartedMsg{Err: err}
+		}
+		lr, lyricsErr := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+		return StreamStartedMsg{
+			Track:     t,
+			PlayedAt:  time.Now(),
+			Lyrics:    lr,
+			LyricsErr: lyricsErr,
+		}
 	}
 }
 
@@ -464,15 +395,8 @@ func (a *App) syncPlaylistState() {
 }
 
 func (a *App) switchSidebar(item SidebarItem) {
-	prev := a.sidebarActive
 	a.sidebarActive = item
-	// Clear tracks when leaving Search or entering Downloads
-	if prev == SideSearch || item == SideDownloads {
-		a.left.tracks = nil
-		a.left.errMsg = ""
-	}
 	if item == SideSearch {
-		a.left.searched = false
 		a.left.searchOnEnter = true
 	} else {
 		a.left.searchOnEnter = false
@@ -484,7 +408,7 @@ func (a *App) resizePanels() {
 	if mainW < 10 {
 		mainW = 10
 	}
-	overhead := 1 + 1 + 4 + 1 + 1 // SOM + sep + process + status + help
+	overhead := 6 + 1 + 1 + 1 // SOM(6) + sep + status + help
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5

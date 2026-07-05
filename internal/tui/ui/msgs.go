@@ -1,6 +1,9 @@
 package ui
 
-import "som/internal/tui/api"
+import (
+	"som/internal/tui/api"
+	"time"
+)
 
 type SearchResultMsg struct {
 	Tracks []api.Track
@@ -13,13 +16,16 @@ type PlayLocalMsg struct {
 	Path  string
 	Title string
 }
-type LyricsLoadedMsg struct {
-	Lyrics api.LyricsResp
-	Err    error
-}
 type DownloadDoneMsg struct {
 	Path string
 	Err  error
+}
+type StreamStartedMsg struct {
+	Track     api.Track
+	PlayedAt  time.Time
+	Lyrics    api.LyricsResp
+	LyricsErr error
+	Err       error
 }
 type LocalFilesMsg struct {
 	Files []LocalFile

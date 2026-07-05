@@ -21,39 +21,13 @@ var (
 	colorBorder  = lipgloss.Color("#2E2E2E")
 	colorBorderF = lipgloss.Color("#E8593C")
 
-	// ── App shell ───────────────────────────────────────────────────────────────
-
-	AppStyle = lipgloss.NewStyle().
-			Background(colorDark)
-
-	HeaderSubStyle = lipgloss.NewStyle().
-			Foreground(colorSubtle2).
-			Background(colorDark).
-			Italic(true)
-
 	// ── Panel containers ────────────────────────────────────────────────────────
-
-	PanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorBorder).
-			Background(colorDark2)
-
-	PanelFocusedStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(colorBorderF).
-				Background(colorDark2)
 
 	PanelTitleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorWhite).
 			Background(colorDark2).
 			Padding(0, 1)
-
-	PanelTitleFocusedStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(colorAccent).
-				Background(colorDark2).
-				Padding(0, 1)
 
 	// ── Search input ────────────────────────────────────────────────────────────
 
@@ -90,29 +64,6 @@ var (
 
 	LyricNormalStyle = lipgloss.NewStyle().
 				Foreground(colorSubtle2)
-
-	// ── Progress bar ────────────────────────────────────────────────────────────
-
-	ProgressBarFill  = lipgloss.NewStyle().Foreground(colorAccent)
-	ProgressBarEmpty = lipgloss.NewStyle().Foreground(colorSubtle)
-
-	ProgressLabelStyle = lipgloss.NewStyle().
-				Foreground(colorWhite).
-				Bold(true)
-
-	ProgressTimeStyle = lipgloss.NewStyle().
-				Foreground(colorSubtle2)
-
-	// ── Now-playing ─────────────────────────────────────────────────────────────
-
-	NowPlayingStyle = lipgloss.NewStyle().
-			Background(colorDark).
-			Foreground(colorWhite).
-			Bold(true).
-			Padding(0, 1)
-
-	PlayingIconStyle = lipgloss.NewStyle().Foreground(colorGreen)
-	PausedIconStyle  = lipgloss.NewStyle().Foreground(colorYellow)
 
 	// ── Status / Help ────────────────────────────────────────────────────────────
 
@@ -204,20 +155,4 @@ func wordWrap(text string, maxW int) []string {
 		lines = append(lines, current)
 	}
 	return lines
-}
-
-func RenderProgressBar(width int, percent float64) string {
-	if width <= 0 {
-		return ""
-	}
-	if percent < 0 {
-		percent = 0
-	}
-	if percent > 1 {
-		percent = 1
-	}
-	filled := int(float64(width) * percent)
-	empty := width - filled
-	return ProgressBarFill.Render(strings.Repeat("█", filled)) +
-		ProgressBarEmpty.Render(strings.Repeat("░", empty))
 }

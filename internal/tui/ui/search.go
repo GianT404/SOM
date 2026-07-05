@@ -25,7 +25,13 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	if p.errMsg != "" {
 		resultContent = StatusErrStyle.Render("X " + p.errMsg)
 	} else if len(p.tracks) > 0 {
-		resultContent = p.renderSearchList(innerW)
+		var statusLine string
+		if p.loadingStream {
+			statusLine = DimItemStyle.Render(" " + p.spinner.View() + " Loading...") + "\n"
+		} else if p.loadingDownload {
+			statusLine = DimItemStyle.Render(" " + p.spinner.View() + " Downloading...") + "\n"
+		}
+		resultContent = statusLine + p.renderSearchList(innerW)
 	} else if !p.searched {
 		padLeft := (innerW) / 2
 		if padLeft < 0 {

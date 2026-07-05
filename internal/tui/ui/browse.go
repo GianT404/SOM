@@ -23,6 +23,9 @@ type LeftPanel struct {
 	searched bool
 	errMsg   string
 
+	loadingStream   bool
+	loadingDownload bool
+
 	width         int
 	height        int
 	searchOnEnter bool
@@ -111,7 +114,8 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 					p.errMsg = "Cannot find home directory"
 					return p, nil
 				}
-				return p, downloadCmd(p.client, t, dir)
+				p.loadingDownload = true
+				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.client, t, dir))
 			}
 
 		case "/":
@@ -134,12 +138,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		}
 
 	case DownloadDoneMsg:
+		p.loadingDownload = false
 		if msg.Err == nil {
 			p.scanLocalFiles()
 		}
 
 	case spinner.TickMsg:
-		if p.loading {
+		if p.loading || p.loadingDownload || p.loadingStream {
 			var cmd tea.Cmd
 			p.spinner, cmd = p.spinner.Update(msg)
 			cmds = append(cmds, cmd)

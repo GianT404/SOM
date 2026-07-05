@@ -7,6 +7,7 @@ import (
 	"som/internal/tui/api"
 	"som/internal/tui/player"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -28,10 +29,16 @@ type RightPanel struct {
 	playlistPos   int
 	playlistTotal int
 	random        bool
+
+	loadingLyrics bool
+	spinner       spinner.Model
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
-	return RightPanel{player: p}
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = StatusMsgStyle
+	return RightPanel{player: p, spinner: sp}
 }
 
 func (r *RightPanel) SetSize(w, h int) { r.width = w; r.height = h }
@@ -44,11 +51,14 @@ func (r *RightPanel) SetTrack(t *api.Track, playedAt time.Time) {
 	r.pausedDur = 0
 	r.curLine = 0
 	r.offset = 0
+	r.loaded = false
+	r.loadingLyrics = true
 }
 
 func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 	r.lyrics = lr
 	r.loaded = true
+	r.loadingLyrics = false
 	r.curLine = 0
 	r.offset = 0
 }
@@ -112,8 +122,9 @@ func (r *RightPanel) TickAt(now time.Time) {
 }
 
 func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
-	if key, ok := msg.(tea.KeyMsg); ok {
-		switch key.String() {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
 		case "pgup", "ctrl+u":
 			if r.offset > 0 {
 				r.offset--
@@ -133,6 +144,13 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 			if r.offset < maxOff {
 				r.offset++
 			}
+		}
+
+	case spinner.TickMsg:
+		if r.loadingLyrics {
+			var cmd tea.Cmd
+			r.spinner, cmd = r.spinner.Update(msg)
+			return r, cmd
 		}
 	}
 	return r, nil

@@ -24,6 +24,24 @@ func (r RightPanel) renderLyrics(innerW int) string {
 	lyrH := r.lyricsHeight()
 	var b strings.Builder
 
+	if r.loadingLyrics {
+		pad := lyrH/2 - 1
+		for i := 0; i < pad; i++ {
+			b.WriteString("\n")
+		}
+		loading := r.spinner.View() + " Loading lyrics..."
+		padLeft := (innerW - lipgloss.Width(DimItemStyle.Render(loading))) / 2
+		if padLeft < 0 {
+			padLeft = 0
+		}
+		b.WriteString(DimItemStyle.Render(strings.Repeat(" ", padLeft) + loading))
+		b.WriteString("\n")
+		for i := pad + 1; i < lyrH; i++ {
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+
 	if !r.loaded {
 		pad := lyrH/2 - 1
 		for i := 0; i < pad; i++ {
