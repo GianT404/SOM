@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -29,31 +31,31 @@ func main() {
 		ytdlpPath = "yt-dlp"
 	}
 
-	// Create the scraper implementation.
+	// Create the scraper implementation
 	sc := scraper.NewYtdlpScraper(ytdlpPath)
 
-	// Wire up handlers.
+	// Wire up handlers
 	searchH := &handler.SearchHandler{Scraper: sc}
 	streamH := handler.NewStreamHandler(sc)
 	lyricsH := &handler.LyricsHandler{Scraper: sc}
 	resolveH := &handler.ResolveHandler{Scraper: sc}
 
-	// Build the chi router.
+	// Build the chi router
 	r := chi.NewRouter()
 
-	// Middleware stack.
+	// Middleware stack
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(3 * time.Minute))
 	r.Use(corsMiddleware)
 
-	// Health check.
+	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","service":"dm4a"}`))
 	})
 
-	// API v1 routes.
+	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/search", searchH.ServeHTTP)
 		r.Get("/stream", streamH.ServeHTTP)
@@ -61,7 +63,7 @@ func main() {
 		r.Get("/resolve", resolveH.ServeHTTP)
 	})
 
-	// Create the HTTP server.
+	// Create the HTTP server
 	srv := &http.Server{
 		Addr:         serverAddr(host, port),
 		Handler:      r,
@@ -70,21 +72,33 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// Graceful shutdown.
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Print(`
- ________       ________      _____ ______      
-|\   ____\     |\   __  \    |\   _ \  _   \    
-\ \  \___|_    \ \  \|\  \   \ \  \\\__\ \  \   
- \ \_____  \    \ \  \\\  \   \ \  \\|__| \  \  
-  \|____|\  \    \ \  \\\  \   \ \  \    \ \  \ 
-    ____\_\  \    \ \_______\   \ \__\    \ \__\
-   |\_________\    \|_______|    \|__|     \|__|
-   \|_________|                                                                  
-`)
+		purples := []lipgloss.Color{
+			"#FFE8DF",
+			"#FFB9A7",
+			"#E8593C",
+			"#C84328",
+			"#9D311A",
+			"#6B1F0E",
+		}
+		art := []string{
+			"     ███████╗   ██████╗   ███╗   ███╗",
+			"     ██╔════╝  ██╔═══██╗  ████╗ ████║",
+			"     ███████╗  ██║   ██║  ██╔████╔██║",
+			"     ╚════██║  ██║   ██║  ██║╚██╔╝██║",
+			"     ███████║  ╚██████╔╝  ██║ ╚═╝ ██║",
+			"     ╚══════╝   ╚═════╝   ╚═╝     ╚═╝ v.2.3",
+		}
+
+		// In ra ASCII art áp dụng màu lipgloss theo từng dòng
+		for i, line := range art {
+			fmt.Println(lipgloss.NewStyle().Foreground(purples[i]).Render(line))
+		}
+
 		log.Printf("Dm4a server starting on %s", srv.Addr)
 		log.Printf("   yt-dlp binary: %s", ytdlpPath)
 		log.Println("   Endpoints:")
@@ -119,7 +133,7 @@ func serverAddr(host string, port string) string {
 	return net.JoinHostPort(host, port)
 }
 
-// corsMiddleware adds CORS headers for the mobile app.
+// corsMiddleware adds CORS headers for the mobile app
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

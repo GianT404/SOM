@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -40,6 +41,7 @@ type App struct {
 	random     bool
 
 	sidebarActive SidebarItem
+	logOffset     int
 }
 
 func NewApp(serverURL string) *App {
@@ -131,7 +133,17 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.syncPlaylistState()
 
 		case "up", "k":
+			if a.sidebarActive == SideLogs {
+				if a.logOffset < LogBuf.Len()-1 {
+					a.logOffset++
+				}
+			}
 		case "down", "j":
+			if a.sidebarActive == SideLogs {
+				if a.logOffset > 0 {
+					a.logOffset--
+				}
+			}
 
 		case "enter":
 
@@ -259,6 +271,8 @@ func (a *App) View() string {
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
 		mainView = a.left.ViewDownloadsContent(mainW, contentH)
+	case SideLogs:
+		mainView = renderLogsView(a.logOffset, mainW, contentH)
 	default:
 		mainView = a.renderLyricsView(mainW, contentH)
 	}
@@ -429,5 +443,5 @@ func init() {
 	if err != nil {
 		panic("CANNOT OPEN LOG FILE: " + err.Error())
 	}
-	log.SetOutput(f)
+	log.SetOutput(io.MultiWriter(f, LogBuf))
 }
