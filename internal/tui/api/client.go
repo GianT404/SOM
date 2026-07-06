@@ -147,16 +147,7 @@ func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, err
 		}
 
 		if len(tracks) > 0 {
-			var selected *ServerLyricTrack
-			for i := range tracks {
-				if tracks[i].Language == "vi" {
-					selected = &tracks[i]
-					break
-				}
-			}
-			if selected == nil {
-				selected = &tracks[0]
-			}
+			selected := &tracks[0]
 			for _, line := range selected.Lines {
 				lr.Synced = append(lr.Synced, LyricLine{
 					Time: line.Start,

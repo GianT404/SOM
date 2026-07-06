@@ -13,7 +13,7 @@ import (
 )
 
 // DirectYoutubeScraper provides an alternative way to fetch subtitles bypassing yt-dlp 429 errors.
-func GetDirectSubtitles(ctx context.Context, videoID string) ([]LyricsData, error) {
+func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang string) ([]LyricsData, error) {
 	client := youtube.Client{}
 
 	// Fetch video info using Innertube API
@@ -21,17 +21,20 @@ func GetDirectSubtitles(ctx context.Context, videoID string) ([]LyricsData, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not get video info: %w", err)
 	}
- 
+
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
-	var results []LyricsData
-
 	// Get caption tracks from the video metadata
 	// `kkdai/youtube` parses the CaptionTracks automatically for the main langs
 	if len(video.CaptionTracks) > 0 {
-		for _, track := range video.CaptionTracks {
+		// Order tracks: preferred language first, then everything else
+		tracks := video.CaptionTracks
+		if preferredLang != "" {
+			tracks = reorderTracks(video.CaptionTracks, preferredLang)
+		}
+		for _, track := range tracks {
 			baseUrl := track.BaseURL
 			if baseUrl == "" {
 				continue
@@ -69,22 +72,16 @@ func GetDirectSubtitles(ctx context.Context, videoID string) ([]LyricsData, erro
 
 			if len(mappedLines) > 0 {
 				langCode := track.LanguageCode
-				// Determine if it's auto-generated, youtube API often adds kind=asr
-				// however, kkdai doesn't export Kind, so we will just use the returned language.
 
-				results = append(results, LyricsData{
+				return []LyricsData{{
 					Language: langCode,
 					Lines:    mappedLines,
-				})
+				}}, nil
 			}
 		}
 	}
 
-	if len(results) == 0 {
-		return nil, fmt.Errorf("no subtitles found or all fetches failed")
-	}
-
-	return results, nil
+	return nil, fmt.Errorf("no subtitles found or all fetches failed")
 }
 
 // GetDirectAudio fetches the best audio stream using kkdai/youtube/v2 directly to bypass yt-dlp.
@@ -140,4 +137,19 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 	}
 
 	return nil
+}
+
+// reorderTracks moves tracks matching preferredLang to the front, so they are
+// tried first when iterating. Tracks that match the preferred language and are
+// not auto-generated (if detectable) get the highest priority.
+func reorderTracks(tracks []youtube.CaptionTrack, preferredLang string) []youtube.CaptionTrack {
+	var preferred, rest []youtube.CaptionTrack
+	for _, t := range tracks {
+		if t.LanguageCode == preferredLang || strings.HasPrefix(t.LanguageCode, preferredLang) {
+			preferred = append(preferred, t)
+		} else {
+			rest = append(rest, t)
+		}
+	}
+	return append(preferred, rest...)
 }

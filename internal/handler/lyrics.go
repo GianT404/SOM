@@ -12,10 +12,9 @@ import (
 )
 
 // LyricsHandler handles GET /api/v1/lyrics?id={video_id}&title={title}&artist={artist}&duration={seconds}.
-// Uses LRCLib exclusively. If title is not provided, fetches it from the video metadata.
-// If no lyrics are found, returns an empty array.
+// Uses LRCLib as the primary source with YouTube captions as fallback.
 type LyricsHandler struct {
-	Scraper scraper.Scraper // Dùng để lấy tiêu đề video khi không được cung cấp
+	Scraper scraper.Scraper
 }
 
 func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -33,11 +32,6 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		duration, _ = strconv.ParseFloat(durationStr, 64)
 	}
 
-	// Chạy LRCLib và YouTube captions song song để giảm độ trễ tổng:
-	// worst-case giờ là max(lrclib, youtube) thay vì lrclib + youtube.
-	// YouTube path tự chia ngân sách 4s (direct) + 6s (yt-dlp) = 10s bên
-	// trong; 12s ở đây chỉ là lớp an toàn ngoài cùng, không phải nguồn cắt
-	// chính — tránh hai lớp timeout đua nhau gây log nhiễu signal:killed.
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
@@ -48,16 +42,29 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	resCh := make(chan result, 2)
 
+	// Goroutine 1: LRCLib with metadata + title-based candidates
 	go func() {
+		// Step 1: try fetching structured metadata from YouTube Music
+		meta, metaErr := h.Scraper.VideoMetadata(ctx, id)
+		if metaErr == nil && meta.Track != "" {
+			log.Printf("lyrics: trying metadata candidate %q by %q", meta.Track, meta.Artist)
+			if data, err := scraper.GetLRCLibLyrics(ctx, meta.Track, meta.Artist, duration); err == nil && len(data) > 0 {
+				resCh <- result{source: "lrclib", data: data}
+				return
+			}
+		}
+
+		// Step 2: fall back to title-based candidates
 		if title == "" {
 			resCh <- result{source: "lrclib", err: fmt.Errorf("no title provided")}
 			return
 		}
-		log.Printf("lyrics: searching LRCLib for %q by %q", title, artist)
+		log.Printf("lyrics: searching LRCLib via title for %q by %q", title, artist)
 		data, err := scraper.TryMultipleLyricProviders(ctx, title, artist, duration)
 		resCh <- result{source: "lrclib", data: data, err: err}
 	}()
 
+	// Goroutine 2: YouTube captions (unchanged)
 	go func() {
 		log.Printf("lyrics: trying YouTube captions for %s", id)
 		data, err := h.Scraper.Lyrics(ctx, id)
@@ -75,7 +82,7 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// LRCLib vẫn là nguồn ưu tiên khi có dữ liệu hợp lệ.
+	// LRCLib priority
 	if lrclibRes != nil && lrclibRes.err == nil && len(lrclibRes.data) > 0 {
 		log.Printf("lyrics: LRCLib OK for %s", id)
 		writeJSON(w, http.StatusOK, lrclibRes.data)

@@ -60,4 +60,8 @@ type Scraper interface {
 
 	// Lyrics returns all parsed subtitle lines mapped by language for the given video ID.
 	Lyrics(ctx context.Context, videoID string) ([]LyricsData, error)
+
+	// VideoMetadata returns structured music metadata (track name, artist) from YouTube Music.
+	// Returns empty strings if no metadata is available.
+	VideoMetadata(ctx context.Context, videoID string) (MusicMetadata, error)
 }

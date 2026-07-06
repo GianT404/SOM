@@ -87,9 +87,9 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	locals := p.getFilteredLocals()
 	if len(locals) == 0 {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
-			return DimItemStyle.Render(" No matching downloaded files found.")
+			return DimItemStyle.Render(" No matching downloaded files found.") + "\n"
 		}
-		return DimItemStyle.Render(" No downloaded files in ~/Music/SOM_Downloads/")
+		return DimItemStyle.Render(" No downloaded files in ~/Music/SOM_Downloads/") + "\n"
 	}
 	var b strings.Builder
 	vis := p.visibleRows()
@@ -102,7 +102,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	if len(locals) >= 1000 {
 		idxW = 4
 	}
-	artistW := 20
+	artistW := 27
 	titleW := innerW - idxW - artistW - 6
 	if titleW < 10 {
 		titleW = 10
@@ -113,7 +113,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 
 	header := fmt.Sprintf("  %*s  %-*s  %s", idxW, "#", titleW, "Title", "Artist")
-	b.WriteString(LocalFileStyle.Width(innerW).Render(header))
+	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	b.WriteString("\n")
 
 	for i := p.offset; i < end; i++ {

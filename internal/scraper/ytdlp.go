@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -296,25 +297,58 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 	return title, nil
 }
 
+func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (MusicMetadata, error) {
+	metaCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(metaCtx, y.BinPath,
+		"--print", "%(track)s|||%(artist)s",
+		"--no-warnings",
+		"--no-check-certificates",
+		"--no-playlist",
+		"--skip-download",
+		"--", "https://www.youtube.com/watch?v="+videoID,
+	)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return MusicMetadata{}, fmt.Errorf("yt-dlp metadata: %w: %s", err, stderr.String())
+	}
+
+	out := strings.TrimSpace(stdout.String())
+	parts := strings.SplitN(out, "|||", 2)
+	if len(parts) != 2 {
+		return MusicMetadata{}, nil
+	}
+
+	track := strings.TrimSpace(parts[0])
+	artist := strings.TrimSpace(parts[1])
+
+	return MusicMetadata{Track: track, Artist: artist}, nil
+}
+
 // Lyrics fetches subtitles and parses them into LyricLines.
 // It attempts to use direct Innertube fetching first to prevent IP blocking.
 // If direct fetching fails, it falls back to yt-dlp downloads.
 func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData, error) {
+	// Detect original video language early so both strategies can prefer it.
+	origLang := detectVideoLanguage(ctx, y.BinPath, videoID)
+
 	// Budget time separately for each strategy so one slow step can't starve
 	// the other of its turn. Without this, GetDirectSubtitles can eat the
 	// entire parent deadline before failing, leaving yt-dlp 0s to run and
 	// causing it to be killed mid-request instead of failing cleanly.
 	directCtx, directCancel := context.WithTimeout(ctx, 4*time.Second)
-	directData, err := GetDirectSubtitles(directCtx, videoID)
+	directData, err := GetDirectSubtitles(directCtx, videoID, origLang)
 	directCancel()
 	if err == nil && len(directData) > 0 {
 		return directData, nil
 	}
 
-	// Fallback to yt-dlp if direct fetch fails. Give it its own bounded
-	// window (independent of how much of the parent ctx is left, but still
-	// capped by it) so it always gets a fair, predictable amount of time to
-	// either succeed or fail on its own rather than being SIGKILLed mid-run.
+	// Fallback to yt-dlp if direct fetch fails.
 	ytdlpCtx, ytdlpCancel := context.WithTimeout(ctx, 6*time.Second)
 	defer ytdlpCancel()
 
@@ -359,40 +393,89 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		return nil, fmt.Errorf("no subtitles available for %s (err: %v): %s", videoID, dlErr, stderr.String())
 	}
 
-	var results []LyricsData
+	// Sort to guarantee deterministic ordering
+	sort.Strings(vttFiles)
 
+	// Select the best single track by priority:
+	// 0. origLang + -orig  (manual captions in video's language)
+	// 1. origLang          (any caption in video's language)
+	// 2. any + -orig        (manual captions in any language)
+	// 3. first alphabetical
+	best := vttFiles[0]
+	bestScore := 99
 	for _, f := range vttFiles {
-		b, err := os.ReadFile(f)
-		if err == nil {
-			vtt := string(b)
-			lines := ParseVTT(vtt)
+		base := filepath.Base(f)
+		parts := strings.Split(base, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		code := strings.TrimSuffix(parts[len(parts)-2], "-orig")
+		isOrig := strings.HasSuffix(parts[len(parts)-2], "-orig")
 
-			if len(lines) > 0 {
-				// Filename format: dm4a_subs_ID.lang.vtt or dm4a_subs_ID.lang-orig.vtt
-				parts := strings.Split(filepath.Base(f), ".")
-				lang := "unknown"
-				if len(parts) >= 3 {
-					lang = parts[len(parts)-2]
-				}
-				// Clean up "-orig" suffix from auto-generated subs
-				lang = strings.TrimSuffix(lang, "-orig")
+		score := 99
+		if origLang != "" && code == origLang && isOrig {
+			score = 0
+		} else if origLang != "" && code == origLang {
+			score = 1
+		} else if isOrig {
+			score = 2
+		} else {
+			score = 3
+		}
 
-				results = append(results, LyricsData{
-					Language: lang,
-					Lines:    lines,
-				})
-			}
+		if score < bestScore {
+			bestScore = score
+			best = f
 		}
 	}
+
+	b, err := os.ReadFile(best)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read subtitle file %s: %w", best, err)
+	}
+
+	lines := ParseVTT(string(b))
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("no valid subtitle lines in %s", best)
+	}
+
+	// Extract language code from filename
+	parts := strings.Split(filepath.Base(best), ".")
+	lang := "unknown"
+	if len(parts) >= 3 {
+		lang = parts[len(parts)-2]
+	}
+	lang = strings.TrimSuffix(lang, "-orig")
+
+	result := []LyricsData{{
+		Language: lang,
+		Lines:    lines,
+	}}
 
 	// Cleanup all generated subtitle files
 	for _, f := range vttFiles {
 		_ = os.Remove(f)
 	}
 
-	if len(results) == 0 {
-		return nil, fmt.Errorf("failed to parse any subtitles for %s", videoID)
-	}
+	return result, nil
+}
 
-	return results, nil
+// detectVideoLanguage runs a fast yt-dlp --print to detect the video's original language.
+func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
+	langCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(langCtx, binPath,
+		"--print", "%(original_language)s",
+		"--skip-download",
+		"--no-warnings",
+		"--no-check-certificates",
+		"--no-playlist",
+		"--", "https://www.youtube.com/watch?v="+videoID,
+	)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if cmd.Run() == nil {
+		return strings.TrimSpace(out.String())
+	}
+	return ""
 }
