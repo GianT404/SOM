@@ -45,8 +45,11 @@ func (b *LogBuffer) Len() int {
 
 var LogBuf = NewLogBuffer(500)
 
-func renderLogsView(logOffset int, w, h int) string {
+func renderLogsView(logOffset int, w, h int, focused bool) string {
 	borderColor := lipgloss.Color("#7c7986")
+	if focused {
+		borderColor = lipgloss.Color("#e8593c")
+	}
 	innerW := w - 4
 	innerH := h - 2
 

@@ -8,9 +8,16 @@ import (
 )
 
 func (p LeftPanel) ViewSearchContent(w, h int) string {
-	borderColor := lipgloss.Color("#7c7986")
-
 	innerW := w - 4
+
+	inputFocused := p.input.Focused()
+	searchBorder := lipgloss.Color("#7c7986")
+	contentBorder := lipgloss.Color("#7c7986")
+	if inputFocused {
+		searchBorder = lipgloss.Color("#e8593c")
+	} else {
+		contentBorder = lipgloss.Color("#e8593c")
+	}
 
 	// Search input box (thin border)
 	inputRow := " " + p.input.View()
@@ -18,7 +25,7 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 		inputRow += " " + p.spinner.View()
 	}
 	inputContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
-	searchBox := renderBox(w, "Search", inputContent, borderColor)
+	searchBox := renderBox(w, "Search", inputContent, searchBorder)
 
 	// Results box (normal border, no title)
 	var resultContent string
@@ -41,7 +48,7 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	} else {
 		resultContent = DimItemStyle.Render(" No results.") + "\n"
 	}
-	resultsBox := renderBox(w, "", resultContent, borderColor)
+	resultsBox := renderBox(w, "", resultContent, contentBorder)
 
 	return searchBox + "\n" + resultsBox
 }

@@ -290,6 +290,7 @@ func (a *App) View() string {
 	sideView := renderSidebar(a.sidebarActive, sideH)
 
 	// Main content
+	inputNotFocused := !a.left.input.Focused()
 	var mainView string
 	switch a.sidebarActive {
 	case SideSearch:
@@ -297,9 +298,9 @@ func (a *App) View() string {
 	case SideDownloads:
 		mainView = a.left.ViewDownloadsContent(mainW, contentH)
 	case SideLogs:
-		mainView = renderLogsView(a.logOffset, mainW, contentH)
+		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
-		mainView = a.renderLyricsView(mainW, contentH)
+		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused)
 	}
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
@@ -326,7 +327,7 @@ func (a *App) View() string {
 	return b.String()
 }
 
-func (a *App) renderLyricsView(w, h int) string {
+func (a *App) renderLyricsView(w, h int, focused bool) string {
 	if a.nowPlay == nil {
 		return lipgloss.NewStyle().
 			Width(w - 2).
@@ -335,7 +336,7 @@ func (a *App) renderLyricsView(w, h int) string {
 	}
 
 	borderColor := lipgloss.Color("#7c7986")
-	lyricsBox := a.right.renderLyricsBox(false, borderColor)
+	lyricsBox := a.right.renderLyricsBox(focused, borderColor)
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 
