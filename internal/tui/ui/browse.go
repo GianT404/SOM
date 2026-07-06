@@ -59,9 +59,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if !focused {
-			break
-		}
 		switch msg.String() {
 		case "enter":
 			if p.input.Focused() {
@@ -89,7 +86,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "up", "k":
-			if p.cursor > 0 {
+			if !p.input.Focused() && p.cursor > 0 {
 				p.cursor--
 				if p.cursor < p.offset {
 					p.offset = p.cursor
@@ -97,17 +94,19 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "down", "j":
-			items := p.itemCount()
-			if p.cursor < items-1 {
-				p.cursor++
-				vis := p.visibleRows()
-				if p.cursor >= p.offset+vis {
-					p.offset++
+			if !p.input.Focused() {
+				items := p.itemCount()
+				if p.cursor < items-1 {
+					p.cursor++
+					vis := p.visibleRows()
+					if p.cursor >= p.offset+vis {
+						p.offset++
+					}
 				}
 			}
 
 		case "d":
-			if len(p.tracks) > 0 && p.cursor < len(p.tracks) && !p.loading {
+			if !p.input.Focused() && len(p.tracks) > 0 && p.cursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.cursor]
 				dir, err := getDownloadDir()
 				if err != nil {
@@ -119,8 +118,10 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "/":
-			p.input.Focus()
-			p.input.SetValue("")
+			if !p.input.Focused() {
+				p.input.Focus()
+				p.input.SetValue("")
+			}
 			return p, nil
 		}
 

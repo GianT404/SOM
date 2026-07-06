@@ -40,7 +40,7 @@ func StartServer(ctx context.Context, port string, ytdlpPath string) error {
 	errChan := make(chan error, 1)
 
 	go func() {
-		log.Printf("Backend khởi chạy ngầm tại cổng %s", port)
+		log.Printf("Backend khởi chạy tại cổng %s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- err
 		}

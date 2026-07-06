@@ -1,14 +1,19 @@
 package ui
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"som/internal/backend"
 	"som/internal/tui/api"
 	"som/internal/tui/player"
 
@@ -45,7 +50,21 @@ type App struct {
 }
 
 func NewApp(serverURL string) *App {
-	c := api.New(serverURL)
+	// Find a free port and start the backend server embedded in this process.
+	port := freePort()
+	go func() {
+		ytdlpPath := os.Getenv("YTDLP_PATH")
+		if ytdlpPath == "" {
+			ytdlpPath = "yt-dlp"
+		}
+		ctx := context.Background()
+		if err := backend.StartServer(ctx, port, ytdlpPath); err != nil {
+			log.Printf("embedded backend error: %v", err)
+		}
+	}()
+
+	localURL := fmt.Sprintf("http://localhost:%s", port)
+	c := api.New(localURL)
 	p := player.New()
 	return &App{
 		client:        c,
@@ -434,6 +453,16 @@ func (a *App) resizePanels() {
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
 	a.statusAt = time.Now()
+}
+
+func freePort() string {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "0"
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	return strconv.Itoa(port)
 }
 
 func init() {
