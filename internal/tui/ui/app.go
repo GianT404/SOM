@@ -100,9 +100,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			a.player.Stop()
 			return a, tea.Quit
+
+		case "q":
+			if !a.left.input.Focused() {
+				a.player.Stop()
+				return a, tea.Quit
+			}
 
 		case "tab":
 			if a.left.input.Focused() {
