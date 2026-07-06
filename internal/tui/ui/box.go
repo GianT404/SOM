@@ -13,7 +13,7 @@ func renderBox(w int, title string, content string, borderColor lipgloss.Termina
 	if title == "" {
 		topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
 	} else {
-		titleRendered := PanelTitleStyle.Render(title)
+		titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
 		titleW := lipgloss.Width(titleRendered)
 		prefix := "╭── "
 		prefixStyled := borderChar.Render(prefix)

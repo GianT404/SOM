@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -49,12 +52,31 @@ func (p *LeftPanel) scanLocalFiles() {
 				}
 			}
 			p.locals = append(p.locals, LocalFile{
-				Name:   name,
-				Path:   localPath,
-				Artist: artist,
+				Name:     name,
+				Path:     localPath,
+				Artist:   artist,
+				Duration: getFileDuration(localPath),
 			})
 		}
 	}
+}
+
+func getFileDuration(path string) int {
+	cmd := exec.Command("ffprobe", "-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return 0
+	}
+	sec, err := strconv.ParseFloat(strings.TrimSpace(out.String()), 64)
+	if err != nil {
+		return 0
+	}
+	return int(sec)
 }
 
 func (p LeftPanel) ViewDownloadsContent(w, h int) string {

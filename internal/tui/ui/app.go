@@ -207,9 +207,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		idx := -1
 		for i, lf := range locals {
 			a.playlist[i] = api.Track{
-				ID:     "local:" + lf.Path,
-				Title:  lf.Name,
-				Artist: lf.Artist,
+				ID:       "local:" + lf.Path,
+				Title:    lf.Name,
+				Artist:   lf.Artist,
+				Duration: lf.Duration,
 			}
 			if lf.Name == msg.Title {
 				idx = i
@@ -269,7 +270,7 @@ func (a *App) View() string {
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		statusH = 1
 	}
-	overhead := 7 + 1 + statusH + 1 // SOM(6) + sep + status + help
+	overhead := 7 + 1 + statusH + 4 + 1 // SOM(6) + sep + status + progress + help
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -315,6 +316,9 @@ func (a *App) View() string {
 		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  /:search  q:quit",
 	)
 
+	// Progress bar
+	progressBar := a.renderProgressBar(a.width)
+
 	var b strings.Builder
 	b.WriteString(somRow + "\n")
 	b.WriteString(sep + "\n")
@@ -322,6 +326,7 @@ func (a *App) View() string {
 	if status != "" {
 		b.WriteString(status + "\n")
 	}
+	b.WriteString(progressBar + "\n")
 	b.WriteString(help)
 
 	return b.String()
@@ -340,6 +345,110 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 
+
+func (a *App) renderProgressBar(w int) string {
+	state := a.player.State()
+
+	// Controls row (all dim #7c7986)
+	playIcon := IconPlay
+	if state == player.Playing {
+		playIcon = IconPause
+	}
+
+	dim := ProgressDimStyle
+
+	shuffleIcon := dim.Render(IconShuffle)
+	if a.random {
+		shuffleIcon = ProgressFilledStyle.Render(IconShuffle)
+	}
+
+	controls := fmt.Sprintf("  %s  %s  %s  %s  %s",
+		dim.Render(IconPrev),
+		dim.Render(IconStop),
+		dim.Render(playIcon),
+		dim.Render(IconNext),
+		shuffleIcon,
+	)
+
+	// Progress bar row
+	innerW := w - 4
+
+	elapsedSec := 0
+	totalSec := 0
+	if a.nowPlay != nil {
+		elapsedSec = int(a.right.elapsed.Seconds())
+		totalSec = a.nowPlay.Duration
+		if totalSec > 0 && elapsedSec > totalSec {
+			elapsedSec = totalSec
+		}
+	}
+
+	timeStr := FormatDuration(elapsedSec)
+	timeW := len([]rune(timeStr))
+
+	// Bar: ██ fillW + time + ░░ emptyW (time overlaid on ░)
+	restW := innerW - timeW
+	if restW < 0 {
+		restW = 0
+	}
+
+	fillW := 0
+	if totalSec > 0 {
+		fillW = restW * elapsedSec / totalSec
+	}
+	if fillW > restW {
+		fillW = restW
+	}
+	emptyW := restW - fillW
+
+	var bar strings.Builder
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", fillW)))
+	bar.WriteString(ProgressTimeStyle.Render(timeStr))
+	bar.WriteString(ProgressEmptyStyle.Render(strings.Repeat("░", emptyW)))
+
+	progress := bar.String()
+
+	// Manually render box to preserve ANSI styles
+	borderColor := lipgloss.Color("#7c7986")
+	borderChar := lipgloss.NewStyle().Foreground(borderColor)
+
+	// Top border with track title
+	title := ""
+	if a.nowPlay != nil {
+		title = a.nowPlay.Title
+	}
+	var topBorder string
+	if title == "" {
+		topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
+	} else {
+		titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
+		titleW := lipgloss.Width(titleRendered)
+		prefix := "╭── "
+		prefixStyled := borderChar.Render(prefix)
+		prefixW := lipgloss.Width(prefixStyled)
+		remain := w - prefixW - titleW - 1
+		if remain < 0 {
+			remain = 0
+		}
+		topBorder = prefixStyled + titleRendered + borderChar.Render(strings.Repeat("─", remain)+"╮")
+	}
+
+	bottomBorder := borderChar.Render("╰" + strings.Repeat("─", w-2) + "╯")
+
+	controlsPad := innerW - lipgloss.Width(controls)
+	if controlsPad < 0 {
+		controlsPad = 0
+	}
+	controlsLine := borderChar.Render("│ ") + controls + strings.Repeat(" ", controlsPad) + borderChar.Render(" │")
+
+	barPad := innerW - lipgloss.Width(progress)
+	if barPad < 0 {
+		barPad = 0
+	}
+	barLine := borderChar.Render("│ ") + progress + strings.Repeat(" ", barPad) + borderChar.Render(" │")
+
+	return topBorder + "\n" + controlsLine + "\n" + barLine + "\n" + bottomBorder
+}
 
 func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	a.currentIdx = idx

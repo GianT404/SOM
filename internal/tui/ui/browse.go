@@ -122,8 +122,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				p.input.Focus()
 				p.input.SetValue("")
 			}
-			return p, nil
-		}
+		return p, nil
+	}
+
 
 	case SearchResultMsg:
 		p.loading = false

@@ -8,6 +8,16 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+// Nerd-font icon codepoints (Font Awesome via nerd-fonts)
+const (
+	IconPrev    = "\uF04A"
+	IconStop    = "\uF04D"
+	IconPlay    = "\uF04B"
+	IconPause   = "\uF04C"
+	IconNext    = "\uF04E"
+	IconShuffle = "\uF074"
+)
+
 var (
 	colorAccent  = lipgloss.Color("#E8593C")
 	colorSubtle  = lipgloss.Color("#4A4A4A")
@@ -75,6 +85,21 @@ var (
 	SubtitleStyle = lipgloss.NewStyle().
 			Foreground(colorSubtle2).
 			Italic(true)
+
+	// ── Progress bar ─────────────────────────────────────────────────────────────
+
+	ProgressFilledStyle = lipgloss.NewStyle().
+				Foreground(colorAccent)
+
+	ProgressEmptyStyle = lipgloss.NewStyle().
+				Foreground(colorWhite)
+
+	ProgressTimeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ffffff")).
+				Bold(true)
+
+	ProgressDimStyle = lipgloss.NewStyle().
+				Foreground(colorWhite)
 )
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
