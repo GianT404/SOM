@@ -18,6 +18,14 @@
 <p align="center">
   <img src="app/assets/thumbnail.png" alt="SOM Logo" width="100%" />
 </p>
+
+<p align="center">
+  <img src="app/assets/playlist-tui.png" alt="SOM Logo" width="100%" />
+</p>
+
+<p align="center">
+  <img src="app/assets/lyric-tui.png" alt="SOM Logo" width="100%" />
+</p>
 ---
 
 ## Features
@@ -40,8 +48,11 @@
 
 ```
 SOM/
-├── cmd/server/          # Go backend entry point
-│   └── main.go          # HTTP server (chi router)
+├── cmd/
+│   ├── server/          # Go backend entry point
+│   │   └── main.go      # HTTP server (chi router)
+│   └── som/             # TUI (terminal) entry point
+│       └── main.go      # Bubble Tea TUI app
 ├── internal/
 │   ├── handler/         # API route handlers
 │   │   ├── search.go    # GET /api/v1/search
@@ -52,6 +63,20 @@ SOM/
 │   │   ├── ytdlp.go     # yt-dlp wrapper
 │   │   ├── lrclib.go    # LRCLib lyrics API
 │   │   └── ...          # VTT parser, fallback scrapers
+│   ├── tui/
+│   │   └── ui/          # TUI components (Bubble Tea)
+│   │       ├── app.go         # Main app loop, sidebar, progress bar
+│   │       ├── browse.go      # Left panel (search/downloads/local)
+│   │       ├── nowplaying.go  # Right panel (lyrics, track info)
+│   │       ├── search.go      # Search input view
+│   │       ├── downloads.go   # Local file scanning
+│   │       ├── sidebar.go     # Sidebar definition
+│   │       ├── logs.go        # Ring-buffer logger
+│   │       ├── styles.go      # Styles & nerd-font icons
+│   │       ├── commands.go    # Bubble Tea commands
+│   │       ├── box.go         # Box drawing helper
+│   │       ├── msgs.go        # Message types
+│   │       └── lyrics.go      # Lyric line parsing
 │   └── cleaner/         # Audio stream processing
 ├── app/                 # React Native (Expo) mobile app
 │   ├── src/
@@ -69,9 +94,11 @@ SOM/
 └── go.mod               # Go module definition
 ```
 
-**Backend** — A lightweight Go HTTP server that proxies YouTube audio and lyrics.
+**Backend** — A lightweight Go HTTP server that proxies YouTube audio and lyrics (can run embedded inside the TUI).
 
-**Frontend** — A React Native app built with Expo, featuring background audio playback, offline downloads, and synced lyrics.
+**Terminal UI** — A Bubble Tea TUI that embeds the backend in-process, featuring keyboard-driven music search, stream, download, lyrics, and local file playback.
+
+**Mobile Frontend** — A React Native app built with Expo, featuring background audio playback, offline downloads, and synced lyrics.
 
 ---
 
@@ -124,7 +151,7 @@ cd app
 npx expo run:android
 ```
 
-### Desktop App
+### Desktop App (Stop supported)
 
 See [`docs/DESKTOP.md`](docs/DESKTOP.md) for Linux/Windows desktop setup.
 
@@ -133,6 +160,55 @@ npm install
 npm run desktop:dev
 npm run desktop:build:linux
 ```
+
+### TUI (Terminal UI)
+
+A standalone terminal music player — stream, download, and listen to music directly from the command line. No desktop environment required.
+
+**Build & run:**
+
+```bash
+cd cmd/som
+go build -o som .
+./som
+```
+
+**Controls:**
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Cycle focus between search input and content panel |
+| `Up` / `Down` | Navigate list items |
+| `Left` / `Right` | Seek backward / forward in track |
+| `Enter` | Play selected track |
+| `Space` | Pause / resume playback |
+| `r` | Shuffle playlist |
+| `p` | prev track |
+| `n` | next track |
+| `/` | Focus search input |
+| `d` | Download selected track |
+| `q` | Quit (when input not focused) |
+
+**Features:**
+
+- YouTube search and stream via embedded `yt-dlp` backend
+- Download tracks for offline playback (`.m4a`)
+- LRCLib synced lyrics with auto-fallback
+- Local `.m4a` file scanning with `ffprobe` duration detection
+- Progress bar with control buttons (prev / play-pause / next / shuffle)
+- Logs tab for backend debugging
+
+**Cross-platform builds:**
+
+```bash
+# Linux
+GOOS=linux GOARCH=amd64 go build -o som-linux-amd64 ./cmd/som
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
+```
+
+> Requires `yt-dlp` in `PATH`. For local file durations, also needs `ffprobe` (from FFmpeg).
 
 ---
 
