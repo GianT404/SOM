@@ -345,7 +345,6 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 
-
 func (a *App) renderProgressBar(w int) string {
 	state := a.player.State()
 
@@ -362,9 +361,8 @@ func (a *App) renderProgressBar(w int) string {
 		shuffleIcon = ProgressFilledStyle.Render(IconShuffle)
 	}
 
-	controls := fmt.Sprintf("  %s  %s  %s  %s  %s",
+	controls := fmt.Sprintf("  %s  %s  %s  %s ",
 		dim.Render(IconPrev),
-		dim.Render(IconStop),
 		dim.Render(playIcon),
 		dim.Render(IconNext),
 		shuffleIcon,
@@ -439,7 +437,12 @@ func (a *App) renderProgressBar(w int) string {
 	if controlsPad < 0 {
 		controlsPad = 0
 	}
-	controlsLine := borderChar.Render("│ ") + controls + strings.Repeat(" ", controlsPad) + borderChar.Render(" │")
+	controlsLine := borderChar.Render("│ ") +
+		lipgloss.NewStyle().
+			Width(innerW).
+			Align(lipgloss.Center).
+			Render(controls) +
+		borderChar.Render(" │")
 
 	barPad := innerW - lipgloss.Width(progress)
 	if barPad < 0 {

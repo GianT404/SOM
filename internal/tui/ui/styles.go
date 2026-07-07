@@ -8,14 +8,14 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// Nerd-font icon codepoints (Font Awesome via nerd-fonts)
+// Nerd-font icon codepoints (Material Design via nerd-fonts)
+// Font Awesome (Nerd Font)
 const (
-	IconPrev    = "\uF04A"
-	IconStop    = "\uF04D"
-	IconPlay    = "\uF04B"
-	IconPause   = "\uF04C"
-	IconNext    = "\uF04E"
-	IconShuffle = "\uF074"
+	IconPrev    = "\uf048"
+	IconPlay    = "\uf04b"
+	IconPause   = "\uf04c"
+	IconNext    = "\uf051"
+	IconShuffle = "\uf074"
 )
 
 var (
