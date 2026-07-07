@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img src="app/assets/lyric-tui.png" alt="SOM Logo" width="100%" />
+  <img src="app/assets/lyrics-tui.png" alt="SOM Logo" width="100%" />
 </p>
 ---
 
