@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -210,10 +211,25 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 	}, nil
 }
 
+var cleanupOnce sync.Once
+
+// cleanupStaleTempFiles removes dm4a_*.m4a temp files older than 1 hour.
+func cleanupStaleTempFiles() {
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dm4a_*.m4a"))
+	now := time.Now()
+	for _, f := range matches {
+		info, err := os.Stat(f)
+		if err == nil && now.Sub(info.ModTime()) > 1*time.Hour {
+			os.Remove(f)
+		}
+	}
+}
+
 // DownloadAudio downloads audio to a temporary file and returns its path.
 // yt-dlp handles YouTube's n-parameter throttle decryption internally,
 // so this gives full-speed downloads unlike raw URL fetching.
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
+	cleanupOnce.Do(cleanupStaleTempFiles)
 	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dm4a_%s.m4a", videoID))
 
 	// If it already exists and is a valid MP4/M4A file, reuse it. Older builds
