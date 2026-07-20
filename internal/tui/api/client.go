@@ -37,6 +37,9 @@ type LyricsResp struct {
 
 	Artist string `json:"artist,omitempty"`
 	Title  string `json:"title,omitempty"`
+	// VideoID is the YouTube video ID this track was downloaded from.
+	// Used to match downloaded files back to search results.
+	VideoID string `json:"video_id,omitempty"`
 }
 
 func (l *LyricsResp) Normalize() {

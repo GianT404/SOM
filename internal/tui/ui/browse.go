@@ -122,9 +122,8 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				p.input.Focus()
 				p.input.SetValue("")
 			}
-		return p, nil
-	}
-
+			return p, nil
+		}
 
 	case SearchResultMsg:
 		p.loading = false
@@ -185,6 +184,50 @@ func (p LeftPanel) visibleRows() int {
 		return 3
 	}
 	return rows
+}
+
+// isDownloaded reports whether a search result track already exists in the
+// local downloads folder.
+//
+// Matching is done primarily by YouTube video ID. However, YouTube search
+// is not fully deterministic: the same song title can come back with a
+// different video ID on a later search (duplicate uploads, re-ranking,
+// etc.), which would cause an exact-ID match to miss a track the user
+// already downloaded. To cover that case, we fall back to a normalized
+// title match, additionally requiring the duration to be within a small
+// tolerance so unrelated tracks that happen to share a generic title
+// aren't flagged as duplicates.
+func (p LeftPanel) isDownloaded(t api.Track) bool {
+	if t.ID != "" {
+		for _, f := range p.locals {
+			if f.VideoID == t.ID {
+				return true
+			}
+		}
+	}
+	if t.Title == "" {
+		return false
+	}
+	key := normalizeTrackTitle(t.Title)
+	for _, f := range p.locals {
+		if normalizeTrackTitle(f.Name) != key {
+			continue
+		}
+		diff := f.Duration - t.Duration
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= 2 {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeTrackTitle lowercases and collapses whitespace so titles that
+// differ only in casing or spacing still compare equal.
+func normalizeTrackTitle(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
 func (p LeftPanel) getFilteredLocals() []LocalFile {

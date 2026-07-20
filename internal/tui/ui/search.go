@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func (p LeftPanel) ViewSearchContent(w, h int) string {
@@ -19,7 +20,6 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 		contentBorder = lipgloss.Color("#e8593c")
 	}
 
-	// Search input box (thin border)
 	inputRow := " " + p.input.View()
 	if p.loading {
 		inputRow += " " + p.spinner.View()
@@ -27,7 +27,6 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	inputContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
 	searchBox := renderBox(w, "Search", inputContent, searchBorder)
 
-	// Results box (normal border, no title)
 	var resultContent string
 	if p.errMsg != "" {
 		resultContent = StatusErrStyle.Render("X " + p.errMsg)
@@ -82,16 +81,35 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 			mark = ""
 		}
 		safeTitle := truncate(t.Title, titleW)
-		titleBlock := lipgloss.NewStyle().Width(titleW).Render(safeTitle)
+		titlePlain := runewidth.FillRight(safeTitle, titleW)
 		durationBlock := FormatDuration(t.Duration)
+		downloaded := p.isDownloaded(t)
 
-		line := mark + titleBlock + " " + durationBlock
-
-		if i == p.cursor {
-			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
-		} else {
-			b.WriteString(NormalItemStyle.Width(innerW).Render(line))
+		checkPlaceholder := " "
+		plainLine := mark + titlePlain + " " + durationBlock + " " + checkPlaceholder
+		pad := innerW - runewidth.StringWidth(plainLine)
+		if pad < 0 {
+			pad = 0
 		}
+
+		rowStyle := NormalItemStyle
+		if i == p.cursor {
+			rowStyle = SelectedItemStyle
+		}
+
+		before := rowStyle.Render(mark + titlePlain + " " + durationBlock + " ")
+		var checkFrag string
+		if downloaded {
+			checkStyle := rowStyle.Foreground(colorDark)
+			checkFrag = checkStyle.Render(IconCheck)
+		} else {
+			checkFrag = rowStyle.Render(" ")
+		}
+		after := rowStyle.Render(strings.Repeat(" ", pad))
+
+		b.WriteString(before)
+		b.WriteString(checkFrag)
+		b.WriteString(after)
 		b.WriteString("\n")
 	}
 	if len(p.tracks) > vis {

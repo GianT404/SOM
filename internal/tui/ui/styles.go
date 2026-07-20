@@ -16,6 +16,7 @@ const (
 	IconPause   = "\uf04c"
 	IconNext    = "\uf051"
 	IconShuffle = "\uf074"
+	IconCheck   = "\uf00c"
 )
 
 var (
@@ -77,7 +78,7 @@ var (
 
 	// ── Status / Help ────────────────────────────────────────────────────────────
 
-	StatusOKStyle  = lipgloss.NewStyle().Foreground(colorGreen)
+	StatusOKStyle  = lipgloss.NewStyle().Foreground(colorDark)
 	StatusErrStyle = lipgloss.NewStyle().Foreground(colorRed)
 	StatusMsgStyle = lipgloss.NewStyle().Foreground(colorYellow)
 	HelpStyle      = lipgloss.NewStyle().Foreground(colorSubtle2)

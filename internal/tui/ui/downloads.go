@@ -38,14 +38,17 @@ func (p *LeftPanel) scanLocalFiles() {
 			localPath := filepath.Join(dir, e.Name())
 			name := strings.TrimSuffix(e.Name(), ".m4a")
 			artist := ""
+			videoID := ""
 			jsonPath := strings.TrimSuffix(localPath, ".m4a") + ".json"
 			if data, err := os.ReadFile(jsonPath); err == nil {
 				var meta struct {
-					Artist string `json:"artist"`
-					Title  string `json:"title"`
+					Artist  string `json:"artist"`
+					Title   string `json:"title"`
+					VideoID string `json:"video_id"`
 				}
 				if json.Unmarshal(data, &meta) == nil {
 					artist = meta.Artist
+					videoID = meta.VideoID
 					if meta.Title != "" {
 						name = meta.Title
 					}
@@ -56,6 +59,7 @@ func (p *LeftPanel) scanLocalFiles() {
 				Path:     localPath,
 				Artist:   artist,
 				Duration: getFileDuration(localPath),
+				VideoID:  videoID,
 			})
 		}
 	}
