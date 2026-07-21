@@ -211,7 +211,18 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 > Requires `yt-dlp` in `PATH`. For local file durations, also needs `ffprobe` (from FFmpeg).
 
 ---
+## Installation
 
+You can automatically install SOM and its dependencies (yt-dlp, ffmpeg, mpv) using the following commands:
+
+**For Linux / macOS:**
+```bash
+curl -fsSL [https://raw.githubusercontent.com/gian404/som/main/install.sh](https://raw.githubusercontent.com/gian404/som/main/install.sh) | bash
+```
+
+```bash
+iwr -useb [https://raw.githubusercontent.com/gian404/som/main/install.ps1](https://raw.githubusercontent.com/gian404/som/main/install.ps1) | iex
+```
 ## API Endpoints
 
 | Method | Endpoint | Params | Description |
