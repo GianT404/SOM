@@ -1,4 +1,4 @@
-ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $Repo = "GianT404/SOM"
 
@@ -8,7 +8,6 @@ function Err($msg)   { Write-Host "LOI: $msg" -ForegroundColor Red; exit 1 }
 
 function Install-Deps {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Warn "Khong tim thay winget. Can Windows 10 1809+ / Windows 11, hoac cai"
         Warn "'App Installer' tu Microsoft Store roi chay lai script nay."
         exit 1
     }
@@ -20,7 +19,7 @@ function Install-Deps {
     winget install --id Gyan.FFmpeg --silent --accept-package-agreements --accept-source-agreements
 
     Info "Cai mpv..."
-    winget install --id mpv-player.mpv --silent --accept-package-agreements --accept-source-agreements
+    winget install --id mpv.mpv --silent --accept-package-agreements --accept-source-agreements
 
     Warn "Neu mpv/ffmpeg vua cai xong ma 'som' van bao khong tim thay, mo lai"
     Warn "terminal moi (winget can terminal moi de nhan PATH vua duoc cap nhat)."
