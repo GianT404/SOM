@@ -215,14 +215,14 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 
 You can automatically install SOM and its dependencies (yt-dlp, ffmpeg, mpv) using the following commands:
 
-**For Linux / macOS:**
 ```bash
-curl -fsSL [https://raw.githubusercontent.com/gian404/som/main/install.sh](https://raw.githubusercontent.com/gian404/som/main/install.sh) | bash
+#Linux
+curl -fsSL https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.sh | bash
+
+#Windows (PowerShell)
+curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.ps1 | iex
 ```
 
-```bash
-iwr -useb [https://raw.githubusercontent.com/gian404/som/main/install.ps1](https://raw.githubusercontent.com/gian404/som/main/install.ps1) | iex
-```
 ## API Endpoints
 
 | Method | Endpoint | Params | Description |
