@@ -52,3 +52,5 @@ desktop/dist/
 desktop/src-tauri/gen/
 desktop/src-tauri/target/
 desktop/src-tauri/binaries/som-backend-*
+som
+som.exe
