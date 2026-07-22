@@ -76,7 +76,9 @@ func runSelfUpdate(current string) error {
 
 	fmt.Printf("Đang cập nhật %s → %s...\n", current, rel.TagName)
 
-	dlResp, err := httpClient.Get(downloadURL)
+	downloadClient := &http.Client{Timeout: 5 * time.Minute}
+
+	dlResp, err := downloadClient.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("tải bản mới thất bại: %w", err)
 	}
