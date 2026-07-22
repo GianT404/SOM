@@ -64,17 +64,18 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			if p.input.Focused() {
 				q := strings.TrimSpace(p.input.Value())
 				if q == "" || p.loading {
-					break
+					return p, nil
 				}
 				if p.searchOnEnter {
 					p.loading = true
 					p.errMsg = ""
 					p.tracks = nil
 					cmds = append(cmds, p.spinner.Tick, searchCmd(p.client, q))
-				} else {
-					p.input.Blur()
 				}
-			} else if len(p.tracks) > 0 && p.cursor < len(p.tracks) {
+				return p, tea.Batch(cmds...)
+			}
+
+			if len(p.tracks) > 0 && p.cursor < len(p.tracks) {
 				t := p.tracks[p.cursor]
 				return p, func() tea.Msg { return PlayStartedMsg{Track: t} }
 			} else {
@@ -130,7 +131,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		p.searched = true
 		p.cursor = 0
 		p.offset = 0
-		p.input.Blur()
+		// p.input.Blur()
 		if msg.Err != nil {
 			p.errMsg = msg.Err.Error()
 			p.tracks = nil
@@ -186,17 +187,6 @@ func (p LeftPanel) visibleRows() int {
 	return rows
 }
 
-// isDownloaded reports whether a search result track already exists in the
-// local downloads folder.
-//
-// Matching is done primarily by YouTube video ID. However, YouTube search
-// is not fully deterministic: the same song title can come back with a
-// different video ID on a later search (duplicate uploads, re-ranking,
-// etc.), which would cause an exact-ID match to miss a track the user
-// already downloaded. To cover that case, we fall back to a normalized
-// title match, additionally requiring the duration to be within a small
-// tolerance so unrelated tracks that happen to share a generic title
-// aren't flagged as duplicates.
 func (p LeftPanel) isDownloaded(t api.Track) bool {
 	if t.ID != "" {
 		for _, f := range p.locals {
