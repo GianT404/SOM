@@ -496,7 +496,8 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 		if err := a.player.Play(streamURL); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
-		lr, lyricsErr := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+		// lr, lyricsErr := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+		lr, lyricsErr := getCachedLyrics(a.client, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
 			PlayedAt:  time.Now(),

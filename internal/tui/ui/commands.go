@@ -31,7 +31,8 @@ func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 		path, err := c.DownloadM4A(t.ID, t.Title, destDir)
 
 		if err == nil {
-			lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+			// lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
+			lr, errLyr := getCachedLyrics(c, t.ID, t.Title, t.Artist, t.Duration)
 			if errLyr != nil {
 				lr = api.LyricsResp{}
 			}
