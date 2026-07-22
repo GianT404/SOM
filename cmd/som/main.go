@@ -13,21 +13,23 @@ import (
 	"som/internal/tui/ui"
 )
 
-// Version is set at build time via:
-//
-//	go build -ldflags "-X main.Version=v0.4.0" ./cmd/som
-//
-// A plain `go build` (no ldflags) leaves it as "dev" — --upgrade refuses to
-// run in that case since there's no real version to compare against GitHub.
 var Version = "dev"
 
 func main() {
 	upgrade := flag.Bool("upgrade", false, "download and install the latest SOM release from GitHub")
+	install := flag.Bool("install", false, "copy this binary to /usr/local/bin (or platform equivalent) so `som` works from anywhere")
 	showVersion := flag.Bool("version", false, "print the current version and exit")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println("som", Version)
+		return
+	}
+	if *install {
+		if err := runInstall(); err != nil {
+			fmt.Fprintln(os.Stderr, "Cài đặt thất bại:", err)
+			os.Exit(1)
+		}
 		return
 	}
 	if *upgrade {
@@ -37,8 +39,6 @@ func main() {
 		}
 		return
 	}
-
-	// Silence chi request logs to avoid noise in the Logs tab.
 	middleware.DefaultLogger = middleware.RequestLogger(
 		&middleware.DefaultLogFormatter{
 			Logger:  log.New(io.Discard, "", 0),

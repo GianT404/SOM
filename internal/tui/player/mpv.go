@@ -6,7 +6,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
+
+	"som/internal/tui/bindeps"
 )
 
 type State int
@@ -22,23 +25,31 @@ type Player struct {
 	cmd    *exec.Cmd
 	state  State
 	stderr bytes.Buffer
+	gen    uint64
 }
 
 func New() *Player { return &Player{} }
 
-const socketPath = "/tmp/mpv-som.sock"
+var socketPath = filepath.Join(os.TempDir(), "mpv-som.sock")
 
 func (p *Player) Play(streamURL string) error {
 	p.Stop()
 
-	if _, err := exec.LookPath("mpv"); err != nil {
-		return fmt.Errorf("mpv not found in PATH")
+	mpvPath := bindeps.Find("mpv")
+	if mpvPath == "mpv" {
+		if _, err := exec.LookPath("mpv"); err != nil {
+			return fmt.Errorf("mpv not found in PATH")
+		}
 	}
 	_ = os.Remove(socketPath)
 
 	p.mu.Lock()
+	p.gen++
+	myGen := p.gen
 	p.stderr.Reset()
-	p.cmd = exec.Command("mpv",
+	p.mu.Unlock()
+
+	cmd := exec.Command(mpvPath,
 		"--no-video",
 		"--really-quiet",
 		"--audio-buffer=5",
@@ -48,28 +59,36 @@ func (p *Player) Play(streamURL string) error {
 		"--input-ipc-server="+socketPath,
 		streamURL,
 	)
-	p.cmd.Stderr = &p.stderr
+
+	p.mu.Lock()
+	cmd.Stderr = &p.stderr
 	p.mu.Unlock()
 
-	if err := p.cmd.Start(); err != nil {
+	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("mpv start: %w", err)
 	}
 
 	p.mu.Lock()
+	if p.gen != myGen {
+		p.mu.Unlock()
+		_ = cmd.Process.Kill()
+		_, _ = cmd.Process.Wait()
+		return nil
+	}
+	p.cmd = cmd
 	p.state = Playing
-	currentCmd := p.cmd
 	p.mu.Unlock()
 
-	go func(c *exec.Cmd) {
+	go func(c *exec.Cmd, gen uint64) {
 		c.Wait()
 
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		if p.cmd == c {
+		if p.gen == gen {
 			p.state = Stopped
 			_ = os.Remove(socketPath)
 		}
-	}(currentCmd)
+	}(cmd, myGen)
 
 	return nil
 }
@@ -77,6 +96,7 @@ func (p *Player) Play(streamURL string) error {
 func (p *Player) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.gen++
 	if p.cmd != nil && p.cmd.Process != nil {
 		_ = p.cmd.Process.Kill()
 	}
