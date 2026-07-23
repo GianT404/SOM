@@ -27,7 +27,7 @@ type lrclibTrack struct {
 }
 
 // lrcTimestampRe matches "[MM:SS.cs]" or "[MM:SS.ms]" at start of line.
-var lrcTimestampRe = regexp.MustCompile(`^\[(\d+):(\d+)\.(\d+)\]\s*(.*)$`)
+var lrcTimestampRe = regexp.MustCompile(`^\[(\d+):(\d+)(?:[.:](\d+))?\]\s*(.*)$`)
 
 // parseLRC converts an LRC-format string into LyricLine slices.
 // Lines without a timestamp are discarded.
@@ -42,10 +42,12 @@ func parseLRC(lrc string) []LyricLine {
 		minutes, _ := strconv.ParseFloat(m[1], 64)
 		seconds, _ := strconv.ParseFloat(m[2], 64)
 
-		// Centiseconds or milliseconds — normalise to seconds.
-		frac, _ := strconv.ParseFloat(m[3], 64)
-		for frac >= 1 {
-			frac /= 10
+		frac := 0.0
+		if m[3] != "" {
+			frac, _ = strconv.ParseFloat(m[3], 64)
+			for frac >= 1 {
+				frac /= 10
+			}
 		}
 
 		startSec := minutes*60 + seconds + frac
