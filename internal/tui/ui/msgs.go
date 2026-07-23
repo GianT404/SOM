@@ -36,10 +36,7 @@ type LocalFile struct {
 	Path     string
 	Artist   string
 	Duration int
-	// VideoID is the YouTube video ID this file was downloaded from,
-	// read back from the accompanying .json metadata (empty if unknown,
-	// e.g. for files predating this field).
-	VideoID string
+	VideoID  string
 }
 
 type Pane int
@@ -48,3 +45,8 @@ const (
 	PaneLeft Pane = iota
 	PaneRight
 )
+
+type PlayPlaylistMsg struct {
+	Tracks []api.Track
+	Index  int
+}

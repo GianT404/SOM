@@ -97,7 +97,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.playNext())
 		}
 		cmds = append(cmds, tick())
-
+	case PlayPlaylistMsg:
+		a.playlist = msg.Tracks
+		a.left.loadingStream = true
+		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -248,7 +251,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	}
 
-	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads
+	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists
 	var leftCmd tea.Cmd
 	a.left, leftCmd = a.left.Update(msg, focusedContent)
 	cmds = append(cmds, leftCmd)
@@ -298,6 +301,8 @@ func (a *App) View() string {
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
 		mainView = a.left.ViewDownloadsContent(mainW, contentH)
+	case SidePlaylists:
+		mainView = a.left.ViewPlaylistsContent(mainW, contentH)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
@@ -329,7 +334,13 @@ func (a *App) View() string {
 	b.WriteString(progressBar + "\n")
 	b.WriteString(help)
 
-	return b.String()
+	view := b.String()
+	if a.left.showAddPopup {
+		popup := a.left.renderAddPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	}
+
+	return view
 }
 
 func (a *App) renderLyricsView(w, h int, focused bool) string {
@@ -560,6 +571,7 @@ func (a *App) syncPlaylistState() {
 func (a *App) switchSidebar(item SidebarItem) {
 	a.sidebarActive = item
 	a.left.activeTab = item
+
 	if item == SideSearch {
 		a.left.searchOnEnter = true
 	} else {

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"som/internal/playlist"
 	"som/internal/tui/api"
 	"strings"
 
@@ -10,13 +11,11 @@ import (
 )
 
 type LeftPanel struct {
-	client  *api.Client
-	input   textinput.Model
-	spinner spinner.Model
-	tracks  []api.Track
-	locals  []LocalFile
-
-	// TÁCH BIỆT CURSOR VÀ OFFSET CHO 2 TAB
+	client       *api.Client
+	input        textinput.Model
+	spinner      spinner.Model
+	tracks       []api.Track
+	locals       []LocalFile
 	searchCursor int
 	searchOffset int
 	dlCursor     int
@@ -30,7 +29,23 @@ type LeftPanel struct {
 	width           int
 	height          int
 	searchOnEnter   bool
-	activeTab       SidebarItem // Biến theo dõi tab hiện tại
+	activeTab       SidebarItem
+
+	plStore        *playlist.Store
+	playlists      []playlist.Playlist
+	activePlaylist *playlist.Playlist
+	plCursor       int
+	plOffset       int
+	plInput        textinput.Model
+	showPlInput    bool
+	showAddPopup   bool
+	popupCursor    int
+}
+
+func (p *LeftPanel) SetSize(mainW int, contentH int) {
+	p.width = mainW
+	p.height = contentH
+	p.input.Width = maxInt(mainW-6, 10)
 }
 
 func NewLeftPanel(c *api.Client) LeftPanel {
@@ -38,24 +53,126 @@ func NewLeftPanel(c *api.Client) LeftPanel {
 	ti.CharLimit = 120
 	ti.PromptStyle = InputPromptStyle
 	ti.Focus()
+
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = StatusMsgStyle
-	p := LeftPanel{client: c, input: ti, spinner: sp, activeTab: SideDownloads}
+
+	// Ô input cho playlist
+	plInput := textinput.New()
+	plInput.CharLimit = 50
+	plInput.Prompt = "Name: "
+
+	p := LeftPanel{
+		client:    c,
+		input:     ti,
+		spinner:   sp,
+		activeTab: SideDownloads,
+		plInput:   plInput,
+	}
+
+	// Khởi tạo Playlist Store và load dữ liệu
+	if store, err := playlist.NewStore(); err == nil {
+		p.plStore = store
+		if pls, err := store.Load(); err == nil {
+			p.playlists = pls
+		}
+	}
+
 	p.scanLocalFiles()
 	return p
 }
 
-func (p *LeftPanel) SetSize(w, h int) {
-	p.width = w
-	p.height = h
-	p.input.Width = maxInt(w-6, 10)
+func (p LeftPanel) itemCount() int {
+	if p.activeTab == SideSearch {
+		return len(p.tracks)
+	} else if p.activeTab == SideDownloads {
+		return len(p.getFilteredLocals())
+	} else if p.activeTab == SidePlaylists {
+		if p.activePlaylist != nil {
+			return len(p.activePlaylist.Tracks)
+		}
+		return len(p.playlists)
+	}
+	return 0
 }
 
 func (p LeftPanel) Init() tea.Cmd { return textinput.Blink }
 
 func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	// 1. XỬ LÝ KHI ĐANG NHẬP TÊN PLAYLIST MỚI
+	if p.showPlInput {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "enter":
+				name := strings.TrimSpace(p.plInput.Value())
+				if name != "" && p.plStore != nil {
+					if pl, err := p.plStore.CreatePlaylist(name); err == nil {
+						p.playlists = append(p.playlists, pl)
+					}
+				}
+				p.showPlInput = false
+				p.plInput.Blur()
+				p.plInput.SetValue("")
+				return p, nil
+			case "esc":
+				p.showPlInput = false
+				p.plInput.Blur()
+				p.plInput.SetValue("")
+				return p, nil
+			}
+			var plInputCmd tea.Cmd
+			p.plInput, plInputCmd = p.plInput.Update(msg)
+			cmds = append(cmds, plInputCmd)
+			return p, tea.Batch(cmds...)
+		}
+	}
+
+	// 2. XỬ LÝ KHI ĐANG MỞ POPUP CHỌN PLAYLIST (Bấm 'a' ở tab Search/Downloads)
+	if p.showAddPopup {
+		if msg, ok := msg.(tea.KeyMsg); ok {
+			switch msg.String() {
+			case "up", "k":
+				if p.popupCursor > 0 {
+					p.popupCursor--
+				}
+			case "down", "j":
+				if p.popupCursor < len(p.playlists)-1 {
+					p.popupCursor++
+				}
+			case "enter":
+				// Lấy bài hát hiện tại đang chọn
+				var selectedTrack playlist.Track
+				if p.activeTab == SideSearch && p.searchCursor < len(p.tracks) {
+					t := p.tracks[p.searchCursor]
+					selectedTrack = playlist.Track{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: p.isDownloaded(t)}
+				} else if p.activeTab == SideDownloads {
+					locals := p.getFilteredLocals()
+					if p.dlCursor < len(locals) {
+						f := locals[p.dlCursor]
+						selectedTrack = playlist.Track{ID: "local:" + f.Path, Title: f.Name, Artist: f.Artist, Duration: f.Duration, IsLocal: true}
+					}
+				}
+				// Thêm vào playlist được chọn trong popup
+				if selectedTrack.ID != "" && p.plStore != nil {
+					pl := p.playlists[p.popupCursor]
+					if err := p.plStore.AddTrack(pl.ID, selectedTrack); err == nil {
+						// Cập nhật lại mảng trong bộ nhớ
+						p.playlists[p.popupCursor].Tracks = append(p.playlists[p.popupCursor].Tracks, selectedTrack)
+					}
+				}
+				p.showAddPopup = false
+			case "esc":
+				p.showAddPopup = false
+			}
+			return p, nil
+		}
+	}
+
+	// 3. XỬ LÝ CÁC PHÍM BÌNH THƯỜNG
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -76,7 +193,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			if !focused {
 				break
 			}
-			// Xử lý enter theo tab hiện tại
+
 			if p.activeTab == SideSearch {
 				if len(p.tracks) > 0 && p.searchCursor < len(p.tracks) {
 					t := p.tracks[p.searchCursor]
@@ -88,7 +205,27 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 					f := locals[p.dlCursor]
 					return p, func() tea.Msg { return PlayLocalMsg{Path: f.Path, Title: f.Name} }
 				}
+			} else if p.activeTab == SidePlaylists {
+				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
+					plTracks := make([]api.Track, len(p.activePlaylist.Tracks))
+					for i, pt := range p.activePlaylist.Tracks {
+						plTracks[i] = api.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+					}
+					return p, func() tea.Msg { return PlayPlaylistMsg{Tracks: plTracks, Index: p.plCursor} }
+				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
+					p.activePlaylist = &p.playlists[p.plCursor]
+					p.plCursor = 0
+					p.plOffset = 0
+				}
 			}
+
+		case "backspace", "esc":
+			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
+				p.activePlaylist = nil
+				p.plCursor = 0
+				p.plOffset = 0
+			}
+
 		case "up", "k":
 			if focused && !p.input.Focused() {
 				if p.activeTab == SideSearch && p.searchCursor > 0 {
@@ -101,29 +238,85 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 					if p.dlCursor < p.dlOffset {
 						p.dlOffset = p.dlCursor
 					}
+				} else if p.activeTab == SidePlaylists && p.plCursor > 0 {
+					p.plCursor--
+					if p.plCursor < p.plOffset {
+						p.plOffset = p.plCursor
+					}
 				}
 			}
+
 		case "down", "j":
 			if focused && !p.input.Focused() {
 				items := p.itemCount()
 				if p.activeTab == SideSearch {
 					if p.searchCursor < items-1 {
 						p.searchCursor++
-						vis := p.visibleRows()
-						if p.searchCursor >= p.searchOffset+vis {
+						if p.searchCursor >= p.searchOffset+p.visibleRows() {
 							p.searchOffset++
 						}
 					}
 				} else if p.activeTab == SideDownloads {
 					if p.dlCursor < items-1 {
 						p.dlCursor++
-						vis := p.visibleRows()
-						if p.dlCursor >= p.dlOffset+vis {
+						if p.dlCursor >= p.dlOffset+p.visibleRows() {
 							p.dlOffset++
+						}
+					}
+				} else if p.activeTab == SidePlaylists {
+					if p.plCursor < items-1 {
+						p.plCursor++
+						if p.plCursor >= p.plOffset+p.visibleRows() {
+							p.plOffset++
 						}
 					}
 				}
 			}
+
+		case "c":
+			if p.activeTab == SidePlaylists && !p.input.Focused() && p.activePlaylist == nil {
+				p.showPlInput = true
+				p.plInput.Focus()
+				p.plInput.SetValue("")
+			}
+		case "a":
+			if !p.input.Focused() && (p.activeTab == SideSearch || p.activeTab == SideDownloads) {
+				if len(p.playlists) == 0 {
+					p.errMsg = "Chưa có playlist nào! Hãy sang tab Playlists bấm 'c' để tạo."
+				} else {
+					p.showAddPopup = true
+					p.popupCursor = 0
+				}
+			}
+
+		case "x":
+			if focused && !p.input.Focused() && p.activeTab == SidePlaylists && p.plStore != nil {
+				// Nếu đang ở Detail View -> Xóa bài hát
+				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
+					trackID := p.activePlaylist.Tracks[p.plCursor].ID
+					p.plStore.RemoveTrack(p.activePlaylist.ID, trackID)
+					// Update local state
+					var filtered []playlist.Track
+					for _, t := range p.activePlaylist.Tracks {
+						if t.ID != trackID {
+							filtered = append(filtered, t)
+						}
+					}
+					p.activePlaylist.Tracks = filtered
+					// Cập nhật lại luôn trong mảng playlists
+					for i, pl := range p.playlists {
+						if pl.ID == p.activePlaylist.ID {
+							p.playlists[i] = *p.activePlaylist
+						}
+					}
+				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
+					// Nếu đang ở List View -> Xóa playlist
+					plID := p.playlists[p.plCursor].ID
+					p.plStore.DeletePlaylist(plID)
+					p.playlists = append(p.playlists[:p.plCursor], p.playlists[p.plCursor+1:]...)
+				}
+			}
+
 		case "d":
 			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.searchCursor]
@@ -135,6 +328,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				p.loadingDownload = true
 				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.client, t, dir))
 			}
+
 		case "/":
 			if !p.input.Focused() {
 				p.input.Focus()
@@ -142,6 +336,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 			return p, nil
 		}
+
 	case SearchResultMsg:
 		p.loading = false
 		p.searched = true
@@ -153,11 +348,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		} else {
 			p.tracks = msg.Tracks
 		}
+
 	case DownloadDoneMsg:
 		p.loadingDownload = false
 		if msg.Err == nil {
 			p.scanLocalFiles()
 		}
+
 	case spinner.TickMsg:
 		if p.loading || p.loadingDownload || p.loadingStream {
 			var cmd tea.Cmd
@@ -165,6 +362,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	}
+
 	var inputCmd tea.Cmd
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
@@ -181,14 +379,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	return p, tea.Batch(cmds...)
 }
 
-func (p LeftPanel) itemCount() int {
-	if p.activeTab == SideSearch {
-		return len(p.tracks)
-	}
-	return len(p.getFilteredLocals())
-}
-
-// --- GIỮ NGUYÊN CÁC HÀM BÊN DƯỚI ---
 func (p LeftPanel) visibleRows() int {
 	rows := p.height - 12
 	if rows < 3 {
