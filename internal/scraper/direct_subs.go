@@ -12,44 +12,39 @@ import (
 	"github.com/kkdai/youtube/v2"
 )
 
+const maxCaptionLanguages = 10
+
 func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang string) ([]LyricsData, error) {
 	client := youtube.Client{}
 
-	// Fetch video info using Innertube API
 	video, err := client.GetVideoContext(ctx, videoID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get video info: %w", err)
-	}
-
-	if len(video.CaptionTracks) == 0 {
-		return nil, fmt.Errorf("no subtitles found or all fetches failed")
 	}
 
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
-	// Order tracks: preferred language first, then everything else
+	if len(video.CaptionTracks) == 0 {
+		return nil, fmt.Errorf("no caption tracks available")
+	}
+
 	tracks := video.CaptionTracks
 	if preferredLang != "" {
 		tracks = reorderTracks(video.CaptionTracks, preferredLang)
 	}
 
-	const maxTracks = 8
-
 	var results []LyricsData
-	seenLang := map[string]bool{}
+	seenLang := make(map[string]bool)
 
 	for _, track := range tracks {
-		if len(results) >= maxTracks {
+		if len(results) >= maxCaptionLanguages {
 			break
 		}
 		baseUrl := track.BaseURL
-		if baseUrl == "" {
-			continue
-		}
 		langCode := track.LanguageCode
-		if seenLang[langCode] {
+		if baseUrl == "" || langCode == "" || seenLang[langCode] {
 			continue
 		}
 
@@ -67,11 +62,10 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 		req.Header.Set("Accept-Language", "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7")
 
 		resp, err := httpClient.Do(req)
-		if err != nil {
-			continue
-		}
-		if resp.StatusCode != 200 {
-			resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			if resp != nil {
+				resp.Body.Close()
+			}
 			continue
 		}
 
@@ -86,20 +80,20 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 			continue
 		}
 
+		seenLang[langCode] = true
 		results = append(results, LyricsData{
 			Language: langCode,
 			Lines:    mappedLines,
 		})
-		seenLang[langCode] = true
 	}
 
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no subtitles found or all fetches failed")
 	}
+
 	return results, nil
 }
 
-// GetDirectAudio fetches the best audio stream using kkdai/youtube/v2 directly to bypass yt-dlp.
 func GetDirectAudio(ctx context.Context, videoID string, destPath string) error {
 	client := youtube.Client{}
 	video, err := client.GetVideoContext(ctx, videoID)
@@ -107,7 +101,7 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 		return err
 	}
 
-	formats := video.Formats.WithAudioChannels() // only get formats with audio
+	formats := video.Formats.WithAudioChannels()
 	if len(formats) == 0 {
 		return fmt.Errorf("no audio formats found")
 	}
@@ -151,7 +145,6 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 
 	return nil
 }
-
 func reorderTracks(tracks []youtube.CaptionTrack, preferredLang string) []youtube.CaptionTrack {
 	var preferred, rest []youtube.CaptionTrack
 	for _, t := range tracks {

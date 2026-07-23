@@ -29,12 +29,12 @@ type LyricLine struct {
 	Text string  `json:"text"`
 }
 
-// LyricsTrack is one language variant of a song's lyrics.
 type LyricsTrack struct {
-	Language   string
-	TrackName  string
-	ArtistName string
-	Synced     []LyricLine
+	Language   string      `json:"language"`
+	Synced     []LyricLine `json:"synced,omitempty"`
+	Plain      string      `json:"plain,omitempty"`
+	TrackName  string      `json:"trackName,omitempty"`
+	ArtistName string      `json:"artistName,omitempty"`
 }
 
 type LyricsResp struct {
@@ -44,22 +44,29 @@ type LyricsResp struct {
 		Synced []LyricLine `json:"synced"`
 	} `json:"lrclib,omitempty"`
 
-	Artist string `json:"artist,omitempty"`
-	Title  string `json:"title,omitempty"`
-
+	Artist  string `json:"artist,omitempty"`
+	Title   string `json:"title,omitempty"`
 	VideoID string `json:"video_id,omitempty"`
 
-	Tracks        []LyricsTrack `json:"-"`
-	SelectedTrack int           `json:"-"`
+	Language string `json:"language,omitempty"`
+
+	AllTracks []LyricsTrack `json:"all_tracks,omitempty"`
 }
 
-// applySelectedTrack copies the currently selecte
-func (l *LyricsResp) applySelectedTrack() {
-	if l.SelectedTrack < 0 || l.SelectedTrack >= len(l.Tracks) {
+func (l *LyricsResp) Normalize() {
+	if len(l.Synced) == 0 && l.Lrclib != nil && len(l.Lrclib.Synced) > 0 {
+		l.Synced = l.Lrclib.Synced
+	}
+}
+
+func (l *LyricsResp) SelectLanguage(i int) {
+	if i < 0 || i >= len(l.AllTracks) {
 		return
 	}
-	t := l.Tracks[l.SelectedTrack]
+	t := l.AllTracks[i]
 	l.Synced = t.Synced
+	l.Plain = t.Plain
+	l.Language = t.Language
 	if t.TrackName != "" {
 		l.Title = t.TrackName
 	}
@@ -68,30 +75,13 @@ func (l *LyricsResp) applySelectedTrack() {
 	}
 }
 
-func (l *LyricsResp) CycleTrack() bool {
-	if len(l.Tracks) < 2 {
-		return false
+func (l *LyricsResp) LanguageIndex() int {
+	for i, t := range l.AllTracks {
+		if t.Language == l.Language {
+			return i
+		}
 	}
-	l.SelectedTrack = (l.SelectedTrack + 1) % len(l.Tracks)
-	l.applySelectedTrack()
-	return true
-}
-
-func (l *LyricsResp) LanguageLabel() string {
-	if len(l.Tracks) < 2 {
-		return ""
-	}
-	lang := l.Tracks[l.SelectedTrack].Language
-	if lang == "" {
-		lang = "?"
-	}
-	return fmt.Sprintf("%s %d/%d", lang, l.SelectedTrack+1, len(l.Tracks))
-}
-
-func (l *LyricsResp) Normalize() {
-	if len(l.Synced) == 0 && l.Lrclib != nil && len(l.Lrclib.Synced) > 0 {
-		l.Synced = l.Lrclib.Synced
-	}
+	return 0
 }
 
 type ServerLyricTrack struct {
@@ -196,25 +186,23 @@ func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, err
 		}
 
 		for _, t := range tracks {
-			var synced []LyricLine
+			lt := LyricsTrack{
+				Language:   t.Language,
+				TrackName:  t.TrackName,
+				ArtistName: t.ArtistName,
+			}
 			for _, line := range t.Lines {
-				synced = append(synced, LyricLine{
+				lt.Synced = append(lt.Synced, LyricLine{
 					Time: line.Start,
 					End:  line.End,
 					Text: line.Text,
 				})
 			}
-			lr.Tracks = append(lr.Tracks, LyricsTrack{
-				Language:   t.Language,
-				TrackName:  t.TrackName,
-				ArtistName: t.ArtistName,
-				Synced:     synced,
-			})
+			lr.AllTracks = append(lr.AllTracks, lt)
 		}
 
-		if len(lr.Tracks) > 0 {
-			lr.SelectedTrack = 0
-			lr.applySelectedTrack()
+		if len(lr.AllTracks) > 0 {
+			lr.SelectLanguage(0)
 		}
 		return lr, nil
 	}

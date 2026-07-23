@@ -16,23 +16,16 @@ import (
 	"time"
 )
 
-// YtdlpScraper implements Scraper using the yt-dlp CLI tool.
 type YtdlpScraper struct {
 	// BinPath is the absolute path to the yt-dlp binary.
 	BinPath string
 }
 
-// NewYtdlpScraper creates a new scraper with the given binary path.
-// It resolves the binary to an absolute path to avoid Go 1.19+ security
-// restrictions on running executables found relative to the current directory.
 func NewYtdlpScraper(binPath string) *YtdlpScraper {
 	if binPath == "" {
 		binPath = "yt-dlp"
 	}
 
-	// Resolve to absolute path to satisfy Go's exec security policy.
-	// exec.LookPath returns ErrDot when the binary is in the current directory;
-	// we must handle that case too, not just err == nil.
 	resolved, err := exec.LookPath(binPath)
 	if err == nil || errors.Is(err, exec.ErrDot) {
 		if abs, err2 := filepath.Abs(resolved); err2 == nil {
@@ -43,16 +36,13 @@ func NewYtdlpScraper(binPath string) *YtdlpScraper {
 	return &YtdlpScraper{BinPath: binPath}
 }
 
-// ytdlpSearchItem is the raw JSON shape emitted by yt-dlp --dump-json --flat-playlist.
 type ytdlpSearchItem struct {
-	ID        string  `json:"id"`
-	Title     string  `json:"title"`
-	Thumbnail string  `json:"thumbnail"`
-	Duration  float64 `json:"duration"`
-	Uploader  string  `json:"uploader"`
-	URL       string  `json:"url"`
-
-	// Thumbnails array fallback (flat-playlist sometimes uses this instead).
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	Thumbnail  string  `json:"thumbnail"`
+	Duration   float64 `json:"duration"`
+	Uploader   string  `json:"uploader"`
+	URL        string  `json:"url"`
 	Thumbnails []struct {
 		URL string `json:"url"`
 	} `json:"thumbnails"`
@@ -134,8 +124,6 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 	return results, nil
 }
 
-// GetStreamInfo returns the direct audio URL and video title for the given video ID.
-// Uses --print to get the title and -g to get the URL in one call.
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
 	// First get the title.
 	titleCmd := exec.CommandContext(ctx, y.BinPath,
@@ -252,6 +240,7 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	// Ignore stdout for clean logs
 	cmd.Stdout = nil
 
 	if err := cmd.Run(); err != nil {
@@ -349,6 +338,8 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 	if err == nil && len(directData) > 0 {
 		return directData, nil
 	}
+
+	// Fallback to yt-dlp if direct fetch fails.
 	ytdlpCtx, ytdlpCancel := context.WithTimeout(ctx, 6*time.Second)
 	defer ytdlpCancel()
 
@@ -367,6 +358,7 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		"--skip-download",
 		"--sub-format", "vtt",
 		"--sub-langs", "en,vi,ja,ko,zh-Hans,zh-Hant",
+
 		"--socket-timeout", "5",
 		"-o", outTmpl,
 		"--no-warnings",
@@ -383,22 +375,18 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		dlErr = fmt.Errorf("yt-dlp timed out after 6s: %w", ytdlpCtx.Err())
 	}
 
-	// Find all downloaded VTT files
 	vttFiles, _ := filepath.Glob(outTmpl + "*.vtt")
 	if len(vttFiles) == 0 {
 		return nil, fmt.Errorf("no subtitles available for %s (err: %v): %s", videoID, dlErr, stderr.String())
 	}
 
-	// Sort to guarantee deterministic ordering
 	sort.Strings(vttFiles)
 
-	type scoredFile struct {
+	type variant struct {
 		path  string
-		lang  string
 		score int
 	}
-	var scoredFiles []scoredFile
-	seenLang := map[string]bool{}
+	bestByLang := make(map[string]variant)
 	for _, f := range vttFiles {
 		base := filepath.Base(f)
 		parts := strings.Split(base, ".")
@@ -408,35 +396,38 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		code := strings.TrimSuffix(parts[len(parts)-2], "-orig")
 		isOrig := strings.HasSuffix(parts[len(parts)-2], "-orig")
 
-		if seenLang[code] {
-			// Already have a track for this language (e.g. both a manual
-			// and an auto-generated file for the same code) — keep only
-			// the first (higher-priority) one encountered.
-			continue
-		}
-
-		score := 99
+		score := 3
 		if origLang != "" && code == origLang && isOrig {
 			score = 0
 		} else if origLang != "" && code == origLang {
 			score = 1
 		} else if isOrig {
 			score = 2
-		} else {
-			score = 3
 		}
 
-		scoredFiles = append(scoredFiles, scoredFile{path: f, lang: code, score: score})
-		seenLang[code] = true
+		if cur, ok := bestByLang[code]; !ok || score < cur.score {
+			bestByLang[code] = variant{path: f, score: score}
+		}
 	}
 
-	sort.SliceStable(scoredFiles, func(i, j int) bool {
-		return scoredFiles[i].score < scoredFiles[j].score
-	})
+	codes := make([]string, 0, len(bestByLang))
+	for code := range bestByLang {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	if origLang != "" {
+		for i, c := range codes {
+			if c == origLang {
+				codes = append(codes[:i:i], codes[i+1:]...)
+				codes = append([]string{origLang}, codes...)
+				break
+			}
+		}
+	}
 
 	var result []LyricsData
-	for _, sf := range scoredFiles {
-		b, err := os.ReadFile(sf.path)
+	for _, code := range codes {
+		b, err := os.ReadFile(bestByLang[code].path)
 		if err != nil {
 			continue
 		}
@@ -444,10 +435,12 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		if len(lines) == 0 {
 			continue
 		}
-		result = append(result, LyricsData{Language: sf.lang, Lines: lines})
+		result = append(result, LyricsData{
+			Language: code,
+			Lines:    lines,
+		})
 	}
 
-	// Cleanup all generated subtitle files
 	for _, f := range vttFiles {
 		_ = os.Remove(f)
 	}
@@ -458,8 +451,6 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 
 	return result, nil
 }
-
-// detectVideoLanguage runs a fast yt-dlp --print to detect the video's original language.
 func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
 	langCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()

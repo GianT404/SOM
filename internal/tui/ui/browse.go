@@ -75,6 +75,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				return p, tea.Batch(cmds...)
 			}
 
+			if !focused {
+				break
+			}
 			if len(p.tracks) > 0 && p.cursor < len(p.tracks) {
 				t := p.tracks[p.cursor]
 				return p, func() tea.Msg { return PlayStartedMsg{Track: t} }
@@ -87,7 +90,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "up", "k":
-			if !p.input.Focused() && p.cursor > 0 {
+			if focused && !p.input.Focused() && p.cursor > 0 {
 				p.cursor--
 				if p.cursor < p.offset {
 					p.offset = p.cursor
@@ -95,7 +98,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "down", "j":
-			if !p.input.Focused() {
+			if focused && !p.input.Focused() {
 				items := p.itemCount()
 				if p.cursor < items-1 {
 					p.cursor++
@@ -107,7 +110,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "d":
-			if !p.input.Focused() && len(p.tracks) > 0 && p.cursor < len(p.tracks) && !p.loading {
+			if focused && !p.input.Focused() && len(p.tracks) > 0 && p.cursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.cursor]
 				dir, err := getDownloadDir()
 				if err != nil {
@@ -214,8 +217,6 @@ func (p LeftPanel) isDownloaded(t api.Track) bool {
 	return false
 }
 
-// normalizeTrackTitle lowercases and collapses whitespace so titles that
-// differ only in casing or spacing still compare equal.
 func normalizeTrackTitle(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }

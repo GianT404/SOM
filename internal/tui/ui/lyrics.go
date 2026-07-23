@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -16,17 +15,83 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 		innerW = 10
 	}
 
+	if r.showLangPopup {
+		return renderBox(r.width, "Select Language", r.renderLangPopup(innerW), borderColor)
+	}
+
 	content := r.renderLyrics(innerW)
 
-	title := "Lyrics"
-	if label := r.lyrics.LanguageLabel(); label != "" {
-		title = fmt.Sprintf("Lyrics (%s) — l: đổi ngôn ngữ", label)
+	if content == "" {
+		return renderBox(r.width, "Lyrics", "\n", borderColor)
+	}
+	return renderBox(r.width, "Lyrics", content, borderColor)
+}
+
+// languageNames maps common language/subtitle codes to friendly display
+// names for the language picker popup.
+var languageNames = map[string]string{
+	"lrclib":  "Synced Lyrics (LRCLib)",
+	"en":      "English",
+	"vi":      "Tiếng Việt",
+	"ja":      "日本語 (Japanese)",
+	"ko":      "한국어 (Korean)",
+	"zh":      "中文 (Chinese)",
+	"zh-Hans": "中文简体 (Chinese Simplified)",
+	"zh-Hant": "中文繁體 (Chinese Traditional)",
+	"fr":      "Français",
+	"es":      "Español",
+	"de":      "Deutsch",
+	"th":      "ไทย (Thai)",
+	"ru":      "Русский",
+	"pt":      "Português",
+	"id":      "Bahasa Indonesia",
+}
+
+func languageLabel(code string) string {
+	if code == "" {
+		return "Unknown"
+	}
+	if name, ok := languageNames[code]; ok {
+		return name
+	}
+	return strings.ToUpper(code)
+}
+
+func (r RightPanel) renderLangPopup(innerW int) string {
+	lyrH := r.lyricsHeight()
+	var b strings.Builder
+
+	for i, t := range r.lyrics.AllTracks {
+		label := languageLabel(t.Language)
+		marker := "  "
+		if i == r.lyrics.LanguageIndex() {
+			marker = " \u2713"
+		}
+		line := marker + " " + label
+		if i == r.langCursor {
+			b.WriteString(LyricHighlightStyle.Render("\u25b8 " + line))
+		} else {
+			b.WriteString(LyricNormalStyle.Render("  " + line))
+		}
+		b.WriteString("\n")
 	}
 
-	if content == "" {
-		return renderBox(r.width, title, "\n", borderColor)
+	written := len(r.lyrics.AllTracks)
+	if written == 0 {
+		hint := "(no languages available)"
+		b.WriteString(DimItemStyle.Render(hint))
+		written++
 	}
-	return renderBox(r.width, title, content, borderColor)
+	b.WriteString("\n")
+	written++
+	b.WriteString(DimItemStyle.Render("  up/down: choose   enter: select   l/esc: cancel"))
+	written++
+
+	for written < lyrH {
+		b.WriteString("\n")
+		written++
+	}
+	return b.String()
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {

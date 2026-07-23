@@ -32,6 +32,11 @@ type RightPanel struct {
 
 	loadingLyrics bool
 	spinner       spinner.Model
+
+	// showLangPopup and langCursor drive the "l"-triggered lyrics language
+	// picker popup.
+	showLangPopup bool
+	langCursor    int
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
@@ -53,6 +58,8 @@ func (r *RightPanel) SetTrack(t *api.Track, playedAt time.Time) {
 	r.offset = 0
 	r.loaded = false
 	r.loadingLyrics = true
+	r.showLangPopup = false
+	r.langCursor = 0
 }
 
 func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
@@ -61,15 +68,7 @@ func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 	r.loadingLyrics = false
 	r.curLine = 0
 	r.offset = 0
-}
-
-func (r *RightPanel) CycleLyricsLanguage() bool {
-	if !r.lyrics.CycleTrack() {
-		return false
-	}
-	r.curLine = 0
-	r.offset = 0
-	return true
+	r.langCursor = lr.LanguageIndex()
 }
 
 func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
@@ -133,7 +132,33 @@ func (r *RightPanel) TickAt(now time.Time) {
 func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if focused && r.showLangPopup {
+			switch msg.String() {
+			case "up", "k":
+				if r.langCursor > 0 {
+					r.langCursor--
+				}
+			case "down", "j":
+				if r.langCursor < len(r.lyrics.AllTracks)-1 {
+					r.langCursor++
+				}
+			case "enter":
+				r.lyrics.SelectLanguage(r.langCursor)
+				r.curLine = 0
+				r.offset = 0
+				r.showLangPopup = false
+			case "l", "esc":
+				r.showLangPopup = false
+			}
+			return r, nil
+		}
+
 		switch msg.String() {
+		case "l":
+			if focused && len(r.lyrics.AllTracks) > 0 {
+				r.langCursor = r.lyrics.LanguageIndex()
+				r.showLangPopup = true
+			}
 		case "pgup", "ctrl+u":
 			if r.offset > 0 {
 				r.offset--

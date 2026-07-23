@@ -41,7 +41,6 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resCh := make(chan result, 2)
 
 	go func() {
-		// Step 1: try fetching structured metadata from YouTube Music
 		meta, metaErr := h.Scraper.VideoMetadata(ctx, id)
 		if metaErr == nil && meta.Track != "" {
 			log.Printf("lyrics: trying metadata candidate %q by %q", meta.Track, meta.Artist)
@@ -50,6 +49,7 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+
 		if title == "" {
 			resCh <- result{source: "lrclib", err: fmt.Errorf("no title provided")}
 			return
@@ -76,17 +76,27 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var merged []scraper.LyricsData
-	if lrclibRes != nil && lrclibRes.err == nil {
-		merged = append(merged, lrclibRes.data...)
+	var combined []scraper.LyricsData
+	if lrclibRes != nil && lrclibRes.err == nil && len(lrclibRes.data) > 0 {
+		combined = append(combined, lrclibRes.data...)
 	}
-	if youtubeRes != nil && youtubeRes.err == nil {
-		merged = append(merged, youtubeRes.data...)
+	if youtubeRes != nil && youtubeRes.err == nil && len(youtubeRes.data) > 0 {
+		seen := make(map[string]bool, len(combined))
+		for _, d := range combined {
+			seen[d.Language] = true
+		}
+		for _, d := range youtubeRes.data {
+			if seen[d.Language] {
+				continue
+			}
+			seen[d.Language] = true
+			combined = append(combined, d)
+		}
 	}
 
-	if len(merged) > 0 {
-		log.Printf("lyrics: merged %d language track(s) for %s", len(merged), id)
-		writeJSON(w, http.StatusOK, merged)
+	if len(combined) > 0 {
+		log.Printf("lyrics: OK for %s (%d language track(s))", id, len(combined))
+		writeJSON(w, http.StatusOK, combined)
 		return
 	}
 
