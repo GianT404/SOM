@@ -58,7 +58,7 @@ func NewLeftPanel(c *api.Client) LeftPanel {
 
 	plInput := textinput.New()
 	plInput.CharLimit = 50
-	plInput.Prompt = "Tên playlist: "
+	plInput.Prompt = ""
 
 	p := LeftPanel{
 		client:    c,
@@ -116,10 +116,31 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 								p.playlists[i] = *p.activePlaylist
 							}
 						}
+
+						if p.plCursor >= len(p.activePlaylist.Tracks) {
+							p.plCursor = len(p.activePlaylist.Tracks) - 1
+						}
+						if p.plCursor < 0 {
+							p.plCursor = 0
+						}
+						if p.plOffset > p.plCursor {
+							p.plOffset = p.plCursor
+						}
+
 					} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
 						plID := p.playlists[p.plCursor].ID
 						p.plStore.DeletePlaylist(plID)
 						p.playlists = append(p.playlists[:p.plCursor], p.playlists[p.plCursor+1:]...)
+
+						if p.plCursor >= len(p.playlists) {
+							p.plCursor = len(p.playlists) - 1
+						}
+						if p.plCursor < 0 {
+							p.plCursor = 0
+						}
+						if p.plOffset > p.plCursor {
+							p.plOffset = p.plCursor
+						}
 					}
 				}
 				p.showDeletePopup = false

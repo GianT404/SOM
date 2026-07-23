@@ -29,12 +29,12 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 	if p.showAddPopup {
 		searchContent.WriteString(p.renderAddPopup())
 	} else if p.showPlInput {
-		searchContent.WriteString(p.plInput.View())
+		searchContent.WriteString("\n " + p.plInput.View())
+	} else {
+		searchContent.WriteString("\n " + DimItemStyle.Render(""))
 	}
 
 	searchBox := renderBox(w, "Playlists", searchContent.String(), searchBorder)
-
-	// --- Playlist List / Detail Box ---
 	var listContent string
 	if p.activePlaylist != nil {
 		listContent = p.renderPlaylistDetail(innerW)
