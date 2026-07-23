@@ -357,9 +357,9 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		"--write-auto-subs",
 		"--skip-download",
 		"--sub-format", "vtt",
-		"--sub-langs", "en,vi,ja,ko,zh-Hans,zh-Hant",
+		"--sub-langs", "all",
 
-		"--socket-timeout", "5",
+		"--socket-timeout", "20",
 		"-o", outTmpl,
 		"--no-warnings",
 		"--no-check-certificates",
