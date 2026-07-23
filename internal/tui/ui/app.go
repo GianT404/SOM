@@ -338,6 +338,9 @@ func (a *App) View() string {
 	if a.left.showAddPopup {
 		popup := a.left.renderAddPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.left.showDeletePopup {
+		popup := a.left.renderDeletePopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	}
 
 	return view
@@ -486,6 +489,14 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 			}
 			if a.left.dlCursor >= a.left.dlOffset+vis {
 				a.left.dlOffset = a.left.dlCursor - vis + 1
+			}
+		} else if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
+			a.left.plCursor = idx
+			if a.left.plCursor < a.left.plOffset {
+				a.left.plOffset = a.left.plCursor
+			}
+			if a.left.plCursor >= a.left.plOffset+vis {
+				a.left.plOffset = a.left.plCursor - vis + 1
 			}
 		}
 	}
