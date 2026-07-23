@@ -28,6 +28,15 @@ type LyricLine struct {
 	End  float64 `json:"end"`
 	Text string  `json:"text"`
 }
+
+// LyricsTrack is one language variant of a song's lyrics.
+type LyricsTrack struct {
+	Language   string
+	TrackName  string
+	ArtistName string
+	Synced     []LyricLine
+}
+
 type LyricsResp struct {
 	Synced []LyricLine `json:"synced"`
 	Plain  string      `json:"plain"`
@@ -37,9 +46,46 @@ type LyricsResp struct {
 
 	Artist string `json:"artist,omitempty"`
 	Title  string `json:"title,omitempty"`
-	// VideoID is the YouTube video ID this track was downloaded from.
-	// Used to match downloaded files back to search results.
+
 	VideoID string `json:"video_id,omitempty"`
+
+	Tracks        []LyricsTrack `json:"-"`
+	SelectedTrack int           `json:"-"`
+}
+
+// applySelectedTrack copies the currently selecte
+func (l *LyricsResp) applySelectedTrack() {
+	if l.SelectedTrack < 0 || l.SelectedTrack >= len(l.Tracks) {
+		return
+	}
+	t := l.Tracks[l.SelectedTrack]
+	l.Synced = t.Synced
+	if t.TrackName != "" {
+		l.Title = t.TrackName
+	}
+	if t.ArtistName != "" {
+		l.Artist = t.ArtistName
+	}
+}
+
+func (l *LyricsResp) CycleTrack() bool {
+	if len(l.Tracks) < 2 {
+		return false
+	}
+	l.SelectedTrack = (l.SelectedTrack + 1) % len(l.Tracks)
+	l.applySelectedTrack()
+	return true
+}
+
+func (l *LyricsResp) LanguageLabel() string {
+	if len(l.Tracks) < 2 {
+		return ""
+	}
+	lang := l.Tracks[l.SelectedTrack].Language
+	if lang == "" {
+		lang = "?"
+	}
+	return fmt.Sprintf("%s %d/%d", lang, l.SelectedTrack+1, len(l.Tracks))
 }
 
 func (l *LyricsResp) Normalize() {
@@ -149,21 +195,26 @@ func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, err
 			return lr, fmt.Errorf("lyrics array decode error: %w", err)
 		}
 
-		if len(tracks) > 0 {
-			selected := &tracks[0]
-			for _, line := range selected.Lines {
-				lr.Synced = append(lr.Synced, LyricLine{
+		for _, t := range tracks {
+			var synced []LyricLine
+			for _, line := range t.Lines {
+				synced = append(synced, LyricLine{
 					Time: line.Start,
 					End:  line.End,
 					Text: line.Text,
 				})
 			}
-			if selected.TrackName != "" {
-				lr.Title = selected.TrackName
-			}
-			if selected.ArtistName != "" {
-				lr.Artist = selected.ArtistName
-			}
+			lr.Tracks = append(lr.Tracks, LyricsTrack{
+				Language:   t.Language,
+				TrackName:  t.TrackName,
+				ArtistName: t.ArtistName,
+				Synced:     synced,
+			})
+		}
+
+		if len(lr.Tracks) > 0 {
+			lr.SelectedTrack = 0
+			lr.applySelectedTrack()
 		}
 		return lr, nil
 	}

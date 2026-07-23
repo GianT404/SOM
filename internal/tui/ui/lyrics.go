@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -17,10 +18,15 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 
 	content := r.renderLyrics(innerW)
 
-	if content == "" {
-		return renderBox(r.width, "Lyrics", "\n", borderColor)
+	title := "Lyrics"
+	if label := r.lyrics.LanguageLabel(); label != "" {
+		title = fmt.Sprintf("Lyrics (%s) — l: đổi ngôn ngữ", label)
 	}
-	return renderBox(r.width, "Lyrics", content, borderColor)
+
+	if content == "" {
+		return renderBox(r.width, title, "\n", borderColor)
+	}
+	return renderBox(r.width, title, content, borderColor)
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {

@@ -157,6 +157,17 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.random = !a.random
 			a.syncPlaylistState()
 
+		case "l":
+			if a.left.input.Focused() {
+				break
+			}
+			if a.sidebarActive == SideLyrics {
+				if a.right.CycleLyricsLanguage() {
+					a.statusMsg = "Lyrics: " + a.right.lyrics.LanguageLabel()
+					a.statusAt = time.Now()
+				}
+			}
+
 		case "up", "k":
 			if a.sidebarActive == SideLogs {
 				if a.logOffset < LogBuf.Len()-1 {
@@ -313,7 +324,7 @@ func (a *App) View() string {
 
 	// Help
 	help := HelpStyle.Render(
-		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  /:search  q:quit",
+		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  l:lang  d:download  space:pause  /:search  q:quit",
 	)
 
 	// Progress bar

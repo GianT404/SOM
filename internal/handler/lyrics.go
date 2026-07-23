@@ -11,8 +11,6 @@ import (
 	"som/internal/scraper"
 )
 
-// LyricsHandler handles GET /api/v1/lyrics?id={video_id}&title={title}&artist={artist}&duration={seconds}.
-// Uses LRCLib as the primary source with YouTube captions as fallback.
 type LyricsHandler struct {
 	Scraper scraper.Scraper
 }
@@ -42,7 +40,6 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	resCh := make(chan result, 2)
 
-	// Goroutine 1: LRCLib with metadata + title-based candidates
 	go func() {
 		// Step 1: try fetching structured metadata from YouTube Music
 		meta, metaErr := h.Scraper.VideoMetadata(ctx, id)
@@ -53,8 +50,6 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-
-		// Step 2: fall back to title-based candidates
 		if title == "" {
 			resCh <- result{source: "lrclib", err: fmt.Errorf("no title provided")}
 			return
@@ -64,7 +59,6 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resCh <- result{source: "lrclib", data: data, err: err}
 	}()
 
-	// Goroutine 2: YouTube captions (unchanged)
 	go func() {
 		log.Printf("lyrics: trying YouTube captions for %s", id)
 		data, err := h.Scraper.Lyrics(ctx, id)
@@ -82,16 +76,17 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// LRCLib priority
-	if lrclibRes != nil && lrclibRes.err == nil && len(lrclibRes.data) > 0 {
-		log.Printf("lyrics: LRCLib OK for %s", id)
-		writeJSON(w, http.StatusOK, lrclibRes.data)
-		return
+	var merged []scraper.LyricsData
+	if lrclibRes != nil && lrclibRes.err == nil {
+		merged = append(merged, lrclibRes.data...)
+	}
+	if youtubeRes != nil && youtubeRes.err == nil {
+		merged = append(merged, youtubeRes.data...)
 	}
 
-	if youtubeRes != nil && youtubeRes.err == nil && len(youtubeRes.data) > 0 {
-		log.Printf("lyrics: YouTube CC fallback OK for %s", id)
-		writeJSON(w, http.StatusOK, youtubeRes.data)
+	if len(merged) > 0 {
+		log.Printf("lyrics: merged %d language track(s) for %s", len(merged), id)
+		writeJSON(w, http.StatusOK, merged)
 		return
 	}
 

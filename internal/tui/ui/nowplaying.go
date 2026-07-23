@@ -63,6 +63,15 @@ func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
 	r.offset = 0
 }
 
+func (r *RightPanel) CycleLyricsLanguage() bool {
+	if !r.lyrics.CycleTrack() {
+		return false
+	}
+	r.curLine = 0
+	r.offset = 0
+	return true
+}
+
 func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
 	r.playlistPos = pos
 	r.playlistTotal = total
