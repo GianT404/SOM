@@ -1,3 +1,4 @@
+# ./scripts/release.sh v0.x.x "cmt"
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
