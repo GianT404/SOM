@@ -1,9 +1,8 @@
 package ui
 
 import (
-	"strings"
-
 	"som/internal/tui/api"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -14,21 +13,24 @@ type LeftPanel struct {
 	client  *api.Client
 	input   textinput.Model
 	spinner spinner.Model
+	tracks  []api.Track
+	locals  []LocalFile
 
-	tracks   []api.Track
-	locals   []LocalFile
-	cursor   int
-	offset   int
-	loading  bool
-	searched bool
-	errMsg   string
+	// TÁCH BIỆT CURSOR VÀ OFFSET CHO 2 TAB
+	searchCursor int
+	searchOffset int
+	dlCursor     int
+	dlOffset     int
 
+	loading         bool
+	searched        bool
+	errMsg          string
 	loadingStream   bool
 	loadingDownload bool
-
-	width         int
-	height        int
-	searchOnEnter bool
+	width           int
+	height          int
+	searchOnEnter   bool
+	activeTab       SidebarItem // Biến theo dõi tab hiện tại
 }
 
 func NewLeftPanel(c *api.Client) LeftPanel {
@@ -36,12 +38,10 @@ func NewLeftPanel(c *api.Client) LeftPanel {
 	ti.CharLimit = 120
 	ti.PromptStyle = InputPromptStyle
 	ti.Focus()
-
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = StatusMsgStyle
-
-	p := LeftPanel{client: c, input: ti, spinner: sp}
+	p := LeftPanel{client: c, input: ti, spinner: sp, activeTab: SideDownloads}
 	p.scanLocalFiles()
 	return p
 }
@@ -56,7 +56,6 @@ func (p LeftPanel) Init() tea.Cmd { return textinput.Blink }
 
 func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -74,44 +73,60 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 				return p, tea.Batch(cmds...)
 			}
-
 			if !focused {
 				break
 			}
-			if len(p.tracks) > 0 && p.cursor < len(p.tracks) {
-				t := p.tracks[p.cursor]
-				return p, func() tea.Msg { return PlayStartedMsg{Track: t} }
-			} else {
+			// Xử lý enter theo tab hiện tại
+			if p.activeTab == SideSearch {
+				if len(p.tracks) > 0 && p.searchCursor < len(p.tracks) {
+					t := p.tracks[p.searchCursor]
+					return p, func() tea.Msg { return PlayStartedMsg{Track: t} }
+				}
+			} else if p.activeTab == SideDownloads {
 				locals := p.getFilteredLocals()
-				if len(locals) > 0 && p.cursor < len(locals) {
-					f := locals[p.cursor]
+				if len(locals) > 0 && p.dlCursor < len(locals) {
+					f := locals[p.dlCursor]
 					return p, func() tea.Msg { return PlayLocalMsg{Path: f.Path, Title: f.Name} }
 				}
 			}
-
 		case "up", "k":
-			if focused && !p.input.Focused() && p.cursor > 0 {
-				p.cursor--
-				if p.cursor < p.offset {
-					p.offset = p.cursor
-				}
-			}
-
-		case "down", "j":
 			if focused && !p.input.Focused() {
-				items := p.itemCount()
-				if p.cursor < items-1 {
-					p.cursor++
-					vis := p.visibleRows()
-					if p.cursor >= p.offset+vis {
-						p.offset++
+				if p.activeTab == SideSearch && p.searchCursor > 0 {
+					p.searchCursor--
+					if p.searchCursor < p.searchOffset {
+						p.searchOffset = p.searchCursor
+					}
+				} else if p.activeTab == SideDownloads && p.dlCursor > 0 {
+					p.dlCursor--
+					if p.dlCursor < p.dlOffset {
+						p.dlOffset = p.dlCursor
 					}
 				}
 			}
-
+		case "down", "j":
+			if focused && !p.input.Focused() {
+				items := p.itemCount()
+				if p.activeTab == SideSearch {
+					if p.searchCursor < items-1 {
+						p.searchCursor++
+						vis := p.visibleRows()
+						if p.searchCursor >= p.searchOffset+vis {
+							p.searchOffset++
+						}
+					}
+				} else if p.activeTab == SideDownloads {
+					if p.dlCursor < items-1 {
+						p.dlCursor++
+						vis := p.visibleRows()
+						if p.dlCursor >= p.dlOffset+vis {
+							p.dlOffset++
+						}
+					}
+				}
+			}
 		case "d":
-			if focused && !p.input.Focused() && len(p.tracks) > 0 && p.cursor < len(p.tracks) && !p.loading {
-				t := p.tracks[p.cursor]
+			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
+				t := p.tracks[p.searchCursor]
 				dir, err := getDownloadDir()
 				if err != nil {
 					p.errMsg = "Cannot find home directory"
@@ -120,7 +135,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				p.loadingDownload = true
 				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.client, t, dir))
 			}
-
 		case "/":
 			if !p.input.Focused() {
 				p.input.Focus()
@@ -128,26 +142,22 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 			return p, nil
 		}
-
 	case SearchResultMsg:
 		p.loading = false
 		p.searched = true
-		p.cursor = 0
-		p.offset = 0
-		// p.input.Blur()
+		p.searchCursor = 0
+		p.searchOffset = 0
 		if msg.Err != nil {
 			p.errMsg = msg.Err.Error()
 			p.tracks = nil
 		} else {
 			p.tracks = msg.Tracks
 		}
-
 	case DownloadDoneMsg:
 		p.loadingDownload = false
 		if msg.Err == nil {
 			p.scanLocalFiles()
 		}
-
 	case spinner.TickMsg:
 		if p.loading || p.loadingDownload || p.loadingStream {
 			var cmd tea.Cmd
@@ -155,33 +165,30 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	}
-
 	var inputCmd tea.Cmd
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
 
-	if !p.input.Focused() && len(p.tracks) == 0 {
+	if !p.input.Focused() && p.activeTab == SideDownloads {
 		localsCount := len(p.getFilteredLocals())
-		if p.cursor >= localsCount && localsCount > 0 {
-			p.cursor = localsCount - 1
+		if p.dlCursor >= localsCount && localsCount > 0 {
+			p.dlCursor = localsCount - 1
 		}
-		if p.cursor < 0 {
-			p.cursor = 0
+		if p.dlCursor < 0 {
+			p.dlCursor = 0
 		}
 	}
-
 	return p, tea.Batch(cmds...)
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────
-
 func (p LeftPanel) itemCount() int {
-	if len(p.tracks) > 0 {
+	if p.activeTab == SideSearch {
 		return len(p.tracks)
 	}
 	return len(p.getFilteredLocals())
 }
 
+// --- GIỮ NGUYÊN CÁC HÀM BÊN DƯỚI ---
 func (p LeftPanel) visibleRows() int {
 	rows := p.height - 12
 	if rows < 3 {
@@ -189,7 +196,6 @@ func (p LeftPanel) visibleRows() int {
 	}
 	return rows
 }
-
 func (p LeftPanel) isDownloaded(t api.Track) bool {
 	if t.ID != "" {
 		for _, f := range p.locals {
@@ -216,11 +222,9 @@ func (p LeftPanel) isDownloaded(t api.Track) bool {
 	}
 	return false
 }
-
 func normalizeTrackTitle(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
-
 func (p LeftPanel) getFilteredLocals() []LocalFile {
 	q := strings.ToLower(strings.TrimSpace(p.input.Value()))
 	if q == "" {

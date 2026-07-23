@@ -24,6 +24,7 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	if p.loading {
 		inputRow += " " + p.spinner.View()
 	}
+
 	inputContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
 	searchBox := renderBox(w, "Search", inputContent, searchBorder)
 
@@ -65,7 +66,7 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 	}
 	var b strings.Builder
 	vis := p.visibleRows()
-	end := p.offset + vis
+	end := p.searchOffset + vis
 	if end > len(p.tracks) {
 		end = len(p.tracks)
 	}
@@ -73,30 +74,26 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 	if titleW < 10 {
 		titleW = 10
 	}
-
-	for i := p.offset; i < end; i++ {
+	for i := p.searchOffset; i < end; i++ {
 		t := p.tracks[i]
 		mark := "  "
-		if i == p.cursor {
+		if i == p.searchCursor {
 			mark = ""
 		}
 		safeTitle := truncate(t.Title, titleW)
 		titlePlain := runewidth.FillRight(safeTitle, titleW)
 		durationBlock := FormatDuration(t.Duration)
 		downloaded := p.isDownloaded(t)
-
 		checkPlaceholder := " "
 		plainLine := mark + titlePlain + " " + durationBlock + " " + checkPlaceholder
 		pad := innerW - runewidth.StringWidth(plainLine)
 		if pad < 0 {
 			pad = 0
 		}
-
 		rowStyle := NormalItemStyle
-		if i == p.cursor {
+		if i == p.searchCursor {
 			rowStyle = SelectedItemStyle
 		}
-
 		before := rowStyle.Render(mark + titlePlain + " " + durationBlock + " ")
 		var checkFrag string
 		if downloaded {
@@ -106,14 +103,13 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 			checkFrag = rowStyle.Render(" ")
 		}
 		after := rowStyle.Render(strings.Repeat(" ", pad))
-
 		b.WriteString(before)
 		b.WriteString(checkFrag)
 		b.WriteString(after)
 		b.WriteString("\n")
 	}
 	if len(p.tracks) > vis {
-		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.cursor+1, len(p.tracks))))
+		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.searchCursor+1, len(p.tracks))))
 		b.WriteString("\n")
 	}
 	return b.String()

@@ -127,11 +127,10 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 	var b strings.Builder
 	vis := p.visibleRows()
-	end := p.offset + vis
+	end := p.dlOffset + vis
 	if end > len(locals) {
 		end = len(locals)
 	}
-
 	idxW := 3
 	if len(locals) >= 1000 {
 		idxW = 4
@@ -145,23 +144,20 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 			artistW = 0
 		}
 	}
-
 	header := fmt.Sprintf("  %*s  %-*s  %s", idxW, "#", titleW, "Title", "Artist")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	b.WriteString("\n")
-
-	for i := p.offset; i < end; i++ {
+	for i := p.dlOffset; i < end; i++ {
 		f := locals[i]
 		mark := "  "
-		if i == p.cursor {
+		if i == p.dlCursor {
 			mark = " "
 		}
 		idx := fmt.Sprintf("%*d", idxW, i+1)
 		title := truncate(f.Name, titleW)
 		artist := truncate(f.Artist, artistW)
 		line := mark + idx + "  " + fmt.Sprintf("%-*s", titleW, title) + "  " + fmt.Sprintf("%-*s", artistW, artist)
-
-		if i == p.cursor {
+		if i == p.dlCursor {
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
 		} else {
 			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
@@ -169,7 +165,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		b.WriteString("\n")
 	}
 	if len(locals) > vis {
-		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.cursor+1, len(locals))))
+		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.dlCursor+1, len(locals))))
 		b.WriteString("\n")
 	}
 	return b.String()

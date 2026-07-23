@@ -459,13 +459,23 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	a.syncPlaylistState()
 
 	if idx >= 0 {
-		a.left.cursor = idx
 		vis := a.left.visibleRows()
-		if a.left.cursor < a.left.offset {
-			a.left.offset = a.left.cursor
-		}
-		if a.left.cursor >= a.left.offset+vis {
-			a.left.offset = a.left.cursor - vis + 1
+		if a.sidebarActive == SideSearch {
+			a.left.searchCursor = idx
+			if a.left.searchCursor < a.left.searchOffset {
+				a.left.searchOffset = a.left.searchCursor
+			}
+			if a.left.searchCursor >= a.left.searchOffset+vis {
+				a.left.searchOffset = a.left.searchCursor - vis + 1
+			}
+		} else if a.sidebarActive == SideDownloads {
+			a.left.dlCursor = idx
+			if a.left.dlCursor < a.left.dlOffset {
+				a.left.dlOffset = a.left.dlCursor
+			}
+			if a.left.dlCursor >= a.left.dlOffset+vis {
+				a.left.dlOffset = a.left.dlCursor - vis + 1
+			}
 		}
 	}
 
@@ -549,6 +559,7 @@ func (a *App) syncPlaylistState() {
 
 func (a *App) switchSidebar(item SidebarItem) {
 	a.sidebarActive = item
+	a.left.activeTab = item
 	if item == SideSearch {
 		a.left.searchOnEnter = true
 	} else {
