@@ -47,10 +47,11 @@ type App struct {
 
 	sidebarActive SidebarItem
 	logOffset     int
+
+	palette CommandPalette
 }
 
 func NewApp(serverURL string) *App {
-	// Find a free port and start the backend server embedded in this process.
 	port := freePort()
 	go func() {
 		ytdlpPath := os.Getenv("YTDLP_PATH")
@@ -72,6 +73,7 @@ func NewApp(serverURL string) *App {
 		left:          NewLeftPanel(c),
 		right:         NewRightPanel(p),
 		sidebarActive: SideDownloads,
+		palette:       NewCommandPalette(),
 	}
 }
 
@@ -111,6 +113,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !a.left.input.Focused() {
 				a.player.Stop()
 				return a, tea.Quit
+			}
+
+		case "esc":
+			if a.palette.Visible() {
+				a.palette.Close()
+			}
+
+		case ":":
+			if a.left.input.Focused() {
+				break
+			}
+			if a.palette.Visible() {
+				a.palette.Close()
+			} else {
+				cmds = append(cmds, a.palette.Open())
 			}
 
 		case "tab":
@@ -260,6 +277,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
 
+	var paletteCmd tea.Cmd
+	a.palette, paletteCmd = a.palette.Update(msg)
+	cmds = append(cmds, paletteCmd)
+
 	return a, tea.Batch(cmds...)
 }
 
@@ -318,7 +339,7 @@ func (a *App) View() string {
 
 	// Help
 	help := HelpStyle.Render(
-		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  /:search  l:lyrics lang  q:quit",
+		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  /:search  l:lyrics lang  ::cmd  q:quit",
 	)
 
 	// Progress bar
@@ -341,6 +362,8 @@ func (a *App) View() string {
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.palette.Visible() {
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, a.palette.View())
 	}
 
 	return view
@@ -362,7 +385,6 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 func (a *App) renderProgressBar(w int) string {
 	state := a.player.State()
 
-	// Controls row (all dim #7c7986)
 	playIcon := IconPlay
 	if state == player.Playing {
 		playIcon = IconPause
@@ -382,7 +404,6 @@ func (a *App) renderProgressBar(w int) string {
 		shuffleIcon,
 	)
 
-	// Progress bar row
 	innerW := w - 4
 
 	elapsedSec := 0
@@ -398,7 +419,6 @@ func (a *App) renderProgressBar(w int) string {
 	timeStr := FormatDuration(elapsedSec)
 	timeW := len([]rune(timeStr))
 
-	// Bar: ██ fillW + time + ░░ emptyW (time overlaid on ░)
 	restW := innerW - timeW
 	if restW < 0 {
 		restW = 0
@@ -419,12 +439,9 @@ func (a *App) renderProgressBar(w int) string {
 	bar.WriteString(ProgressEmptyStyle.Render(strings.Repeat("░", emptyW)))
 
 	progress := bar.String()
-
-	// Manually render box to preserve ANSI styles
 	borderColor := lipgloss.Color("#7c7986")
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 
-	// Top border with track title
 	title := ""
 	if a.nowPlay != nil {
 		title = a.nowPlay.Title
@@ -528,7 +545,6 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 		if err := a.player.Play(streamURL); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
-		// lr, lyricsErr := a.client.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
 		lr, lyricsErr := getCachedLyrics(a.client, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
