@@ -410,6 +410,10 @@ func (a *App) renderProgressBar(w int) string {
 	totalSec := 0
 	if a.nowPlay != nil {
 		elapsedSec = int(a.right.elapsed.Seconds())
+		if elapsedSec < 0 {
+			elapsedSec = 0
+		}
+
 		totalSec = a.nowPlay.Duration
 		if totalSec > 0 && elapsedSec > totalSec {
 			elapsedSec = totalSec
@@ -445,6 +449,10 @@ func (a *App) renderProgressBar(w int) string {
 	title := ""
 	if a.nowPlay != nil {
 		title = a.nowPlay.Title
+	}
+	borderW := w - 2
+	if borderW < 0 {
+		borderW = 0
 	}
 	var topBorder string
 	if title == "" {
