@@ -31,6 +31,8 @@ type CommandPalette struct {
 	phase     float64
 	width     int
 	height    int
+	peaks     []float64
+	peakHold  []int
 }
 
 func NewCommandPalette() CommandPalette {
@@ -43,6 +45,8 @@ func NewCommandPalette() CommandPalette {
 func (m *CommandPalette) Open() tea.Cmd {
 	m.visible = true
 	m.amps = make([]float64, paletteVisBands)
+	m.peaks = make([]float64, paletteVisBands)
+	m.peakHold = make([]int, paletteVisBands)
 	m.phase = 0
 
 	if err := m.capture.Start(paletteVisBands); err == nil {
@@ -76,6 +80,23 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 	if _, ok := msg.(visTickMsg); ok {
 		if snap := m.capture.Bands(); snap != nil {
 			m.amps = snap
+
+			// Xử lý Peak Hold & Gravity Decay
+			for i := range m.amps {
+				if m.amps[i] >= m.peaks[i] {
+					m.peaks[i] = m.amps[i]
+					m.peakHold[i] = 15
+				} else {
+					if m.peakHold[i] > 0 {
+						m.peakHold[i]--
+					} else {
+						m.peaks[i] -= 0.025 // Tốc độ rơi,
+						if m.peaks[i] < m.amps[i] {
+							m.peaks[i] = m.amps[i]
+						}
+					}
+				}
+			}
 		}
 		return m, visTick()
 	}
@@ -180,39 +201,57 @@ func (m CommandPalette) renderVisualizer() string {
 		theta0 := 2*math.Pi*float64(i)/float64(n) + m.phase
 
 		amp := m.amps[i]
+		peakAmp := m.peaks[i] // Trích xuất biên độ của đỉnh lơ lửng
+
 		if amp < 0 {
 			amp = 0
 		} else if amp > 1 {
 			amp = 1
 		}
+		if peakAmp < 0 {
+			peakAmp = 0
+		} else if peakAmp > 1 {
+			peakAmp = 1
+		}
 
 		barLen := amp * maxBar
-		if barLen < 0.001 {
-			continue
-		}
+		peakLen := peakAmp * maxBar
 
 		rSteps := int(barLen*3) + 3
 		aSteps := int(barWidthPx) + 2
-
 		maxDrop := barWidthPx / 2.0
 
 		for as := 0; as <= aSteps; as++ {
 			frac := (float64(as)/float64(aSteps))*2.0 - 1.0
 
-			capReduction := maxDrop * (1.0 - math.Sqrt(1.0-frac*frac))
-
-			capReduction *= (1.0 - amp)
-
-			targetLen := barLen - capReduction
+			// 1. Tính độ hụt vòm cho CỘT THÂN (Amp)
+			capReductionAmp := maxDrop * (1.0 - math.Sqrt(1.0-frac*frac))
+			capReductionAmp *= (1.0 - amp)
+			targetLen := barLen - capReductionAmp
 			if targetLen < 0 {
 				targetLen = 0
 			}
 
+			// 2. Tính độ hụt vòm cho ĐỈNH LƠ LỬNG (Peak)
+			capReductionPeak := maxDrop * (1.0 - math.Sqrt(1.0-frac*frac))
+			capReductionPeak *= (1.0 - peakAmp)
+			peakTargetLen := peakLen - capReductionPeak
+			if peakTargetLen < 0 {
+				peakTargetLen = 0
+			}
+
 			theta := theta0 - halfWidthAngle + 2*halfWidthAngle*float64(as)/float64(aSteps)
 
-			for rs := 0; rs <= rSteps; rs++ {
-				ratio := float64(rs) / float64(rSteps)
-				r := baseR + targetLen*ratio
+			if barLen >= 0.001 {
+				for rs := 0; rs <= rSteps; rs++ {
+					ratio := float64(rs) / float64(rSteps)
+					r := baseR + targetLen*ratio
+					plotBarPoint(cx+r*math.Cos(theta), cy-r*math.Sin(theta))
+				}
+			}
+
+			if peakTargetLen > targetLen+0.5 {
+				r := baseR + peakTargetLen
 				plotBarPoint(cx+r*math.Cos(theta), cy-r*math.Sin(theta))
 			}
 		}

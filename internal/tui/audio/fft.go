@@ -2,6 +2,8 @@ package audio
 
 import "math"
 
+var autoGainPeak float64 = 1.0
+
 type complexN struct{ re, im float64 }
 
 func fft(x []complexN) {
@@ -91,16 +93,24 @@ func magnitudeBands(samples []float64, bands int) []float64 {
 		}
 	}
 
-	peak := 0.0
+	framePeak := 0.0
 	for _, v := range out {
-		if v > peak {
-			peak = v
+		if v > framePeak {
+			framePeak = v
 		}
 	}
-	if peak > 0 {
-		for i := range out {
-			out[i] /= peak
-		}
+	if framePeak > autoGainPeak {
+		autoGainPeak = framePeak
+	} else {
+		autoGainPeak *= 0.995
+	}
+
+	if autoGainPeak < 0.001 {
+		autoGainPeak = 0.001
+	}
+
+	for i := range out {
+		out[i] /= autoGainPeak
 	}
 
 	return out
