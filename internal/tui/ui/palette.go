@@ -3,6 +3,7 @@ package ui
 import (
 	"log"
 	"math"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -23,8 +24,7 @@ func visTick() tea.Cmd {
 const paletteVisBands = 28
 
 type CommandPalette struct {
-	visible bool
-
+	visible   bool
 	capture   *audio.Capture
 	captureOK bool
 	amps      []float64
@@ -85,12 +85,12 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 			for i := range m.amps {
 				if m.amps[i] >= m.peaks[i] {
 					m.peaks[i] = m.amps[i]
-					m.peakHold[i] = 15
+					m.peakHold[i] = 15 // Đỉnh khựng lại ~15 frames
 				} else {
 					if m.peakHold[i] > 0 {
 						m.peakHold[i]--
 					} else {
-						m.peaks[i] -= 0.025 // Tốc độ rơi,
+						m.peaks[i] -= 0.025 // Tốc độ rơi của đỉnh
 						if m.peaks[i] < m.amps[i] {
 							m.peaks[i] = m.amps[i]
 						}
@@ -152,16 +152,24 @@ func (m CommandPalette) renderVisualizer() string {
 		}
 	}
 
-	// render bar
 	plotBarPoint := func(x, y float64) {
 		xi := int(math.Round(x))
 		yi := int(math.Round(y))
-		if xi < 0 || xi >= subW || yi < 0 || yi >= subH {
+
+		if xi < 0 || xi >= subW-1 || yi < 0 || yi >= subH-1 {
 			return
 		}
 		r := math.Hypot(x-cx, y-cy)
-		if dots[xi][yi] < 0 || r > dots[xi][yi] {
-			dots[xi][yi] = r
+
+		for dx := 0; dx <= 1; dx++ {
+			for dy := 0; dy <= 1; dy++ {
+				nx, ny := xi+dx, yi+dy
+				if nx >= 0 && nx < subW && ny >= 0 && ny < subH {
+					if dots[nx][ny] < 0 || r > dots[nx][ny] {
+						dots[nx][ny] = r
+					}
+				}
+			}
 		}
 	}
 
@@ -174,20 +182,21 @@ func (m CommandPalette) renderVisualizer() string {
 		bass /= float64(bassN)
 	}
 
+	isChaosFrame := bass > 0.85
 	minDim := math.Min(cx, cy)
 
 	baseR := (minDim * 0.35) + 3.0
 	baseR *= (1 + 0.2*bass)
 	maxBar := minDim * 0.45
 
-	const circleSteps = 120
+	const circleSteps = 360
 	for s := 0; s < circleSteps; s++ {
 		theta := 2 * math.Pi * float64(s) / circleSteps
 		plotCircle(cx+baseR*math.Cos(theta), cy-baseR*math.Sin(theta))
 	}
 
 	n := len(m.amps)
-	outerR := baseR + maxBar // (biên độ = 1)
+	outerR := baseR + maxBar
 	circumference := 2 * math.Pi * outerR
 	slotPx := circumference / float64(n)
 
@@ -201,7 +210,7 @@ func (m CommandPalette) renderVisualizer() string {
 		theta0 := 2*math.Pi*float64(i)/float64(n) + m.phase
 
 		amp := m.amps[i]
-		peakAmp := m.peaks[i] // Trích xuất biên độ của đỉnh lơ lửng
+		peakAmp := m.peaks[i]
 
 		if amp < 0 {
 			amp = 0
@@ -221,10 +230,15 @@ func (m CommandPalette) renderVisualizer() string {
 		aSteps := int(barWidthPx) + 2
 		maxDrop := barWidthPx / 2.0
 
+		jitterX, jitterY := 0.0, 0.0
+		if amp > 0.90 && rand.Float64() < 0.50 {
+			jitterX = (rand.Float64() - 0.5) * 12.0
+			jitterY = (rand.Float64() - 0.5) * 12.0
+		}
+
 		for as := 0; as <= aSteps; as++ {
 			frac := (float64(as)/float64(aSteps))*2.0 - 1.0
 
-			// 1. Tính độ hụt vòm cho CỘT THÂN (Amp)
 			capReductionAmp := maxDrop * (1.0 - math.Sqrt(1.0-frac*frac))
 			capReductionAmp *= (1.0 - amp)
 			targetLen := barLen - capReductionAmp
@@ -232,7 +246,6 @@ func (m CommandPalette) renderVisualizer() string {
 				targetLen = 0
 			}
 
-			// 2. Tính độ hụt vòm cho ĐỈNH LƠ LỬNG (Peak)
 			capReductionPeak := maxDrop * (1.0 - math.Sqrt(1.0-frac*frac))
 			capReductionPeak *= (1.0 - peakAmp)
 			peakTargetLen := peakLen - capReductionPeak
@@ -246,13 +259,36 @@ func (m CommandPalette) renderVisualizer() string {
 				for rs := 0; rs <= rSteps; rs++ {
 					ratio := float64(rs) / float64(rSteps)
 					r := baseR + targetLen*ratio
-					plotBarPoint(cx+r*math.Cos(theta), cy-r*math.Sin(theta))
+
+					xPos := cx + r*math.Cos(theta) + jitterX
+					yPos := cy - r*math.Sin(theta) + jitterY
+
+					plotBarPoint(xPos, yPos)
 				}
 			}
 
 			if peakTargetLen > targetLen+0.5 {
-				r := baseR + peakTargetLen
-				plotBarPoint(cx+r*math.Cos(theta), cy-r*math.Sin(theta))
+				maxParticles := 5.0
+
+				particleCount := int(maxParticles * (1.0 - peakAmp))
+				if particleCount < 1 {
+					particleCount = 1
+				}
+
+				for p := 0; p < particleCount; p++ {
+					spread := (1.0 - peakAmp) * 1.0
+
+					scatterR := baseR + peakTargetLen + (rand.Float64()-0.5)*spread
+					scatterTheta := theta + (rand.Float64()-0.5)*(spread/baseR)
+					pX := int(math.Round(cx + scatterR*math.Cos(scatterTheta) + jitterX))
+					pY := int(math.Round(cy - scatterR*math.Sin(scatterTheta) + jitterY))
+
+					if pX >= 0 && pX < subW && pY >= 0 && pY < subH {
+						if dots[pX][pY] < 0 || scatterR > dots[pX][pY] {
+							dots[pX][pY] = scatterR
+						}
+					}
+				}
 			}
 		}
 	}
@@ -302,8 +338,20 @@ func (m CommandPalette) renderVisualizer() string {
 					}
 				}
 
+				finalColor := palette[colorIdx]
+
+				// --- SCANLINE ABERRATION (Loạn sắc sọc ngang) ---
+				if isChaosFrame && avgR > baseR {
+					scanline := math.Sin(float64(row) * 1.2)
+					if scanline > 0.85 {
+						finalColor = lipgloss.Color("#00FFFF") // Cyan
+					} else if scanline < -0.85 {
+						finalColor = lipgloss.Color("#ffffff") // Red/Purple Glitch
+					}
+				}
+
 				runeStr := string(rune(0x2800 + int(mask)))
-				out.WriteString(lipgloss.NewStyle().Foreground(palette[colorIdx]).Render(runeStr))
+				out.WriteString(lipgloss.NewStyle().Foreground(finalColor).Render(runeStr))
 			} else {
 				out.WriteByte(' ')
 			}
