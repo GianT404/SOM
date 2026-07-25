@@ -78,6 +78,14 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 	}
 
 	if _, ok := msg.(visTickMsg); ok {
+		//xoayy
+		m.phase -= 0.02
+
+		if m.phase <= -2*math.Pi {
+			m.phase += 2 * math.Pi
+		} else if m.phase >= 2*math.Pi {
+			m.phase -= 2 * math.Pi
+		}
 		if snap := m.capture.Bands(); snap != nil {
 			m.amps = snap
 
@@ -340,13 +348,12 @@ func (m CommandPalette) renderVisualizer() string {
 
 				finalColor := palette[colorIdx]
 
-				// --- SCANLINE ABERRATION (Loạn sắc sọc ngang) ---
 				if isChaosFrame && avgR > baseR {
 					scanline := math.Sin(float64(row) * 1.2)
 					if scanline > 0.85 {
-						finalColor = lipgloss.Color("#00FFFF") // Cyan
+						finalColor = lipgloss.Color("#00FFFF")
 					} else if scanline < -0.85 {
-						finalColor = lipgloss.Color("#ffffff") // Red/Purple Glitch
+						finalColor = lipgloss.Color("#ffffff")
 					}
 				}
 
