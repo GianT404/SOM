@@ -15,6 +15,26 @@ import (
 
 type visTickMsg time.Time
 
+var (
+	visStylesOut = []lipgloss.Style{
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#9D311A")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#C84328")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#E8593C")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#EF9F27")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")),
+	}
+
+	visStylesIn = []lipgloss.Style{
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#1B0604")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#3A0F08")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#5E190D")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#9D311A")),
+	}
+
+	visStyleGlitch1 = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFFF"))
+	visStyleGlitch2 = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff"))
+)
+
 func visTick() tea.Cmd {
 	return tea.Tick(33*time.Millisecond, func(t time.Time) tea.Msg {
 		return visTickMsg(t)
@@ -87,18 +107,25 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 			m.phase -= 2 * math.Pi
 		}
 		if snap := m.capture.Bands(); snap != nil {
-			m.amps = snap
-
-			// Xử lý Peak Hold & Gravity Decay
+			for i, v := range snap {
+				if v >= m.amps[i] {
+					m.amps[i] = v
+				} else {
+					m.amps[i] -= 0.06
+					if m.amps[i] < v {
+						m.amps[i] = v
+					}
+				}
+			}
 			for i := range m.amps {
 				if m.amps[i] >= m.peaks[i] {
 					m.peaks[i] = m.amps[i]
-					m.peakHold[i] = 15 // Đỉnh khựng lại ~15 frames
+					m.peakHold[i] = 15
 				} else {
 					if m.peakHold[i] > 0 {
 						m.peakHold[i]--
 					} else {
-						m.peaks[i] -= 0.025 // Tốc độ rơi của đỉnh
+						m.peaks[i] -= 0.025
 						if m.peaks[i] < m.amps[i] {
 							m.peaks[i] = m.amps[i]
 						}
@@ -114,7 +141,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 
 func (m CommandPalette) View() string {
 	if !m.captureOK {
-		return DimItemStyle.Render("")
+		return DimItemStyle.Render("visualizer unavailable")
 	}
 	return m.renderVisualizer()
 }
@@ -125,6 +152,7 @@ var brailleBit = [2][4]uint8{
 }
 
 func (m CommandPalette) renderVisualizer() string {
+
 	if m.width < 10 || m.height < 5 {
 		return DimItemStyle.Render("")
 	}
@@ -191,8 +219,16 @@ func (m CommandPalette) renderVisualizer() string {
 	}
 
 	isChaosFrame := bass > 0.85
-	minDim := math.Min(cx, cy)
+	baseCx := float64(subW) / 2
+	baseCy := float64(subH) / 2
+	minDim := math.Min(baseCx, baseCy)
 
+	if isChaosFrame {
+		shakeForce := (bass - 0.85) * 100.0
+
+		cx += (rand.Float64() - 0.5) * shakeForce
+		cy += (rand.Float64() - 0.5) * shakeForce
+	}
 	baseR := (minDim * 0.35) + 3.0
 	baseR *= (1 + 0.2*bass)
 	maxBar := minDim * 0.45
@@ -273,6 +309,21 @@ func (m CommandPalette) renderVisualizer() string {
 
 					plotBarPoint(xPos, yPos)
 				}
+
+				innerTargetLen := targetLen * 0.4
+				if innerTargetLen > 0 {
+					innerRSteps := int(innerTargetLen*3) + 2
+					for rs := 0; rs <= innerRSteps; rs++ {
+						ratio := float64(rs) / float64(innerRSteps)
+
+						r := baseR - innerTargetLen*ratio
+
+						xPos := cx + r*math.Cos(theta) + jitterX*0.3
+						yPos := cy - r*math.Sin(theta) + jitterY*0.3
+
+						plotBarPoint(xPos, yPos)
+					}
+				}
 			}
 
 			if peakTargetLen > targetLen+0.5 {
@@ -301,14 +352,6 @@ func (m CommandPalette) renderVisualizer() string {
 		}
 	}
 
-	palette := []lipgloss.Color{
-		"#9D311A",
-		"#C84328",
-		"#E8593C",
-		"#EF9F27",
-		"#FFD700",
-	}
-
 	var out strings.Builder
 	for row := 0; row < m.height; row++ {
 		for col := 0; col < m.width; col++ {
@@ -331,34 +374,45 @@ func (m CommandPalette) renderVisualizer() string {
 
 			if any {
 				avgR := sumR / float64(count)
-				var colorIdx int
 
-				if avgR <= baseR {
-					colorIdx = 0
+				var finalStyle lipgloss.Style
+				maxInnerBar := maxBar * 0.4
+
+				if avgR < baseR {
+					distInwards := baseR - avgR
+					norm := 1.0 - (distInwards / maxInnerBar)
+					if norm < 0 {
+						norm = 0
+					}
+					if norm > 1 {
+						norm = 1
+					}
+
+					colorIdx := int(norm * float64(len(visStylesIn)-1))
+					finalStyle = visStylesIn[colorIdx]
+
 				} else {
 					norm := (avgR - baseR) / maxBar
 					if norm > 1 {
 						norm = 1
 					}
-					colorIdx = int(norm * float64(len(palette)-1))
-					if colorIdx > len(palette)-1 {
-						colorIdx = len(palette) - 1
-					}
+
+					colorIdx := int(norm * float64(len(visStylesOut)-1))
+					finalStyle = visStylesOut[colorIdx]
 				}
 
-				finalColor := palette[colorIdx]
-
+				//  (Scanline Aberration)
 				if isChaosFrame && avgR > baseR {
 					scanline := math.Sin(float64(row) * 1.2)
 					if scanline > 0.85 {
-						finalColor = lipgloss.Color("#00FFFF")
+						finalStyle = visStyleGlitch1
 					} else if scanline < -0.85 {
-						finalColor = lipgloss.Color("#ffffff")
+						finalStyle = visStyleGlitch2
 					}
 				}
 
 				runeStr := string(rune(0x2800 + int(mask)))
-				out.WriteString(lipgloss.NewStyle().Foreground(finalColor).Render(runeStr))
+				out.WriteString(finalStyle.Render(runeStr))
 			} else {
 				out.WriteByte(' ')
 			}
