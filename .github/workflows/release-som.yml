@@ -1,8 +1,5 @@
 name: Release SOM TUI
 
-# Push a tag like "v0.5.0" to trigger this — `som --upgrade` looks for
-# assets named exactly `som-<GOOS>-<GOARCH>[.exe]` in the latest release,
-# so keep these names in sync with cmd/som/update.go if you ever change them.
 on:
   push:
     tags:
@@ -20,6 +17,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+
+      - name: Install ALSA dependencies (for Linux build)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
       - name: Build Linux amd64
         run: |

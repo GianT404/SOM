@@ -47,8 +47,8 @@ type App struct {
 
 	sidebarActive SidebarItem
 	logOffset     int
-
-	palette CommandPalette
+	activeContext SidebarItem
+	palette       CommandPalette
 }
 
 func NewApp(serverURL string) *App {
@@ -73,6 +73,7 @@ func NewApp(serverURL string) *App {
 		left:          NewLeftPanel(c),
 		right:         NewRightPanel(p),
 		sidebarActive: SideDownloads,
+		activeContext: SideDownloads,
 		palette:       NewCommandPalette(),
 	}
 }
@@ -94,13 +95,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		a.right.TickAt(a.playedAt)
-		if a.player.State() == player.Stopped && a.nowPlay != nil {
+		if !a.left.loadingStream && a.player.State() == player.Stopped && a.nowPlay != nil {
 			a.nowPlay = nil
 			cmds = append(cmds, a.playNext())
 		}
+
 		cmds = append(cmds, tick())
 	case PlayPlaylistMsg:
 		a.playlist = msg.Tracks
+		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
@@ -195,15 +198,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case SearchResultMsg:
-		if msg.Err == nil {
-			a.playlist = msg.Tracks
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 		}
 
 	case PlayStartedMsg:
 		t := msg.Track
-		if len(a.left.tracks) > 0 {
-			a.playlist = a.left.tracks
-		}
+		a.playlist = a.left.tracks
+		a.activeContext = SideSearch
+
 		idx := -1
 		for i, tr := range a.playlist {
 			if tr.ID == t.ID {
@@ -239,6 +242,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if idx < 0 {
 			idx = len(a.playlist) - 1
 		}
+		a.activeContext = SideDownloads
 		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
 
 	case StreamStartedMsg:
@@ -497,7 +501,7 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	a.nowPlay = &t
 	a.syncPlaylistState()
 
-	if idx >= 0 {
+	if idx >= 0 && a.sidebarActive == a.activeContext {
 		vis := a.left.visibleRows()
 		if a.sidebarActive == SideSearch {
 			a.left.searchCursor = idx
