@@ -28,7 +28,7 @@ type LyricLine struct {
 
 // StreamInfo holds the direct audio URL and video title for streaming.
 type StreamInfo struct {
-	URL   string // Direct m4a/aac audio URL
+	URL   string // Direct opus audio URL
 	Title string // Video title (for Content-Disposition filename)
 }
 
@@ -51,7 +51,7 @@ type Scraper interface {
 	GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error)
 
 	// DownloadAudio downloads audio to a temporary file and returns its path.
-	// This ensures the moov atom is correctly written for m4a files,
+	// This ensures the moov atom is correctly written for opus files,
 	// bypassing ExoPlayer UnrecognizedInputFormatException issues.
 	DownloadAudio(ctx context.Context, videoID string) (string, error)
 

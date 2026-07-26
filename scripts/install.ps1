@@ -1,60 +1,65 @@
 $ErrorActionPreference = "Stop"
-
 $Repo = "GianT404/SOM"
+$DestDir = Join-Path $env:LocalAppData "Programs\som"
 
 function Info($msg)  { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Warn($msg)  { Write-Host "!! $msg" -ForegroundColor Yellow }
-function Err($msg)   { Write-Host "LOI: $msg" -ForegroundColor Red; exit 1 }
+function Err($msg)   { Write-Host "LỖI: $msg" -ForegroundColor Red; exit 1 }
 
 function Install-Deps {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Warn "'App Installer' tu Microsoft Store roi chay lai script nay."
-        exit 1
+    New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
+
+    # 1. Kéo yt-dlp.exe 
+    $ytDlpPath = Join-Path $DestDir "yt-dlp.exe"
+    if (-not (Test-Path $ytDlpPath)) {
+        Info "Kéo yt-dlp trực tiếp từ GitHub..."
+        Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile $ytDlpPath
+    } else {
+        Info "yt-dlp đã có sẵn."
     }
 
-    Info "Cai yt-dlp..."
-    winget install --id yt-dlp.yt-dlp --silent --accept-package-agreements --accept-source-agreements
-
-    Info "Cai ffmpeg (kem ffprobe)..."
-    winget install --id Gyan.FFmpeg --silent --accept-package-agreements --accept-source-agreements
-
-    Info "Cai mpv..."
-    winget install --id mpv.mpv --silent --accept-package-agreements --accept-source-agreements
-
-    Warn "Neu mpv/ffmpeg vua cai xong ma 'som' van bao khong tim thay, mo lai"
-    Warn "terminal moi (winget can terminal moi de nhan PATH vua duoc cap nhat)."
+    # 2. Kéo FFmpeg (Static Build)
+    $ffmpegPath = Join-Path $DestDir "ffmpeg.exe"
+    if (-not (Test-Path $ffmpegPath)) {
+        Info "Kéo FFmpeg Static Build (Gyan)..."
+        $zipPath = Join-Path $env:TEMP "ffmpeg_static.zip"
+        Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $zipPath
+        
+        Info "Giải nén FFmpeg..."
+        Expand-Archive -Path $zipPath -DestinationPath $env:TEMP -Force
+        
+        $extractedDir = Join-Path $env:TEMP "ffmpeg-master-latest-win64-gpl\bin"
+        Move-Item -Path (Join-Path $extractedDir "ffmpeg.exe") -Destination $DestDir -Force
+        Move-Item -Path (Join-Path $extractedDir "ffprobe.exe") -Destination $DestDir -Force
+        
+        Remove-Item -Path $zipPath -Force
+        Remove-Item -Path (Join-Path $env:TEMP "ffmpeg-master-latest-win64-gpl") -Recurse -Force
+    }
 }
 
 function Install-Som {
-    $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { Err "Chi ho tro amd64" }
+    $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { Err "Chỉ hỗ trợ amd64" }
     $asset = "som-windows-$arch.exe"
     $url = "https://github.com/$Repo/releases/latest/download/$asset"
+    $dest = Join-Path $DestDir "som.exe"
 
-    $destDir = Join-Path $env:LocalAppData "Programs\som"
-    New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-    $dest = Join-Path $destDir "som.exe"
-
-    Info "Tai $asset (ban moi nhat)..."
+    Info "Tải SOM mới nhất ($asset)..."
     try {
         Invoke-WebRequest -Uri $url -OutFile $dest
     } catch {
-        Err "Tai that bai - kiem tra lai release co build cho $asset chua."
+        Err "Tải thất bại. Kiểm tra lại release trên GitHub."
     }
 
-    Info "Da cai vao $dest"
+    Info "Đã cài vào $dest"
+    
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if ($userPath -notlike "*$destDir*") {
-        Info "Them $destDir vao PATH cua user..."
-        $newPath = if ([string]::IsNullOrEmpty($userPath)) { $destDir } else { "$userPath;$destDir" }
+    if ($userPath -notlike "*$DestDir*") {
+        Info "Thêm $DestDir vào PATH..."
+        $newPath = if ([string]::IsNullOrEmpty($userPath)) { $DestDir } else { "$userPath;$DestDir" }
         [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        Warn "Da them vao PATH - mo terminal MOI de dung duoc lenh 'som' ngay."
-    } else {
-        Info "$destDir da co san trong PATH."
+        Warn "Đã cập nhật PATH. Hãy mở lại Terminal mới để chạy lệnh 'som'."
     }
 }
 
 Install-Deps
 Install-Som
-
-Write-Host ""
-Info "Xong! Mo terminal moi roi thu: som --version"

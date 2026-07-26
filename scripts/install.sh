@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 REPO="GianT404/SOM"
@@ -8,69 +9,61 @@ warn()  { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
 error() { printf '\033[1;31mLỖI:\033[0m %s\n' "$1" >&2; exit 1; }
 
 install_deps() {
-	if command -v yt-dlp >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1 && command -v mpv >/dev/null 2>&1; then
-		info "yt-dlp, ffprobe, mpv đã có sẵn — bỏ qua bước cài dependency."
-		return
+	# 1. Kéo yt-dlp
+	if ! command -v yt-dlp >/dev/null 2>&1; then
+		info "Đang kéo yt-dlp mới nhất trực tiếp từ GitHub..."
+		sudo curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o /usr/local/bin/yt-dlp
+		sudo chmod a+rx /usr/local/bin/yt-dlp
+	else
+		info "yt-dlp đã tồn tại, tiến hành tự cập nhật..."
+		sudo yt-dlp -U || true
 	fi
 
-	if command -v pacman >/dev/null 2>&1; then
-		info "Phát hiện pacman (Arch/Manjaro) — cài yt-dlp, ffmpeg, mpv..."
-		sudo pacman -S --needed --noconfirm yt-dlp ffmpeg mpv
-
-	elif command -v apt >/dev/null 2>&1; then
-		info "Phát hiện apt (Debian/Ubuntu) — cài ffmpeg, mpv, yt-dlp..."
-		sudo apt update
-		sudo apt install -y ffmpeg mpv
-		if command -v pip3 >/dev/null 2>&1; then
-			pip3 install --user -U yt-dlp
-		else
-			sudo apt install -y yt-dlp
+	# 2. Kéo FFmpeg Static Build
+	if ! command -v ffmpeg >/dev/null 2>&1; then
+		info "Đang kéo FFmpeg Static Build..."
+		if [ "$(uname -s)" = "Linux" ]; then
+			curl -L "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o /tmp/ffmpeg.tar.xz
+			tar -xf /tmp/ffmpeg.tar.xz -C /tmp
+			sudo mv /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe /usr/local/bin/
+			rm -rf /tmp/ffmpeg*
+		elif [ "$(uname -s)" = "Darwin" ]; then
+			curl -L "https://evermeet.cx/ffmpeg/ffmpeg-115312-g6c039750d7.zip" -o /tmp/ffmpeg.zip
+			unzip -q /tmp/ffmpeg.zip -d /tmp/
+			sudo mv /tmp/ffmpeg /usr/local/bin/
+			rm /tmp/ffmpeg.zip
 		fi
-
-	elif command -v dnf >/dev/null 2>&1; then
-		info "Phát hiện dnf (Fedora) — cài ffmpeg, mpv, yt-dlp..."
-		sudo dnf install -y ffmpeg mpv yt-dlp
-
-	elif command -v brew >/dev/null 2>&1; then
-		info "Phát hiện Homebrew (macOS) — cài yt-dlp, ffmpeg, mpv..."
-		brew install yt-dlp ffmpeg mpv
-
 	else
-		warn "Không nhận diện được package manager (pacman/apt/dnf/brew)."
-		warn "Tự cài yt-dlp, ffmpeg (có ffprobe), mpv theo distro của bạn rồi chạy lại script này."
-		exit 1
+		info "FFmpeg đã có sẵn."
 	fi
 }
 
 install_som() {
 	local os arch asset tmp
-
 	case "$(uname -s)" in
 		Linux)  os="linux" ;;
 		Darwin) os="darwin" ;;
 		*) error "Hệ điều hành không được hỗ trợ: $(uname -s)" ;;
 	esac
-
 	case "$(uname -m)" in
 		x86_64|amd64) arch="amd64" ;;
-		*) error "Kiến trúc CPU không được hỗ trợ: $(uname -m) (hiện chỉ có bản amd64)" ;;
+		arm64|aarch64) arch="arm64" ;;
+		*) error "Kiến trúc CPU không hỗ trợ: $(uname -m)" ;;
 	esac
 
 	asset="som-${os}-${arch}"
-	tmp="$(mktemp)"
+	tmp="$(mktemp -d)"
+	
+	info "Tải SOM bản mới nhất từ GitHub ($asset)..."
+	curl -sL "https://github.com/$REPO/releases/latest/download/$asset" -o "$tmp/som"
+	chmod +x "$tmp/som"
 
-	info "Tải ${asset} (bản mới nhất)..."
-	curl -fL "https://github.com/${REPO}/releases/latest/download/${asset}" -o "$tmp" \
-		|| error "Tải thất bại — kiểm tra lại release có build cho ${asset} chưa."
+	info "Cài đặt vào $INSTALL_DIR/som ..."
+	sudo mv "$tmp/som" "$INSTALL_DIR/som"
+	rm -rf "$tmp"
 
-	chmod +x "$tmp"
-
-	info "Cài vào ${INSTALL_DIR}/som (cần sudo)..."
-	sudo mv "$tmp" "${INSTALL_DIR}/som"
+	info "Cài đặt thành công! Gõ 'som' để quẩy nhạc."
 }
 
 install_deps
 install_som
-
-echo
-info "Xong! Thử chạy: som --version"

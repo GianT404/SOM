@@ -125,10 +125,9 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
-	// First get the title.
 	titleCmd := exec.CommandContext(ctx, y.BinPath,
 		"--print", "%(title)s",
-		"-f", "ba[ext=m4a]/ba",
+		"-f", "bestaudio",
 		"--no-warnings",
 		"--no-check-certificates",
 		"--no-playlist",
@@ -139,10 +138,9 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 	titleCmd.Stdout = &titleOut
 	titleCmd.Stderr = &titleErr
 
-	// Get the direct URL.
 	urlCmd := exec.CommandContext(ctx, y.BinPath,
 		"-g",
-		"-f", "ba[ext=m4a]/ba",
+		"-f", "bestaudio",
 		"--no-warnings",
 		"--no-check-certificates",
 		"--no-playlist",
@@ -201,9 +199,8 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 
 var cleanupOnce sync.Once
 
-// cleanupStaleTempFiles removes dm4a_*.m4a temp files older than 1 hour.
 func cleanupStaleTempFiles() {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dm4a_*.m4a"))
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dm4a_*.opus"))
 	now := time.Now()
 	for _, f := range matches {
 		info, err := os.Stat(f)
@@ -215,21 +212,16 @@ func cleanupStaleTempFiles() {
 
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
 	cleanupOnce.Do(cleanupStaleTempFiles)
-	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dm4a_%s.m4a", videoID))
+	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dm4a_%s.opus", videoID))
 
-	if isM4AFile(tempFile) {
+	if isOpusFile(tempFile) {
 		return tempFile, nil
 	}
 	_ = os.Remove(tempFile)
-
-	// Try direct download to bypass yt-dlp
-	err := GetDirectAudio(ctx, videoID, tempFile)
-	if err == nil {
-		return tempFile, nil
-	}
-
 	cmd := exec.CommandContext(ctx, y.BinPath,
-		"-f", "ba[ext=m4a]",
+		"-f", "bestaudio",
+		"-x", "--audio-format", "opus",
+		"--embed-metadata",
 		"-o", tempFile,
 		"--no-warnings",
 		"--no-check-certificates",
@@ -240,34 +232,33 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	// Ignore stdout for clean logs
 	cmd.Stdout = nil
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("yt-dlp download: %w: %s", err, stderr.String())
 	}
-	if !isM4AFile(tempFile) {
+	if !isOpusFile(tempFile) {
 		_ = os.Remove(tempFile)
-		return "", fmt.Errorf("yt-dlp download: output is not a playable m4a file")
+		return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
 	}
 
 	return tempFile, nil
 }
 
-func isM4AFile(path string) bool {
+func isOpusFile(path string) bool {
 	file, err := os.Open(path)
 	if err != nil {
 		return false
 	}
 	defer file.Close()
 
-	header := make([]byte, 12)
+	header := make([]byte, 4)
 	n, err := file.Read(header)
 	if err != nil || n < len(header) {
 		return false
 	}
 
-	return string(header[4:8]) == "ftyp"
+	return string(header) == "OggS"
 }
 
 // VideoTitle returns the title of the video.

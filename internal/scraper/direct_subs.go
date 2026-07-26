@@ -123,7 +123,7 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 		}
 	}
 	if bestFormat == nil {
-		return fmt.Errorf("no m4a audio format found")
+		return fmt.Errorf("no opus audio format found")
 	}
 
 	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)

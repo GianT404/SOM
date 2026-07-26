@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,57 +27,57 @@ type lrclibTrack struct {
 	PlainLyrics  string  `json:"plainLyrics"`
 }
 
-// lrcTimestampRe matches "[MM:SS.cs]" or "[MM:SS.ms]" at start of line.
 var lrcTimestampRe = regexp.MustCompile(`^\[(\d+):(\d+)(?:[.:](\d+))?\]\s*(.*)$`)
+var lrcRegex = regexp.MustCompile(`^\[(\d{2,}):(\d{2})\.(\d{2,3})\](.*)`)
 
-// parseLRC converts an LRC-format string into LyricLine slices.
-// Lines without a timestamp are discarded.
-func parseLRC(lrc string) []LyricLine {
+func parseLRC(syncedLyrics string) []LyricLine {
 	var lines []LyricLine
-	for _, raw := range strings.Split(lrc, "\n") {
-		raw = strings.TrimSpace(raw)
-		m := lrcTimestampRe.FindStringSubmatch(raw)
-		if m == nil {
+	scanner := bufio.NewScanner(strings.NewReader(syncedLyrics))
+
+	for scanner.Scan() {
+		text := strings.TrimSpace(scanner.Text())
+		if text == "" {
 			continue
 		}
-		minutes, _ := strconv.ParseFloat(m[1], 64)
-		seconds, _ := strconv.ParseFloat(m[2], 64)
 
-		frac := 0.0
-		if m[3] != "" {
-			frac, _ = strconv.ParseFloat(m[3], 64)
-			for frac >= 1 {
-				frac /= 10
+		matches := lrcRegex.FindStringSubmatch(text)
+		if len(matches) == 5 {
+			min, _ := strconv.Atoi(matches[1])
+			sec, _ := strconv.Atoi(matches[2])
+
+			msStr := matches[3]
+			ms, _ := strconv.Atoi(msStr)
+			if len(msStr) == 2 {
+				ms *= 10
 			}
+
+			start := float64(min)*60 + float64(sec) + float64(ms)/1000.0
+			content := strings.TrimSpace(matches[4])
+
+			lines = append(lines, LyricLine{
+				Start: start,
+				End:   0,
+				Text:  content,
+			})
 		}
-
-		startSec := minutes*60 + seconds + frac
-		text := strings.TrimSpace(m[4])
-
-		lines = append(lines, LyricLine{
-			Start: startSec,
-			End:   0, // filled in after the loop
-			Text:  text,
-		})
 	}
 
-	// Fill in End timestamps from the next line's Start.
-	for i := range lines {
-		if i+1 < len(lines) {
-			lines[i].End = lines[i+1].Start
-		} else {
-			// Last line: extend 5 seconds past its start.
-			lines[i].End = lines[i].Start + 5
+	for i := 0; i < len(lines)-1; i++ {
+		lines[i].End = lines[i+1].Start
+
+		if lines[i].End-lines[i].Start > 10.0 {
+			lines[i].End = lines[i].Start + 5.0
 		}
+	}
+
+	if len(lines) > 0 {
+		lastIdx := len(lines) - 1
+		lines[lastIdx].End = lines[lastIdx].Start + 5.0
 	}
 
 	return lines
 }
 
-// lrclibHTTPClient is shared to reuse connections.
-// Timeout is kept short because lyrics are a secondary feature — we don't
-// want a slow/unresponsive LRCLib to hold up the whole request for 30s,
-// especially since we may call it twice (get + search) per request.
 var lrclibHTTPClient = &http.Client{Timeout: 6 * time.Second}
 
 // GetLRCLibLyrics fetches synced lyrics from lrclib.net.

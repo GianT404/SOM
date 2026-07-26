@@ -535,7 +535,7 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 		a.playedAt = time.Now()
 		a.right.SetTrack(&t, a.playedAt)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
-		jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
+		jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
 		data, err := os.ReadFile(jsonPath)
 		if err == nil {
 			var lr api.LyricsResp

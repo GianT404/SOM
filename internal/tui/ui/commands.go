@@ -28,7 +28,7 @@ func getDownloadDir() (string, error) {
 
 func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 	return func() tea.Msg {
-		path, err := c.DownloadM4A(t.ID, t.Title, destDir)
+		path, err := c.DownloadOPUS(t.ID, t.Title, destDir)
 
 		if err == nil {
 			// lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
@@ -39,7 +39,7 @@ func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
 			lr.Artist = t.Artist
 			lr.Title = t.Title
 			lr.VideoID = t.ID
-			jsonPath := strings.TrimSuffix(path, ".m4a") + ".json"
+			jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
 			data, _ := json.MarshalIndent(lr, "", "  ")
 			_ = os.WriteFile(jsonPath, data, 0644)
 		}

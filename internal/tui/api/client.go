@@ -215,7 +215,7 @@ func (c *Client) Lyrics(id, title, artist string, duration int) (LyricsResp, err
 }
 
 // ─── Download ─────────────────────────────────────────────────────────────────
-func (c *Client) DownloadM4A(id, title, destDir string) (string, error) {
+func (c *Client) DownloadOPUS(id, title, destDir string) (string, error) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir %s: %w", destDir, err)
 	}
@@ -223,7 +223,7 @@ func (c *Client) DownloadM4A(id, title, destDir string) (string, error) {
 	if safe == "" {
 		safe = id
 	}
-	dest := filepath.Join(destDir, safe+".m4a")
+	dest := filepath.Join(destDir, safe+".opus")
 
 	resp, err := c.getStream("/api/v1/stream", url.Values{"id": {id}})
 	if err != nil {

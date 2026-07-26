@@ -34,12 +34,12 @@ func (p *LeftPanel) scanLocalFiles() {
 	p.errMsg = ""
 
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".m4a") {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".opus") {
 			localPath := filepath.Join(dir, e.Name())
-			name := strings.TrimSuffix(e.Name(), ".m4a")
+			name := strings.TrimSuffix(e.Name(), ".opus")
 			artist := ""
 			videoID := ""
-			jsonPath := strings.TrimSuffix(localPath, ".m4a") + ".json"
+			jsonPath := strings.TrimSuffix(localPath, ".opus") + ".json"
 			if data, err := os.ReadFile(jsonPath); err == nil {
 				var meta struct {
 					Artist  string `json:"artist"`
