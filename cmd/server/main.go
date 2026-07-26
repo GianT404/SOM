@@ -99,7 +99,7 @@ func main() {
 			fmt.Println(lipgloss.NewStyle().Foreground(purples[i]).Render(line))
 		}
 
-		log.Printf("Dm4a server starting on %s", srv.Addr)
+		log.Printf("SOM server starting on %s", srv.Addr)
 		log.Printf("   yt-dlp binary: %s", ytdlpPath)
 		log.Println("   Endpoints:")
 		log.Println("     GET /api/v1/search?q={keyword}")
