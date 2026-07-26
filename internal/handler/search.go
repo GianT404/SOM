@@ -4,11 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"som/internal/scraper"
 )
+
+var reVideoID = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+
+func validateVideoID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "missing required parameter: id")
+		return "", false
+	}
+	if !reVideoID.MatchString(id) {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return "", false
+	}
+	return id, true
+}
 
 // SearchHandler handles GET /api/v1/search?q={keyword}.
 type SearchHandler struct {
@@ -22,7 +38,6 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// yt-dlp search can be slow on first run or on restricted networks.
 	ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
 	defer cancel()
 
@@ -46,7 +61,6 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	// Escape any quotes in the message for valid JSON.
 	safe := strings.ReplaceAll(msg, `"`, `\"`)
 	w.Write([]byte(`{"error":"` + safe + `"}`))
 }

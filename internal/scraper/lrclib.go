@@ -145,7 +145,7 @@ func absDiff(a, b float64) float64 {
 // fetchLRCLibSingle does a GET and decodes a single lrclibTrack.
 func fetchLRCLibSingle(ctx context.Context, reqURL string) ([]LyricsData, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	req.Header.Set("Lrclib-Client", "dm4a/1.0 (github.com/dm4a)")
+	req.Header.Set("Lrclib-Client", "SOM/1.0 (https://github.com/GianT404/SOM)")
 
 	resp, err := lrclibHTTPClient.Do(req)
 	if err != nil {
@@ -171,7 +171,7 @@ func fetchLRCLibSingle(ctx context.Context, reqURL string) ([]LyricsData, error)
 // fetchLRCLibSearch does a GET and decodes an array of lrclibTrack.
 func fetchLRCLibSearch(ctx context.Context, reqURL string) ([]lrclibTrack, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	req.Header.Set("Lrclib-Client", "dm4a/1.0 (github.com/dm4a)")
+	req.Header.Set("Lrclib-Client", "SOM/1.0 (https://github.com/GianT404/SOM)")
 
 	resp, err := lrclibHTTPClient.Do(req)
 	if err != nil {

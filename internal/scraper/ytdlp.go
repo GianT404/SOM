@@ -200,7 +200,7 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 var cleanupOnce sync.Once
 
 func cleanupStaleTempFiles() {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dm4a_*.opus"))
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus*.opus"))
 	now := time.Now()
 	for _, f := range matches {
 		info, err := os.Stat(f)
@@ -212,7 +212,7 @@ func cleanupStaleTempFiles() {
 
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
 	cleanupOnce.Do(cleanupStaleTempFiles)
-	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dm4a_%s.opus", videoID))
+	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
 
 	if isOpusFile(tempFile) {
 		return tempFile, nil
@@ -335,7 +335,7 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 	defer ytdlpCancel()
 
 	tmpDir := os.TempDir()
-	outTmpl := filepath.Join(tmpDir, fmt.Sprintf("dm4a_subs_%s", videoID))
+	outTmpl := filepath.Join(tmpDir, fmt.Sprintf("dopus%s", videoID))
 
 	// Clean up any old files for this video
 	matches, _ := filepath.Glob(outTmpl + "*")

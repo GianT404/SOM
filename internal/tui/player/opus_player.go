@@ -1,6 +1,7 @@
 package player
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -17,6 +18,31 @@ const (
 	Paused
 )
 
+// syncBuffer là bytes.Buffer có lock riêng, an toàn khi ffmpeg (chạy nền)
+// ghi log lỗi trong lúc UI gọi Stderr() đọc cùng lúc.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
+func (s *syncBuffer) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.buf.Reset()
+}
+
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -26,6 +52,7 @@ type Player struct {
 	currentPath string
 	startTime   time.Time
 	pauseOffset time.Duration
+	stderrBuf   syncBuffer // stderr thật của ffmpeg, để debug khi decode lỗi
 }
 
 func New() *Player {
@@ -81,11 +108,14 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
-		"-v", "quiet",
+		"-v", "error", // chỉ log lỗi thật, không log info/warning rác
 		"-",
 	)
 
 	p.decoder = exec.Command("ffmpeg", args...)
+
+	p.stderrBuf.Reset()
+	p.decoder.Stderr = &p.stderrBuf
 
 	pcmOut, err := p.decoder.StdoutPipe()
 	if err != nil {
@@ -170,5 +200,5 @@ func (p *Player) SeekBy(seconds int) {
 }
 
 func (p *Player) Stderr() string {
-	return ""
+	return p.stderrBuf.String()
 }

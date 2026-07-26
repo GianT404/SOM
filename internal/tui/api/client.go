@@ -149,8 +149,41 @@ func (c *Client) Search(q string) ([]Track, error) {
 }
 
 // ─── Stream ───────────────────────────────────────────────────────────────────
+
+// StreamURL trả về URL của endpoint download-to-disk (server tải xong opus
+// rồi mới serve). Dùng cho tính năng tải về máy (DownloadOPUS), KHÔNG dùng
+// để phát nhạc ngay vì độ trễ = thời gian tải cả bài.
 func (c *Client) StreamURL(id string) string {
 	return fmt.Sprintf("%s/api/v1/stream?id=%s", c.base, url.QueryEscape(id))
+}
+
+type resolveResp struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// ResolveStream lấy URL audio trực tiếp từ CDN (qua /api/v1/resolve) để phát
+// ngay lập tức, không phải đợi server tải xong toàn bộ file như StreamURL.
+func (c *Client) ResolveStream(id string) (string, error) {
+	resp, err := c.getShort("/api/v1/resolve", url.Values{"id": {id}})
+	if err != nil {
+		return "", fmt.Errorf("resolve request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("resolve: server %s — %s", resp.Status, truncateMsg(body))
+	}
+
+	var rr resolveResp
+	if err := json.Unmarshal(body, &rr); err != nil {
+		return "", fmt.Errorf("resolve decode: %w\nbody: %s", err, truncateMsg(body))
+	}
+	if rr.URL == "" {
+		return "", fmt.Errorf("resolve: empty url returned for id=%s", id)
+	}
+	return rr.URL, nil
 }
 
 // ─── Lyrics ──────────────────────────────────────────────────────────────────

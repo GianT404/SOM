@@ -71,9 +71,8 @@ func (h *StreamHandler) getCachedTitle(ctx context.Context, id string) string {
 }
 
 func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "missing required parameter: id")
+	id, ok := validateVideoID(w, r)
+	if !ok {
 		return
 	}
 

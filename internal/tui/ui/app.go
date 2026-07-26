@@ -549,7 +549,10 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		streamURL := a.client.StreamURL(t.ID)
+		streamURL, err := a.client.ResolveStream(t.ID)
+		if err != nil {
+			streamURL = a.client.StreamURL(t.ID)
+		}
 		if err := a.player.Play(streamURL); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
