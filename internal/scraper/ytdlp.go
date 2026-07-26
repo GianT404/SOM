@@ -314,10 +314,20 @@ func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (Music
 		return MusicMetadata{}, nil
 	}
 
-	track := strings.TrimSpace(parts[0])
-	artist := strings.TrimSpace(parts[1])
+	// yt-dlp in ra literal "NA" khi field không tồn tại, phải lọc bỏ
+	track := cleanYtdlpNA(parts[0])
+	artist := cleanYtdlpNA(parts[1])
 
 	return MusicMetadata{Track: track, Artist: artist}, nil
+}
+
+// cleanYtdlpNA trả về "" nếu yt-dlp in ra placeholder "NA"
+func cleanYtdlpNA(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "NA" {
+		return ""
+	}
+	return s
 }
 
 func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData, error) {

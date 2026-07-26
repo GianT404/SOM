@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -40,21 +39,22 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resCh := make(chan result, 2)
 
 	go func() {
+		// VideoMetadata trả track/artist rỗng nếu video không có metadata
+		// YouTube Music (rất phổ biến với video tự upload/rap/indie) - khi đó
+		// FetchLyrics tự rơi xuống candidate parse từ title, không cần xử lý
+		// rẽ nhánh ở đây nữa.
 		meta, metaErr := h.Scraper.VideoMetadata(ctx, id)
-		if metaErr == nil && meta.Track != "" {
-			log.Printf("lyrics: trying metadata candidate %q by %q", meta.Track, meta.Artist)
-			if data, err := scraper.GetLRCLibLyrics(ctx, meta.Track, meta.Artist, duration); err == nil && len(data) > 0 {
-				resCh <- result{source: "lrclib", data: data}
-				return
-			}
+		if metaErr != nil {
+			meta = scraper.MusicMetadata{}
 		}
-
-		if title == "" {
-			resCh <- result{source: "lrclib", err: fmt.Errorf("no title provided")}
-			return
+		// artist truyền từ client (vd uploader/tên kênh) dùng làm hint dự phòng
+		// nếu metadata YouTube Music không có sẵn artist.
+		if meta.Artist == "" && artist != "" {
+			meta.Artist = artist
 		}
-		log.Printf("lyrics: searching LRCLib via title for %q by %q", title, artist)
-		data, err := scraper.TryMultipleLyricProviders(ctx, title, artist, duration)
+		log.Printf("lyrics: fetching for %s (metadata track=%q artist=%q, title=%q)",
+			id, meta.Track, meta.Artist, title)
+		data, err := scraper.FetchLyrics(ctx, meta, title, duration)
 		resCh <- result{source: "lrclib", data: data, err: err}
 	}()
 

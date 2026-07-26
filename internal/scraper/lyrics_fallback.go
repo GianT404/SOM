@@ -1,26 +1,9 @@
 package scraper
 
 import (
-	"context"
-	"fmt"
 	"regexp"
 	"strings"
 )
-
-func TryMultipleLyricProviders(ctx context.Context, rawTitle, artistName string, durationSec float64) ([]LyricsData, error) {
-	candidates := buildTitleCandidates(rawTitle, artistName)
-
-	for _, c := range candidates {
-		if c.track == "" {
-			continue
-		}
-		if data, err := GetLRCLibLyrics(ctx, c.track, c.artist, durationSec); err == nil && len(data) > 0 {
-			return data, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no lyrics found for %q by %q", rawTitle, artistName)
-}
 
 type candidate struct {
 	track  string
@@ -53,12 +36,18 @@ func buildTitleCandidates(rawTitle, artist string) []candidate {
 	if track, art := splitDash(rawTitle); track != "" {
 		add(track, firstOf(art, artist))
 		add(track, artist)
+		if art != "" {
+			add(art, track) // heuristic có thể đoán ngược, thêm bản đảo để scoring tự chọn
+		}
 	}
 
-	// Pattern: "Song | Artist" hoặc "Song (Artist Official)"
+	// Pattern: "Song | Artist" (2 phần) hoặc "Song | Artist | Kênh/Label" (3+ phần)
 	if track, art := splitPipe(rawTitle); track != "" {
 		add(track, firstOf(art, artist))
 		add(track, artist)
+		if art != "" {
+			add(art, track) // đề phòng đoán ngược thứ tự
+		}
 	}
 
 	// Pattern: 【MV】Artist「Song」 hoặc Artist「Song」
@@ -112,24 +101,36 @@ func splitDash(title string) (track, artist string) {
 	return left, right
 }
 
-// splitPipe tách "Song | Artist" hoặc "Artist | Song".
+// splitPipe tách title theo dấu "|". Convention phổ biến nhất là
+// "Song | Artist" (2 đoạn) hoặc "Song (info) | Artist | Kênh/Label..." (3+ đoạn,
+// hay gặp ở video rap/underground VN). Vì vậy: đoạn đầu = track, đoạn 2 = artist,
+// các đoạn sau (thường là tên kênh/label) bị bỏ qua.
+//
+// LƯU Ý: trước đây hàm này dùng heuristic "phần dài hơn là tên bài hát" và chỉ
+// SplitN 2 phần, dẫn tới sai hoàn toàn với title 3 đoạn kiểu trên (phần
+// "Artist | Kênh" dính lại thành 1 cục dài hơn rồi bị hiểu nhầm là track name).
 func splitPipe(title string) (track, artist string) {
 	// Loại bỏ ngoặc có noise trước khi tách
 	clean := regexNoisyParens.ReplaceAllString(title, "")
-	parts := strings.SplitN(clean, "|", 2)
-	if len(parts) != 2 {
+
+	var parts []string
+	for _, p := range strings.Split(clean, "|") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+
+	switch len(parts) {
+	case 0:
 		return "", ""
+	case 1:
+		return parts[0], ""
+	default:
+		// 2 phần: "Song | Artist". 3+ phần: lấy 2 phần đầu, bỏ phần còn lại
+		// (thường là tên kênh/label, không phải nhạc).
+		return parts[0], parts[1]
 	}
-	left := strings.TrimSpace(parts[0])
-	right := strings.TrimSpace(parts[1])
-	if left == "" {
-		return right, ""
-	}
-	// Phần dài hơn thường là tên bài hát
-	if len(left) >= len(right) {
-		return left, right
-	}
-	return right, left
 }
 
 // splitJapaneseBracket tách 【MV】Artist「Song」 hoặc Artist「Song」

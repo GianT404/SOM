@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -80,13 +81,108 @@ func parseLRC(syncedLyrics string) []LyricLine {
 
 var lrclibHTTPClient = &http.Client{Timeout: 6 * time.Second}
 
-// GetLRCLibLyrics fetches synced lyrics from lrclib.net.
-// It first tries the exact /api/get endpoint (requires duration),
-// then falls back to /api/search if the exact match returns 404.
-//
-// trackName and artistName come from video metadata (title / uploader).
-// durationSec is the video duration in seconds (used to pick the best result).
-func GetLRCLibLyrics(ctx context.Context, trackName, artistName string, durationSec float64) ([]LyricsData, error) {
+// ---- Thuật toán chấm điểm để chọn kết quả LRCLib đúng nhất ----
+// Trước đây chỉ chọn theo duration gần nhất -> dễ chọn nhầm bài hoàn toàn
+// khác nếu title bị làm sạch sai (VD: yt-dlp trả "NA"/"NA"). Giờ kết hợp
+// độ giống tên bài + nghệ sĩ với độ lệch duration, và loại bỏ kết quả
+// có độ giống tên quá thấp thay vì chấp nhận đại.
+
+const (
+	minNameScore     = 0.35 // dưới ngưỡng này coi như không liên quan, loại bỏ
+	minAcceptedScore = 0.45 // điểm tổng tối thiểu để chấp nhận 1 kết quả
+)
+
+var nonWordRe = regexp.MustCompile(`[^\p{L}\p{N} ]+`)
+
+// viDiacriticsReplacer bỏ dấu tiếng Việt, vì title YouTube hay bị gõ
+// không dấu trong khi LRCLib lưu có dấu (hoặc ngược lại).
+var viDiacriticsReplacer = strings.NewReplacer(
+	"à", "a", "á", "a", "ạ", "a", "ả", "a", "ã", "a",
+	"â", "a", "ầ", "a", "ấ", "a", "ậ", "a", "ẩ", "a", "ẫ", "a",
+	"ă", "a", "ằ", "a", "ắ", "a", "ặ", "a", "ẳ", "a", "ẵ", "a",
+	"è", "e", "é", "e", "ẹ", "e", "ẻ", "e", "ẽ", "e",
+	"ê", "e", "ề", "e", "ế", "e", "ệ", "e", "ể", "e", "ễ", "e",
+	"ì", "i", "í", "i", "ị", "i", "ỉ", "i", "ĩ", "i",
+	"ò", "o", "ó", "o", "ọ", "o", "ỏ", "o", "õ", "o",
+	"ô", "o", "ồ", "o", "ố", "o", "ộ", "o", "ổ", "o", "ỗ", "o",
+	"ơ", "o", "ờ", "o", "ớ", "o", "ợ", "o", "ở", "o", "ỡ", "o",
+	"ù", "u", "ú", "u", "ụ", "u", "ủ", "u", "ũ", "u",
+	"ư", "u", "ừ", "u", "ứ", "u", "ự", "u", "ử", "u", "ữ", "u",
+	"ỳ", "y", "ý", "y", "ỵ", "y", "ỷ", "y", "ỹ", "y",
+	"đ", "d",
+)
+
+// normalizeForMatch chuẩn hoá chuỗi để so sánh: lowercase, bỏ dấu, bỏ ký tự đặc biệt
+func normalizeForMatch(s string) string {
+	s = strings.ToLower(s)
+	s = viDiacriticsReplacer.Replace(s)
+	s = nonWordRe.ReplaceAllString(s, " ")
+	return normalizeSpaces(s)
+}
+
+func tokenSet(s string) map[string]bool {
+	set := make(map[string]bool)
+	for _, w := range strings.Fields(normalizeForMatch(s)) {
+		if len(w) > 1 { // bỏ token 1 ký tự (thường là noise)
+			set[w] = true
+		}
+	}
+	return set
+}
+
+// jaccardSimilarity đo độ giống nhau giữa 2 chuỗi theo tập từ (0..1)
+func jaccardSimilarity(a, b string) float64 {
+	setA, setB := tokenSet(a), tokenSet(b)
+	if len(setA) == 0 && len(setB) == 0 {
+		return 0
+	}
+	inter := 0
+	for w := range setA {
+		if setB[w] {
+			inter++
+		}
+	}
+	union := len(setA) + len(setB) - inter
+	if union == 0 {
+		return 0
+	}
+	return float64(inter) / float64(union)
+}
+
+// nameScore kết hợp độ giống track name (trọng số cao) và artist name
+func nameScore(queryTrack, queryArtist, candTrack, candArtist string) float64 {
+	trackSim := jaccardSimilarity(queryTrack, candTrack)
+	// Nếu track name khớp gần như tuyệt đối theo substring, ưu tiên mạnh
+	if qn, cn := normalizeForMatch(queryTrack), normalizeForMatch(candTrack); qn != "" &&
+		(strings.Contains(cn, qn) || strings.Contains(qn, cn)) {
+		trackSim = math.Max(trackSim, 0.8)
+	}
+
+	if queryArtist == "" {
+		return trackSim
+	}
+	artistSim := jaccardSimilarity(queryArtist, candArtist)
+	return trackSim*0.75 + artistSim*0.25
+}
+
+// durationScore trả 1.0 nếu duration khớp hoàn toàn, giảm dần khi lệch xa
+func durationScore(diffSec float64) float64 {
+	const tolerance = 8.0 // giây, lệch trong khoảng này coi gần như khớp
+	if diffSec <= tolerance {
+		return 1.0
+	}
+	score := 1.0 - (diffSec-tolerance)/30.0
+	if score < 0 {
+		return 0
+	}
+	return score
+}
+
+// lookupLRCLibCandidate tra 1 candidate (track, artist) cụ thể trên LRCLib.
+// Thử /api/get (exact) trước, fail thì fallback /api/search + chấm điểm.
+// Đây là building block cho FetchLyrics (lyrics_pipeline.go), không gọi trực
+// tiếp từ ngoài package nữa.
+func lookupLRCLibCandidate(ctx context.Context, trackName, artistName string, durationSec float64) ([]LyricsData, error) {
 	// Cap total time spent across both strategies (get + search) so this
 	// secondary feature can't stall the parent request for too long. The
 	// caller (handler) also enforces its own overall deadline; this is a
@@ -95,19 +191,26 @@ func GetLRCLibLyrics(ctx context.Context, trackName, artistName string, duration
 	defer cancel()
 
 	// ---- Strategy 1: exact match via /api/get ----
-	if durationSec > 0 {
+	if durationSec > 0 && trackName != "" {
 		params := url.Values{
 			"track_name":  {trackName},
 			"artist_name": {artistName},
 			"duration":    {fmt.Sprintf("%.0f", durationSec)},
 		}
 		reqURL := lrclibBase + "/api/get?" + params.Encode()
-		if data, err := fetchLRCLibSingle(ctx, reqURL); err == nil && data != nil {
-			return data, nil
+		if t, err := fetchLRCLibGet(ctx, reqURL); err == nil && t != nil {
+			// vẫn chấm điểm để tránh trường hợp server match nhầm bản cover/remix
+			if nameScore(trackName, artistName, t.TrackName, t.ArtistName) >= minNameScore {
+				return lrclibTrackToLyricsData(*t), nil
+			}
 		}
 	}
 
-	// ---- Strategy 2: search fallback ----
+	if trackName == "" {
+		return nil, fmt.Errorf("lrclib: empty track name")
+	}
+
+	// ---- Strategy 2: search fallback (trả về tối đa ~20 kết quả) ----
 	query := trackName
 	if artistName != "" {
 		query = artistName + " " + trackName
@@ -120,19 +223,33 @@ func GetLRCLibLyrics(ctx context.Context, trackName, artistName string, duration
 		return nil, fmt.Errorf("lrclib: no results for %q", trackName)
 	}
 
-	// Pick best result: prefer one whose duration is closest to ours.
-	best := tracks[0]
-	if durationSec > 0 {
-		bestDiff := absDiff(best.Duration, durationSec)
-		for _, t := range tracks[1:] {
-			if d := absDiff(t.Duration, durationSec); d < bestDiff {
-				best = t
-				bestDiff = d
-			}
+	// Chấm điểm từng kết quả: kết hợp độ giống tên (chính) + độ lệch duration (phụ)
+	var best *lrclibTrack
+	var bestScore float64
+	for i := range tracks {
+		t := &tracks[i]
+		ns := nameScore(trackName, artistName, t.TrackName, t.ArtistName)
+		if ns < minNameScore {
+			continue // tên không liên quan, loại ngay dù duration có khớp
+		}
+
+		score := ns
+		if durationSec > 0 {
+			ds := durationScore(absDiff(t.Duration, durationSec))
+			score = ns*0.7 + ds*0.3
+		}
+
+		if best == nil || score > bestScore {
+			best = t
+			bestScore = score
 		}
 	}
 
-	return lrclibTrackToLyricsData(best), nil
+	if best == nil || bestScore < minAcceptedScore {
+		return nil, fmt.Errorf("lrclib: no confident match for %q by %q", trackName, artistName)
+	}
+
+	return lrclibTrackToLyricsData(*best), nil
 }
 
 func absDiff(a, b float64) float64 {
@@ -142,8 +259,9 @@ func absDiff(a, b float64) float64 {
 	return b - a
 }
 
-// fetchLRCLibSingle does a GET and decodes a single lrclibTrack.
-func fetchLRCLibSingle(ctx context.Context, reqURL string) ([]LyricsData, error) {
+// fetchLRCLibGet does a GET and decodes a single lrclibTrack (raw, chưa convert)
+// để caller có thể chấm điểm trước khi chấp nhận.
+func fetchLRCLibGet(ctx context.Context, reqURL string) (*lrclibTrack, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	req.Header.Set("Lrclib-Client", "SOM/1.0 (https://github.com/GianT404/SOM)")
 
@@ -165,7 +283,7 @@ func fetchLRCLibSingle(ctx context.Context, reqURL string) ([]LyricsData, error)
 		return nil, fmt.Errorf("lrclib: decode error: %w", err)
 	}
 
-	return lrclibTrackToLyricsData(t), nil
+	return &t, nil
 }
 
 // fetchLRCLibSearch does a GET and decodes an array of lrclibTrack.
