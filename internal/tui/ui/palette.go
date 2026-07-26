@@ -45,6 +45,7 @@ const paletteVisBands = 28
 
 type CommandPalette struct {
 	visible   bool
+	is3D      bool
 	capture   *audio.Capture
 	captureOK bool
 	amps      []float64
@@ -96,7 +97,12 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 	if !m.visible {
 		return m, nil
 	}
-
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "l", "L":
+			m.is3D = !m.is3D
+		}
+	}
 	if _, ok := msg.(visTickMsg); ok {
 		//xoayy
 		m.phase -= 0.02
@@ -143,7 +149,12 @@ func (m CommandPalette) View() string {
 	if !m.captureOK {
 		return DimItemStyle.Render("visualizer unavailable")
 	}
-	return m.renderVisualizer()
+
+	if m.is3D {
+		return m.Render3DVisualizer()
+	} else {
+		return m.renderVisualizer()
+	}
 }
 
 var brailleBit = [2][4]uint8{
