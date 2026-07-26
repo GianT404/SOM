@@ -553,13 +553,15 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		streamURL, err := a.client.ResolveStream(t.ID)
-		if err != nil {
-			streamURL = a.client.StreamURL(t.ID)
+		directURL, err := a.client.ResolveStream(t.ID)
+		if err != nil || directURL == "" {
+			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
 		}
-		if err := a.player.Play(streamURL); err != nil {
+
+		if err := a.player.Play(directURL); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
+
 		lr, lyricsErr := getCachedLyrics(a.client, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
