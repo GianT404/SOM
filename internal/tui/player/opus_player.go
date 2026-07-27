@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -99,10 +100,9 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	p.startTime = time.Now().Add(-time.Duration(startSec) * time.Second)
 	p.pauseOffset = 0
 
-	args := []string{
-		"-reconnect", "1",
-		"-reconnect_streamed", "1",
-		"-reconnect_delay_max", "5",
+	var args []string
+	if strings.HasPrefix(filePath, "http://") {
+		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
 	}
 	if startSec > 0 {
 		args = append(args, "-ss", fmt.Sprintf("%d", startSec))
