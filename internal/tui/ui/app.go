@@ -122,7 +122,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.palette.Visible() {
 				a.palette.Close()
 			}
-
+		case "1", "2", "3", "4", "5":
+			if a.left.input.Focused() {
+				break
+			}
+			targetTab := SidebarItem(msg.String()[0] - '1')
+			a.switchSidebar(targetTab)
 		case ":":
 			if a.left.input.Focused() {
 				break
@@ -216,34 +221,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(idx, t))
-
-	// case PlayLocalMsg:
-	// 	locals := a.left.getFilteredLocals()
-	// 	if len(locals) == 0 {
-	// 		locals = a.left.locals
-	// 	}
-	// 	if len(locals) == 0 {
-	// 		a.setStatus(StatusErrStyle.Render("X No local files found"))
-	// 		break
-	// 	}
-	// 	a.playlist = make([]api.Track, len(locals))
-	// 	idx := -1
-	// 	for i, lf := range locals {
-	// 		a.playlist[i] = api.Track{
-	// 			ID:       "local:" + lf.Path,
-	// 			Title:    lf.Name,
-	// 			Artist:   lf.Artist,
-	// 			Duration: lf.Duration,
-	// 		}
-	// 		if lf.Name == msg.Title {
-	// 			idx = i
-	// 		}
-	// 	}
-	// 	if idx < 0 {
-	// 		idx = len(a.playlist) - 1
-	// 	}
-	// 	a.activeContext = SideDownloads
-	// 	cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
 
 	case PlayLocalMsg:
 		locals := a.left.getFilteredLocals()
