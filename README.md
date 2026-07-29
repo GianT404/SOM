@@ -5,7 +5,7 @@
 <h1 align="center">SOM</h1>
 
 <p align="center">
-  <b>Stream and play music directly from the terminal </b>
+  <b>Stream and play local music </b>
   <br>
   <b>Supports Linux, Windows, Android, and iOS.</b>
 </p>
@@ -22,12 +22,9 @@
 </p>
 
 <p align="center">
-  <img src="./assets/playlist-tui.png" alt="SOM Logo" width="100%" />
-</p>
-
-<p align="center">
   <img src="./assets/lyrics-tui.png" alt="SOM Logo" width="100%" />
 </p>
+
 ---
 
 ## Features

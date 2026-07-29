@@ -265,6 +265,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if idx < 0 {
 			idx = len(a.playlist) - 1
 		}
+		a.activeContext = SideDownloads
 		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
 
 	case StreamStartedMsg:
