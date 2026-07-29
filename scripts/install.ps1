@@ -12,20 +12,20 @@ function Install-Deps {
     # 1. Kéo yt-dlp.exe 
     $ytDlpPath = Join-Path $DestDir "yt-dlp.exe"
     if (-not (Test-Path $ytDlpPath)) {
-        Info "Kéo yt-dlp trực tiếp từ GitHub..."
+        Info " ..."
         Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile $ytDlpPath
     } else {
-        Info "yt-dlp đã có sẵn."
+        Info "yt-dlp already "
     }
 
     # 2. Kéo FFmpeg (Static Build)
     $ffmpegPath = Join-Path $DestDir "ffmpeg.exe"
     if (-not (Test-Path $ffmpegPath)) {
-        Info "Kéo FFmpeg Static Build (Gyan)..."
+        Info "FFmpeg Static Build (Gyan)..."
         $zipPath = Join-Path $env:TEMP "ffmpeg_static.zip"
         Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $zipPath
         
-        Info "Giải nén FFmpeg..."
+        Info "Extract FFmpeg..."
         Expand-Archive -Path $zipPath -DestinationPath $env:TEMP -Force
         
         $extractedDir = Join-Path $env:TEMP "ffmpeg-master-latest-win64-gpl\bin"
@@ -43,21 +43,20 @@ function Install-Som {
     $url = "https://github.com/$Repo/releases/latest/download/$asset"
     $dest = Join-Path $DestDir "som.exe"
 
-    Info "Tải SOM mới nhất ($asset)..."
+    Info "Download SOM ($asset)..."
     try {
         Invoke-WebRequest -Uri $url -OutFile $dest
     } catch {
-        Err "Tải thất bại. Kiểm tra lại release trên GitHub."
+        Err "Faile ."
     }
 
-    Info "Đã cài vào $dest"
+    Info "Installed $dest"
     
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$DestDir*") {
-        Info "Thêm $DestDir vào PATH..."
+        Info "Add $DestDir in PATH..."
         $newPath = if ([string]::IsNullOrEmpty($userPath)) { $DestDir } else { "$userPath;$DestDir" }
         [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        Warn "Đã cập nhật PATH. Hãy mở lại Terminal mới để chạy lệnh 'som'."
     }
 }
 

@@ -1,11 +1,13 @@
 <p align="center">
-  <img src="app/assets/logo.png" alt="SOM Logo" width="120" />
+  <img src="./assets/logo.svg" alt="SOM Logo" width="120" />
 </p>
 
 <h1 align="center">SOM</h1>
 
 <p align="center">
-  <b>Stream music from YouTube — free, offline-capable, and beautiful..</b>
+  <b>Stream and play music directly from the terminal </b>
+  <br>
+  <b>Supports Linux, Windows, Android, and iOS.</b>
 </p>
 
 <p align="center">
@@ -16,15 +18,15 @@
 </p>
 
 <p align="center">
-  <img src="app/assets/thumbnail.png" alt="SOM Logo" width="100%" />
+  <img src="./assets/thumbnail.png" alt="SOM Logo" width="100%" />
 </p>
 
 <p align="center">
-  <img src="app/assets/playlist-tui.png" alt="SOM Logo" width="100%" />
+  <img src="./assets/playlist-tui.png" alt="SOM Logo" width="100%" />
 </p>
 
 <p align="center">
-  <img src="app/assets/lyrics-tui.png" alt="SOM Logo" width="100%" />
+  <img src="./assets/lyrics-tui.png" alt="SOM Logo" width="100%" />
 </p>
 ---
 
@@ -34,13 +36,16 @@
 |---------|-------------|
 |  **Search** | Search YouTube for any song or artist |
 |  **Stream** | Stream audio directly without downloading the full video |
-|  **Offline Playback** | Download tracks to a local playlist for offline listening |
-|  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback |
+|  **Offline Playback** | Download tracks (`.opus`) for offline listening |
+|  **Playlists** | Create, manage, and play custom playlists (TUI) |
+|  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback, with language selection |
 |  **Media Controls** | Lock screen & notification controls (play, pause, skip, seek) |
 |  **Shuffle & Repeat** | Shuffle, repeat-all, and repeat-one modes |
+|  **Audio Visualizer** | Live 2D/3D visualizer driven by real-time system audio capture (TUI) |
 |  **Dynamic Theming** | Album art-based color extraction for immersive UI |
 |  **Audio Settings** | Configurable buffer size and sample rate |
-|  **Desktop App** | Tauri desktop shell for Linux and Windows with the existing Go backend as a sidecar |
+|  **Self Install/Update** | `som --install` and `som --upgrade` for one-command setup and updates |
+|  **Desktop App** | Tauri desktop shell for Linux and Windows with the existing Go backend as a sidecar (no longer actively maintained) |
 
 ---
 
@@ -64,20 +69,29 @@ SOM/
 │   │   ├── lrclib.go    # LRCLib lyrics API
 │   │   └── ...          # VTT parser, fallback scrapers
 │   ├── tui/
-│   │   └── ui/          # TUI components (Bubble Tea)
-│   │       ├── app.go         # Main app loop, sidebar, progress bar
-│   │       ├── browse.go      # Left panel (search/downloads/local)
-│   │       ├── nowplaying.go  # Right panel (lyrics, track info)
-│   │       ├── search.go      # Search input view
-│   │       ├── downloads.go   # Local file scanning
-│   │       ├── sidebar.go     # Sidebar definition
-│   │       ├── logs.go        # Ring-buffer logger
-│   │       ├── styles.go      # Styles & nerd-font icons
-│   │       ├── commands.go    # Bubble Tea commands
-│   │       ├── box.go         # Box drawing helper
-│   │       ├── msgs.go        # Message types
-│   │       └── lyrics.go      # Lyric line parsing
-│   └── cleaner/         # Audio stream processing
+│   │   ├── audio/             # System audio capture + FFT for the visualizer
+│   │   ├── player/            # ffmpeg-based decode + oto playback (opus_player.go)
+│   │   ├── bindeps/           # Bundled binary dependency helpers
+│   │   └── ui/                # TUI components (Bubble Tea)
+│   │       ├── app.go           # Main app loop, sidebar, progress bar, key handling
+│   │       ├── browse.go        # Left panel (search/downloads/local)
+│   │       ├── nowplaying.go    # Right panel (lyrics, track info)
+│   │       ├── search.go        # Search input view
+│   │       ├── downloads.go     # Local file scanning
+│   │       ├── playlists.go     # Playlist create/add/play/delete UI
+│   │       ├── palette.go       # Live 2D audio visualizer (opened with `:`)
+│   │       ├── visualizer_3d.go # 3D wireframe visualizer mode
+│   │       ├── help.go          # Keyboard shortcuts popup (`?`)
+│   │       ├── sidebar.go       # Sidebar definition
+│   │       ├── logs.go          # Ring-buffer logger
+│   │       ├── styles.go        # Styles & nerd-font icons
+│   │       ├── commands.go      # Bubble Tea commands
+│   │       ├── box.go           # Box drawing helper
+│   │       ├── msgs.go          # Message types
+│   │       ├── cache.go         # Lyrics/search caching
+│   │       └── lyrics.go        # Lyric line parsing
+│   ├── playlist/         # Playlist persistence (store.go)
+│   └── cleaner/          # Audio stream processing
 ├── app/                 # React Native (Expo) mobile app
 │   ├── src/
 │   │   ├── screens/     # HomeScreen, SearchScreen, NowPlayingScreen, ...
@@ -173,30 +187,40 @@ go build -o som .
 ./som
 ```
 
+**Sidebar tabs (`1`-`5` or `Tab`):** Search, Downloads, Playlists, Lyrics, Logs.
+
 **Controls:**
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Cycle focus between search input and content panel |
-| `Up` / `Down` | Navigate list items |
-| `Left` / `Right` | Seek backward / forward in track |
-| `Enter` | Play selected track |
-| `Space` | Pause / resume playback |
-| `r` | Shuffle playlist |
-| `p` | prev track |
-| `n` | next track |
+| `?` | Toggle help popup (full shortcut list) |
+| `Tab` | Cycle through sidebar tabs |
+| `1`-`5` | Jump directly to a tab |
 | `/` | Focus search input |
+| `:` | Open live audio visualizer |
+| `Enter` | Play selected track |
+| `Space` | Play / pause |
+| `n` / `p` | Next / previous track |
+| `r` | Toggle shuffle (random) |
+| `←` / `→` | Seek -/+ 5s |
+| `a` | Add current track to a playlist |
+| `c` / `n` (Playlists tab) | Create a new playlist |
+| `Delete` | Remove selected playlist |
 | `d` | Download selected track |
+| `l` | Choose lyrics language |
 | `q` | Quit (when input not focused) |
 
 **Features:**
 
-- YouTube search and stream via embedded `yt-dlp` backend
-- Download tracks for offline playback (`.m4a`)
-- LRCLib synced lyrics with auto-fallback
-- Local `.m4a` file scanning with `ffprobe` duration detection
+- YouTube search and stream via embedded backend (Go server runs in-process, no separate process needed)
+- Download tracks for offline playback in `.opus` format
+- Playlist management — create, add tracks, play, and delete playlists
+- LRCLib synced lyrics with multi-language selection and auto-fallback to YouTube subtitles
+- Local `.opus` file scanning with `ffprobe` duration detection
+- Live audio visualizer (`:`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
 - Logs tab for backend debugging
+- Built-in self-installer and self-updater (see below)
 
 **Cross-platform builds:**
 
@@ -208,12 +232,20 @@ GOOS=linux GOARCH=amd64 go build -o som-linux-amd64 ./cmd/som
 GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 ```
 
-> Requires `yt-dlp` in `PATH`. For local file durations, also needs `ffprobe` (from FFmpeg).
+**CLI flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
+| `--upgrade` | Download and install the latest SOM release from GitHub |
+| `--version` | Print the current version and exit |
+
+> Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`, so `mpv` is no longer needed). `ffprobe` is also used for local file duration detection.
 
 ---
 ## Installation
 
-You can automatically install SOM and its dependencies (yt-dlp, ffmpeg, mpv) using the following commands:
+You can automatically install SOM and its dependencies (yt-dlp, ffmpeg) using the following commands:
 
 ```bash
 #Linux
@@ -239,8 +271,10 @@ curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.
 ### Backend
 - **Go** — Fast, compiled HTTP server
 - **Chi** — Lightweight HTTP router
-- **yt-dlp** — YouTube audio extraction
+- **yt-dlp** — YouTube audio extraction (opus format)
 - **LRCLib** — Synced lyrics database
+- **Bubble Tea** — TUI framework powering the terminal app
+- **oto** — Cross-platform Go audio playback (decodes via `ffmpeg`, no `mpv` dependency)
 
 ### Frontend
 - **React Native** — Cross-platform mobile framework

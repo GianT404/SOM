@@ -11,17 +11,15 @@ error() { printf '\033[1;31mLỖI:\033[0m %s\n' "$1" >&2; exit 1; }
 install_deps() {
 	# 1. Kéo yt-dlp
 	if ! command -v yt-dlp >/dev/null 2>&1; then
-		info "Đang kéo yt-dlp mới nhất trực tiếp từ GitHub..."
 		sudo curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o /usr/local/bin/yt-dlp
 		sudo chmod a+rx /usr/local/bin/yt-dlp
 	else
-		info "yt-dlp đã tồn tại, tiến hành tự cập nhật..."
 		sudo yt-dlp -U || true
 	fi
 
 	# 2. Kéo FFmpeg Static Build
 	if ! command -v ffmpeg >/dev/null 2>&1; then
-		info "Đang kéo FFmpeg Static Build..."
+		info "Downloading FFmpeg static build..."
 		if [ "$(uname -s)" = "Linux" ]; then
 			curl -L "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o /tmp/ffmpeg.tar.xz
 			tar -xf /tmp/ffmpeg.tar.xz -C /tmp
@@ -34,7 +32,7 @@ install_deps() {
 			rm /tmp/ffmpeg.zip
 		fi
 	else
-		info "FFmpeg đã có sẵn."
+		info "FFmpeg already."
 	fi
 }
 
@@ -43,26 +41,25 @@ install_som() {
 	case "$(uname -s)" in
 		Linux)  os="linux" ;;
 		Darwin) os="darwin" ;;
-		*) error "Hệ điều hành không được hỗ trợ: $(uname -s)" ;;
+		*) error "Unsupported operating system: $(uname -s)" ;;
 	esac
 	case "$(uname -m)" in
 		x86_64|amd64) arch="amd64" ;;
 		arm64|aarch64) arch="arm64" ;;
-		*) error "Kiến trúc CPU không hỗ trợ: $(uname -m)" ;;
+		*) error "CPU architecture not supported: $(uname -m)" ;;
 	esac
 
 	asset="som-${os}-${arch}"
 	tmp="$(mktemp -d)"
 	
-	info "Tải SOM bản mới nhất từ GitHub ($asset)..."
+	info "($asset)..."
 	curl -sL "https://github.com/$REPO/releases/latest/download/$asset" -o "$tmp/som"
 	chmod +x "$tmp/som"
 
-	info "Cài đặt vào $INSTALL_DIR/som ..."
+	info "Install $INSTALL_DIR/som ..."
 	sudo mv "$tmp/som" "$INSTALL_DIR/som"
 	rm -rf "$tmp"
 
-	info "Cài đặt thành công! Gõ 'som' để quẩy nhạc."
 }
 
 install_deps
