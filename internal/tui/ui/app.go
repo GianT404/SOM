@@ -30,20 +30,20 @@ func tick() tea.Cmd {
 }
 
 type App struct {
-	client    *api.Client
-	player    *player.Player
-	width     int
-	height    int
-	left      LeftPanel
-	right     RightPanel
-	nowPlay   *api.Track
-	playedAt  time.Time
-	statusMsg string
-	statusAt  time.Time
-
-	playlist   []api.Track
-	currentIdx int
-	random     bool
+	client        *api.Client
+	player        *player.Player
+	width         int
+	height        int
+	left          LeftPanel
+	right         RightPanel
+	nowPlay       *api.Track
+	playedAt      time.Time
+	statusMsg     string
+	statusAt      time.Time
+	showHelpPopup bool
+	playlist      []api.Track
+	currentIdx    int
+	random        bool
 
 	sidebarActive SidebarItem
 	logOffset     int
@@ -107,7 +107,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
+
+		// Nếu popup help đang mở, chỉ cho phép phím đóng popup, chặn hết phím khác
+		if a.showHelpPopup {
+			switch msg.String() {
+			case "?", "esc", "q":
+				a.showHelpPopup = false
+			}
+			return a, nil
+		}
+
 		switch msg.String() {
+
 		case "ctrl+c":
 			a.player.Stop()
 			return a, tea.Quit
@@ -197,6 +208,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.logOffset--
 				}
 			}
+
+		case "?":
+			if a.left.input.Focused() {
+				break
+			}
+			a.showHelpPopup = true
+			return a, nil
 
 		case "enter":
 
@@ -297,12 +315,11 @@ func (a *App) View() string {
 		return "Loading..."
 	}
 
-	// Layout: SOM + separator + sidebar|content + status + help
 	statusH := 0
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		statusH = 1
 	}
-	overhead := 7 + 1 + statusH + 4 + 1 // SOM(6) + sep + status + progress + help
+	overhead := 7 + 1 + statusH + 4 + 1
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -313,16 +330,12 @@ func (a *App) View() string {
 		mainW = 10
 	}
 
-	// SOM logo
 	somRow := renderSOMLogo()
 
-	// Separator
 	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
 
-	// Sidebar
 	sideView := renderSidebar(a.sidebarActive, sideH)
 
-	// Main content
 	inputNotFocused := !a.left.input.Focused()
 	var mainView string
 	switch a.sidebarActive {
@@ -339,18 +352,15 @@ func (a *App) View() string {
 	}
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
-	// Status
 	status := ""
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		status = "  " + a.statusMsg
 	}
 
-	// Help
 	help := HelpStyle.Render(
-		"  tab:nav  enter:play up/down/jk:nav  n:next  p:prev  r:random  d:download  space:pause  /:search  l:lyrics lang  ::cmd  q:quit",
+		"  tab:nav  enter:play  n:next  p:prev  r:random  d:download  space:pause  /:search  ?:help q:quit",
 	)
 
-	// Progress bar
 	progressBar := a.renderProgressBar(a.width)
 
 	var b strings.Builder
@@ -364,14 +374,19 @@ func (a *App) View() string {
 	b.WriteString(help)
 
 	view := b.String()
-	if a.left.showAddPopup {
+
+	if a.showHelpPopup {
+		popup := a.renderHelpPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.left.showAddPopup {
 		popup := a.left.renderAddPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.palette.Visible() {
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, a.palette.View())
+		popup := a.palette.View()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	}
 
 	return view
@@ -632,7 +647,7 @@ func (a *App) resizePanels() {
 	if mainW < 10 {
 		mainW = 10
 	}
-	overhead := 6 + 1 + 1 + 1 // SOM(6) + sep + status + help
+	overhead := 6 + 1 + 1 + 1
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
