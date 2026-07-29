@@ -47,6 +47,7 @@ cookies.txt
 !docs/
 !docs/*.md
 
+
 # Desktop generated artifacts
 desktop/dist/
 desktop/src-tauri/gen/
