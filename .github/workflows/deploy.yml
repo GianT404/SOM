@@ -14,7 +14,8 @@ jobs:
         with:
           host: ${{ secrets.GCP_VM_IP }}
           username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}\
+          command_timeout: 30m
           script: |
             cd ~/SOM
             git pull origin main
