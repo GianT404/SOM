@@ -1,0 +1,26 @@
+services:
+  backend:
+    image: gian404/som-backend:latest
+    container_name: som-backend-prod
+    restart: always
+    logging:
+      driver: gcplogs
+      options:
+        gcp-project: "besom-502914"
+        gpc-log-cmd: "true"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443" 
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
