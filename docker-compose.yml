@@ -3,11 +3,11 @@ services:
     image: gian404/som-backend:latest
     container_name: som-backend-prod
     restart: always
-    logging:
-      driver: gcplogs
-      options:
-        gcp-project: "besom-502914"
-        gcp-log-cmd: "true"
+    # logging:
+    #   driver: gcplogs
+    #   options:
+    #     gcp-project: "besom-502914"
+    #     gcp-log-cmd: "true"
 
   caddy:
     image: caddy:2-alpine
