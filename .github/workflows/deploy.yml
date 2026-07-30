@@ -6,6 +6,20 @@ on:
       - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.26' 
+
+      - name: Run Unit Tests
+        run: go test -v ./... 
+
   build-and-push:
     runs-on: ubuntu-latest
     steps:

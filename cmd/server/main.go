@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +21,15 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	go func() {
+		slog.Info("Starting pprof monitoring", "port", "6060")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			slog.Error("pprof server failed", "error", err.Error())
+		}
+	}()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -44,7 +54,7 @@ func main() {
 	r := chi.NewRouter()
 
 	// Middleware stack
-	r.Use(middleware.Logger)
+	// r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(3 * time.Minute))
 	r.Use(corsMiddleware)
@@ -99,7 +109,7 @@ func main() {
 			fmt.Println(lipgloss.NewStyle().Foreground(purples[i]).Render(line))
 		}
 
-		log.Printf("Dm4a server starting on %s", srv.Addr)
+		log.Printf("Server starting on %s", srv.Addr)
 		log.Printf("   yt-dlp binary: %s", ytdlpPath)
 		log.Println("   Endpoints:")
 		log.Println("     GET /api/v1/search?q={keyword}")
@@ -107,23 +117,25 @@ func main() {
 		log.Println("     GET /api/v1/lyrics?id={video_id}")
 		log.Println("     GET /api/v1/resolve?id={video_id}")
 		log.Println("     GET /health")
-
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "error", err.Error())
+			os.Exit(1)
 		}
 	}()
 
 	<-quit
-	log.Println("Shutting down server...")
+	slog.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("forced shutdown: %v", err)
+		slog.Error("forced shutdown", "error", err.Error())
+		os.Exit(1)
 	}
 
-	log.Println("Server stopped gracefully")
+	slog.Info("Server stopped gracefully")
+
 }
 
 func serverAddr(host string, port string) string {
