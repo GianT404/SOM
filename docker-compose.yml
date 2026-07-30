@@ -7,7 +7,7 @@ services:
       driver: gcplogs
       options:
         gcp-project: "besom-502914"
-        gpc-log-cmd: "true"
+        gcp-log-cmd: "true"
 
   caddy:
     image: caddy:2-alpine
