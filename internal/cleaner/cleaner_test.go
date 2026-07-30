@@ -13,7 +13,7 @@ func TestCleanYouTubeTitle(t *testing.T) {
 		{
 			name:     "Xử lý Official MV",
 			input:    "Tatarka - KAWAII",
-			expected: " KAWAII",
+			expected: "KAWAII",
 		},
 	}
 
