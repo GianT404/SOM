@@ -1,0 +1,343 @@
+openapi: 3.1.0
+info:
+  title: SOM API
+  description: >
+    SOM (Stream Old Music) — API backend viết bằng Go, cho phép tìm kiếm
+    bài hát trên YouTube, stream/proxy audio, lấy lyrics đồng bộ (synced
+    lyrics) và resolve direct audio URL để client tự tải nhạc.
+    Backend sử dụng yt-dlp để trích xuất dữ liệu YouTube và LRCLib làm
+    nguồn lyrics chính, với fallback là phụ đề (caption) của YouTube.
+  version: "1.0.0"
+  contact:
+    name: GianT404
+    url: https://github.com/GianT404/SOM
+  license:
+    name: Personal / Educational Use Only
+
+servers:
+  - url: https://somz.duckdns.org
+    description: Production server
+
+tags:
+  - name: System
+    description: Endpoint kiểm tra tình trạng server
+  - name: Search
+    description: Tìm kiếm bài hát trên YouTube
+  - name: Stream
+    description: Proxy stream audio trực tiếp qua server
+  - name: Resolve
+    description: Lấy direct audio URL để client tự tải/stream
+  - name: Lyrics
+    description: Lấy lyrics đồng bộ theo thời gian (synced lyrics)
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Kiểm tra server còn sống hay không. Không yêu cầu tham số.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server đang hoạt động bình thường.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                service: dopus
+
+  /api/v1/search:
+    get:
+      tags: [Search]
+      summary: Tìm kiếm bài hát trên YouTube
+      description: >
+        Tìm kiếm video/bài hát theo từ khoá `q`, trả về tối đa 7 kết quả.
+        Request có timeout nội bộ 110 giây.
+      operationId: searchTracks
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Từ khoá tìm kiếm (tên bài hát, nghệ sĩ,...).
+          schema:
+            type: string
+            minLength: 1
+          example: "Sơn Tùng M-TP Chúng Ta Của Hiện Tại"
+      responses:
+        "200":
+          description: Danh sách kết quả tìm kiếm (có thể rỗng nếu không tìm thấy).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchResult"
+                maxItems: 7
+        "400":
+          description: Thiếu tham số bắt buộc `q`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "missing required parameter: q"
+        "500":
+          description: Lỗi phía scraper (yt-dlp) khi thực hiện tìm kiếm.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/stream:
+    get:
+      tags: [Stream]
+      summary: Proxy stream audio
+      description: >
+        Server tải audio (định dạng opus) về file tạm bằng yt-dlp rồi trả
+        về cho client dưới dạng file đính kèm. Endpoint hỗ trợ HTTP Range
+        request (seek/resume), do dùng `http.ServeFile`. Vì server phải
+        tải xong file trước khi phục vụ nên độ trễ ban đầu có thể lớn hơn
+        `/resolve`.
+      operationId: streamAudio
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Luồng audio dạng opus (đóng gói ogg).
+          headers:
+            Content-Disposition:
+              description: 'Gợi ý tên file tải về, ví dụ: attachment; filename="Ten-bai-hat.opus"'
+              schema:
+                type: string
+            Content-Type:
+              schema:
+                type: string
+                example: audio/ogg
+            Accept-Ranges:
+              description: Server hỗ trợ Range request để seek/resume.
+              schema:
+                type: string
+                example: bytes
+          content:
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Partial content trả về khi client gửi header `Range`.
+          content:
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Thiếu hoặc sai định dạng tham số `id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lỗi khi tải audio từ YouTube.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "failed to download audio"
+
+  /api/v1/resolve:
+    get:
+      tags: [Resolve]
+      summary: Resolve direct audio URL
+      description: >
+        Trả về link audio trực tiếp (CDN của Google/YouTube) cùng tiêu đề,
+        giúp client tự tải/stream mà không cần chờ server proxy toàn bộ
+        file. Nhanh hơn `/stream` vì server chỉ trích xuất URL, không tải
+        nội dung audio.
+      operationId: resolveStreamUrl
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Thông tin URL audio trực tiếp và tiêu đề video.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveResponse"
+        "400":
+          description: Thiếu hoặc sai định dạng tham số `id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lỗi khi resolve URL audio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "failed to resolve audio URL"
+
+  /api/v1/lyrics:
+    get:
+      tags: [Lyrics]
+      summary: Lấy lyrics đồng bộ (synced lyrics)
+      description: >
+        Lấy lyrics có timestamp cho video. Server truy vấn song song 2
+        nguồn: LRCLib (dựa trên metadata YouTube Music, ưu tiên chính
+        xác) và phụ đề (caption) gốc của YouTube làm fallback. Kết quả
+        từ 2 nguồn được gộp lại, loại trùng theo `language`. Nếu cả hai
+        nguồn đều thất bại, API vẫn trả về `200 OK` với mảng rỗng thay vì
+        lỗi. Request có timeout nội bộ 20 giây.
+      operationId: getLyrics
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+        - name: title
+          in: query
+          required: false
+          description: Tiêu đề bài hát (hint) do client cung cấp, dùng khi metadata YouTube Music không có sẵn.
+          schema:
+            type: string
+        - name: artist
+          in: query
+          required: false
+          description: Tên nghệ sĩ/kênh (hint) do client cung cấp, dùng làm dự phòng khi metadata không có artist.
+          schema:
+            type: string
+        - name: duration
+          in: query
+          required: false
+          description: Thời lượng bài hát tính bằng giây, giúp LRCLib khớp kết quả chính xác hơn.
+          schema:
+            type: number
+            format: double
+          example: 245.5
+      responses:
+        "200":
+          description: >
+            Danh sách lyrics theo ngôn ngữ. Trả về mảng rỗng nếu không tìm
+            thấy lyrics ở cả hai nguồn (không phải lỗi).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LyricsData"
+        "400":
+          description: Thiếu hoặc sai định dạng tham số `id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    VideoId:
+      name: id
+      in: query
+      required: true
+      description: YouTube video ID, đúng 11 ký tự (chữ, số, `_`, `-`).
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_-]{11}$"
+      example: dQw4w9WgXcQ
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: dopus
+      required: [status, service]
+
+    ErrorResponse:
+      type: object
+      description: Cấu trúc lỗi chuẩn trả về từ mọi endpoint khi thất bại.
+      properties:
+        error:
+          type: string
+          description: Thông điệp mô tả lỗi.
+      required: [error]
+
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: YouTube video ID (11 ký tự).
+          example: dQw4w9WgXcQ
+        title:
+          type: string
+          description: Tiêu đề video.
+        thumbnail:
+          type: string
+          format: uri
+          description: URL ảnh thumbnail.
+        duration:
+          type: integer
+          description: Thời lượng video (giây).
+        uploader:
+          type: string
+          description: Tên kênh/người đăng tải video.
+        artist:
+          type: string
+          description: Tên nghệ sĩ (nếu có metadata YouTube Music), có thể rỗng.
+      required: [id, title, thumbnail, duration, uploader, artist]
+
+    ResolveResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Direct audio URL (định dạng opus) trên CDN của YouTube.
+        title:
+          type: string
+          description: Tiêu đề gốc của video.
+        safeName:
+          type: string
+          description: Tên file đã lọc ký tự không hợp lệ, chưa gồm phần mở rộng.
+      required: [url, title, safeName]
+
+    LyricLine:
+      type: object
+      properties:
+        start:
+          type: number
+          format: double
+          description: Thời điểm bắt đầu dòng lyric (giây).
+        end:
+          type: number
+          format: double
+          description: Thời điểm kết thúc dòng lyric (giây).
+        text:
+          type: string
+          description: Nội dung dòng lyric.
+      required: [start, end, text]
+
+    LyricsData:
+      type: object
+      description: Lyrics cho một ngôn ngữ cụ thể.
+      properties:
+        language:
+          type: string
+          description: Mã/tên ngôn ngữ của track lyrics (dùng để loại trùng giữa các nguồn).
+          example: en
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/LyricLine"
+        trackName:
+          type: string
+          description: Tên bài hát khớp được (chỉ có khi lấy từ LRCLib).
+        artistName:
+          type: string
+          description: Tên nghệ sĩ khớp được (chỉ có khi lấy từ LRCLib).
+      required: [language, lines]
