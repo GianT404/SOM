@@ -1,7 +1,7 @@
 info:
   title: SOM API
   description: >
-    SOM — API backend viết bằng Go, cho phép tìm kiếm
+    SOM API backend viết bằng Go, cho phép tìm kiếm
     bài hát trên YouTube, stream/proxy audio, lấy lyrics đồng bộ (synced
     lyrics) và resolve direct audio URL để client tự tải nhạc.
     Backend sử dụng yt-dlp để trích xuất dữ liệu YouTube và LRCLib làm
@@ -81,6 +81,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: "missing required parameter: q"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "500":
           description: Lỗi phía scraper (yt-dlp) khi thực hiện tìm kiếm.
           content:
@@ -136,6 +138,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "500":
           description: Lỗi khi tải audio từ YouTube.
           content:
@@ -170,6 +174,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "500":
           description: Lỗi khi resolve URL audio.
           content:
@@ -230,8 +236,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
 components:
+  responses:
+    TooManyRequests:
+      description: >
+        Vượt quá giới hạn số request cho phép theo IP. `/stream` và
+        `/resolve` có giới hạn chặt hơn `/search` và `/lyrics` vì tốn tài
+        nguyên xử lý. Client nên chờ theo giá trị header
+        `Retry-After` rồi thử lại.
+      headers:
+        Retry-After:
+          description: Số giây client nên chờ trước khi gửi lại request.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "rate limit exceeded, please slow down"
+
   parameters:
     VideoId:
       name: id

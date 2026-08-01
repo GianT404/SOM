@@ -21,15 +21,22 @@ func StartServer(ctx context.Context, port string, ytdlpPath string) error {
 	lyricsH := &handler.LyricsHandler{Scraper: sc}
 	resolveH := &handler.ResolveHandler{Scraper: sc}
 
+	generalLimiter := newIPRateLimiter(2, 20)
+
+	heavyLimiter := newIPRateLimiter(0.2, 5)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger, middleware.Recoverer)
 	r.Use(middleware.Timeout(3 * time.Minute))
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(generalLimiter.Middleware)
+
 		r.Get("/search", searchH.ServeHTTP)
-		r.Get("/stream", streamH.ServeHTTP)
 		r.Get("/lyrics", lyricsH.ServeHTTP)
-		r.Get("/resolve", resolveH.ServeHTTP)
+
+		r.With(heavyLimiter.Middleware).Get("/stream", streamH.ServeHTTP)
+		r.With(heavyLimiter.Middleware).Get("/resolve", resolveH.ServeHTTP)
 	})
 
 	srv := &http.Server{
