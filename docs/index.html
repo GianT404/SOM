@@ -1,24 +1,157 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>SOM API Docs</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
-  <style>
-    body { margin: 0; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SOM API Reference</title>
+
+<!-- Font: Space Grotesk (heading), Inter (body), JetBrains Mono (code) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141c;
+    --border: #24242f;
+    --text: #e8e6e1;
+    --text-dim: #8f8d96;
+    --accent: #e8a33d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+  }
+
+  /* ---- Header / branding ---- */
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 28px 40px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  }
+
+  .brand { display: flex; align-items: center; gap: 16px; }
+
+  .brand h1 {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .brand p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  /* Signature: waveform nhấp nhô nhẹ, gợi sóng âm thanh */
+  .waveform {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 28px;
+  }
+  .waveform span {
+    display: block;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: bounce 1.4s ease-in-out infinite;
+  }
+  .waveform span:nth-child(1) { height: 10px; animation-delay: -1.2s; }
+  .waveform span:nth-child(2) { height: 20px; animation-delay: -1.0s; }
+  .waveform span:nth-child(3) { height: 28px; animation-delay: -0.8s; }
+  .waveform span:nth-child(4) { height: 16px; animation-delay: -0.6s; }
+  .waveform span:nth-child(5) { height: 24px; animation-delay: -0.4s; }
+  .waveform span:nth-child(6) { height: 12px; animation-delay: -0.2s; }
+
+  @keyframes bounce {
+    0%, 100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .waveform span { animation: none; transform: scaleY(0.75); }
+  }
+
+  .badge {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 6px 14px;
+    white-space: nowrap;
+  }
+
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  #api-reference { --scalar-custom-header-height: 0px; }
+</style>
 </head>
 <body>
-  <div id="swagger-ui"></div>
 
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <header class="hero">
+    <div class="brand">
+      <div class="waveform" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div>
+        <h1>SOM API</h1>
+        <p>Tìm kiếm, stream &amp; lấy lyrics nhạc</p>
+      </div>
+    </div>
+  </header>
+
+  <div id="api-reference" data-url="./openapi.yaml"></div>
+
   <script>
-    window.onload = () => {
-      window.ui = SwaggerUIBundle({
-        url: "./openapi.yaml",
-        dom_id: "#swagger-ui",
-      });
+    var configuration = {
+      theme: "none", 
+      darkMode: true,
+      hideDarkModeToggle: true,
+      layout: "modern",
+      customCss: `
+        :root {
+          --scalar-color-1: #e8e6e1;
+          --scalar-color-2: #b8b6c0;
+          --scalar-color-3: #8f8d96;
+          --scalar-color-accent: #e8a33d;
+          --scalar-background-1: #0a0a0f;
+          --scalar-background-2: #14141c;
+          --scalar-background-3: #1c1c26;
+          --scalar-border-color: #24242f;
+          --scalar-font: 'Inter', sans-serif;
+          --scalar-font-code: 'JetBrains Mono', monospace;
+          --scalar-heading-font: 'Space Grotesk', sans-serif;
+        }
+      `,
     };
+
+    document.getElementById("api-reference").dataset.configuration =
+      JSON.stringify(configuration);
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+
 </body>
 </html>

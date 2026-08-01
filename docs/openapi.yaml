@@ -1,4 +1,3 @@
-openapi: 3.1.0
 info:
   title: SOM API
   description: >
@@ -7,7 +6,6 @@ info:
     lyrics) và resolve direct audio URL để client tự tải nhạc.
     Backend sử dụng yt-dlp để trích xuất dữ liệu YouTube và LRCLib làm
     nguồn lyrics chính, với fallback là phụ đề (caption) của YouTube.
-  version: "1.0.0"
   contact:
     name: GianT404
     url: https://github.com/GianT404/SOM
@@ -64,7 +62,7 @@ paths:
           schema:
             type: string
             minLength: 1
-          example: "Sơn Tùng M-TP Chúng Ta Của Hiện Tại"
+          example: "A Cruel Angel's Thesis - Neon Genesis Evangelion OP"
       responses:
         "200":
           description: Danh sách kết quả tìm kiếm (có thể rỗng nếu không tìm thấy).
