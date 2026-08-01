@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: SOM API
   description: >
-    SOM (Stream Old Music) — API backend viết bằng Go, cho phép tìm kiếm
+    SOM — API backend viết bằng Go, cho phép tìm kiếm
     bài hát trên YouTube, stream/proxy audio, lấy lyrics đồng bộ (synced
     lyrics) và resolve direct audio URL để client tự tải nhạc.
     Backend sử dụng yt-dlp để trích xuất dữ liệu YouTube và LRCLib làm
