@@ -123,7 +123,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.Stop()
 			return a, tea.Quit
 
-		case "q":
+		case "q", "Q":
 			if !a.left.input.Focused() {
 				a.player.Stop()
 				return a, tea.Quit
@@ -177,19 +177,19 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.SeekBy(-5)
 			a.right.SeekBy(-5 * time.Second)
 
-		case "[":
+		case "]", "}":
 			if a.left.input.Focused() {
 				break
 			}
 			cmds = append(cmds, a.playNext())
 
-		case "]":
+		case "[", "{":
 			if a.left.input.Focused() {
 				break
 			}
 			cmds = append(cmds, a.playPrev())
 
-		case "r":
+		case "r", "R":
 			if a.left.input.Focused() {
 				break
 			}
@@ -197,13 +197,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.shuffleHist = nil
 			a.syncPlaylistState()
 
-		case "up", "k":
+		case "up":
 			if a.sidebarActive == SideLogs {
 				if a.logOffset < LogBuf.Len()-1 {
 					a.logOffset++
 				}
 			}
-		case "down", "j":
+		case "down":
 			if a.sidebarActive == SideLogs {
 				if a.logOffset > 0 {
 					a.logOffset--

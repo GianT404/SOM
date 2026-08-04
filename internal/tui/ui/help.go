@@ -31,7 +31,7 @@ var helpSections = []helpSection{
 		binds: []helpBind{
 			{"enter", "Play Selected"},
 			{"space", "Play / Pause"},
-			{"[ / ]", "Next / Prev"},
+			{"] / [", "Next / Prev"},
 			{"r", "Toggle Random"},
 			{"←/→", "Seek +/- 5s"},
 		},
@@ -58,10 +58,10 @@ var helpSections = []helpSection{
 const helpMaxColumns = 3
 
 func renderHelpSection(sec helpSection, keyWidth int) string {
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E8593C")).Bold(true)
+	headerStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	keyStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(colorWhite)
-	dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3a3742"))
+	dividerStyle := lipgloss.NewStyle().Foreground(colorBorder)
 
 	var b strings.Builder
 	b.WriteString(headerStyle.Render(sec.title) + "\n")

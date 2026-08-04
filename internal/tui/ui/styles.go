@@ -26,7 +26,6 @@ var (
 	deleteColor  = lipgloss.Color("#ff2a00")
 	colorYellow  = lipgloss.Color("#EF9F27")
 	colorBorder  = lipgloss.Color("#2E2E2E")
-	colorBorderF = lipgloss.Color("#E8593C")
 
 	// ── Panel containers ────────────────────────────────────────────────────────
 
