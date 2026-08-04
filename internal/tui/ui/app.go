@@ -357,9 +357,13 @@ func (a *App) View() string {
 		status = "  " + a.statusMsg
 	}
 
-	help := HelpStyle.Render(
-		"  tab:nav  enter:play  [:next  ]:prev  r:random  d:download  space:pause  /:search  ?:help q:quit",
-	)
+	rStyle := HelpStyle
+	if a.random {
+		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
+	}
+	help := HelpStyle.Render("  tab:nav  enter:play  [:next  ]:prev  ") +
+		rStyle.Render("r") +
+		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help q:quit")
 
 	progressBar := a.renderProgressBar(a.width)
 
@@ -410,6 +414,7 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 
 func (a *App) renderProgressBar(w int) string {
 	dim := ProgressDimStyle
+
 	controls := dim.Render("")
 
 	innerW := w - 4
