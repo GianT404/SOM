@@ -19,22 +19,13 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 		contentBorder = lipgloss.Color("#e8593c")
 	}
 
-	var searchContent strings.Builder
 	inputRow := " " + p.input.View()
 	if p.loading {
 		inputRow += " " + p.spinner.View()
 	}
-	searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
+	searchContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
 
-	if p.showAddPopup {
-		searchContent.WriteString(p.renderAddPopup())
-	} else if p.showPlInput {
-		searchContent.WriteString("\n " + p.plInput.View())
-	} else {
-		searchContent.WriteString("\n " + DimItemStyle.Render(""))
-	}
-
-	searchBox := renderBox(w, "Playlists", searchContent.String(), searchBorder)
+	searchBox := renderBox(w, "Playlists", searchContent, searchBorder)
 	var listContent string
 	if p.activePlaylist != nil {
 		listContent = p.renderPlaylistDetail(innerW)
@@ -49,7 +40,7 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 
 func (p LeftPanel) renderPlaylistList(innerW int) string {
 	if len(p.playlists) == 0 {
-		return DimItemStyle.Render(" No playlists available. Press 'c' to create a new playlist.") + "\n"
+		return DimItemStyle.Render(" No playlists available. Press '/' to create a new playlist.") + "\n"
 	}
 
 	var b strings.Builder
@@ -142,6 +133,15 @@ func (p LeftPanel) renderPlaylistDetail(innerW int) string {
 	}
 
 	return b.String()
+}
+
+func (p LeftPanel) renderPlInputPopup() string {
+	var b strings.Builder
+	b.WriteString("\n ")
+	b.WriteString(p.plInput.View())
+	b.WriteString("\n\n")
+	b.WriteString(DimItemStyle.Render(" (enter: create  | esc: cancel)"))
+	return renderBox(40, "New Playlist", b.String(), lipgloss.Color("#e8593c"))
 }
 
 func (p LeftPanel) renderAddPopup() string {

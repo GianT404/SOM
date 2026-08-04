@@ -31,7 +31,7 @@ var helpSections = []helpSection{
 		binds: []helpBind{
 			{"enter", "Play Selected"},
 			{"space", "Play / Pause"},
-			{"n / p", "Next / Prev"},
+			{"[ / ]", "Next / Prev"},
 			{"r", "Toggle Random"},
 			{"←/→", "Seek +/- 5s"},
 		},
@@ -40,14 +40,14 @@ var helpSections = []helpSection{
 		title: "Playlists & Actions",
 		binds: []helpBind{
 			{"a", "Add to Playlist"},
-			{"c / n", "Create Playlist"},
+			{"/", "Create Playlist"},
 			{"delete", "Remove Playlist"},
 			{"d", "Download"},
 			{"l", "Lyrics Language"},
 		},
 	},
 	{
-		title: "Command",
+		title: "Flags",
 		binds: []helpBind{
 			{"--version", "Show version"},
 			{"--upgrade", "True to it's name."},

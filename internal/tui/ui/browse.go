@@ -317,17 +317,10 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 			}
 
-		case "n", "c":
-			if p.activeTab == SidePlaylists && !p.input.Focused() && p.activePlaylist == nil {
-				p.showPlInput = true
-				p.plInput.Focus()
-				p.plInput.SetValue("")
-			}
-
 		case "a":
 			if !p.input.Focused() && (p.activeTab == SideSearch || p.activeTab == SideDownloads) {
 				if len(p.playlists) == 0 {
-					p.errMsg = "Chưa có playlist nào! Hãy sang tab Playlists bấm 'n' để tạo."
+					p.errMsg = "Chưa có playlist nào! Hãy sang tab Playlists bấm '/' để tạo."
 				} else {
 					p.showAddPopup = true
 					p.popupCursor = 0
@@ -360,7 +353,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "/":
-			if !p.input.Focused() {
+			if p.activeTab == SidePlaylists {
+				if !p.input.Focused() && p.activePlaylist == nil {
+					p.showPlInput = true
+					p.plInput.Focus()
+					p.plInput.SetValue("")
+				}
+			} else if !p.input.Focused() {
 				p.input.Focus()
 				p.input.SetValue("")
 			}

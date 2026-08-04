@@ -108,7 +108,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
 
-		// Nếu popup help đang mở, chỉ cho phép phím đóng popup, chặn hết phím khác
 		if a.showHelpPopup {
 			switch msg.String() {
 			case "?", "esc", "q":
@@ -177,13 +176,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.SeekBy(-5)
 			a.right.SeekBy(-5 * time.Second)
 
-		case "n":
+		case "[":
 			if a.left.input.Focused() {
 				break
 			}
 			cmds = append(cmds, a.playNext())
 
-		case "p":
+		case "]":
 			if a.left.input.Focused() {
 				break
 			}
@@ -359,7 +358,7 @@ func (a *App) View() string {
 	}
 
 	help := HelpStyle.Render(
-		"  tab:nav  enter:play  n:next  p:prev  r:random  d:download  space:pause  /:search  ?:help q:quit",
+		"  tab:nav  enter:play  [:next  ]:prev  r:random  d:download  space:pause  /:search  ?:help q:quit",
 	)
 
 	progressBar := a.renderProgressBar(a.width)
@@ -378,6 +377,9 @@ func (a *App) View() string {
 
 	if a.showHelpPopup {
 		popup := a.renderHelpPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.left.showPlInput {
+		popup := a.left.renderPlInputPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showAddPopup {
 		popup := a.left.renderAddPopup()
