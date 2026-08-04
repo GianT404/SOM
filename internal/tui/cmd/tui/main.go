@@ -3,26 +3,36 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
-	"log"
 	"os"
+
+	"som/internal/domain"
+	"som/internal/local"
+	"som/internal/scraper"
+	"som/internal/tui/api"
 	"som/internal/tui/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
-	server := flag.String("server", "http://localhost:8080", "SOM backend base URL")
+	serverURL := flag.String("server", "", "SOM backend base URL (Để trống để chạy nội bộ/Local)")
 	flag.Parse()
-	middleware.DefaultLogger = middleware.RequestLogger(
-		&middleware.DefaultLogFormatter{
-			Logger:  log.New(io.Discard, "", 0),
-			NoColor: true,
-		},
-	)
-	app := ui.NewApp(*server)
 
+	var provider domain.MusicProvider
+
+	if *serverURL == "" {
+		ytdlpPath := os.Getenv("YTDLP_PATH")
+		if ytdlpPath == "" {
+			ytdlpPath = "yt-dlp"
+		}
+		sc := scraper.NewYtdlpScraper(ytdlpPath)
+		provider = &local.DirectProvider{Scraper: sc}
+	} else {
+		// Bật Remote Mode
+		provider = api.NewHTTPProvider(*serverURL)
+	}
+
+	app := ui.NewApp(provider)
 	p := tea.NewProgram(
 		app,
 		tea.WithAltScreen(),

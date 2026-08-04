@@ -1,16 +1,17 @@
 package ui
 
 import (
-	"som/internal/tui/api"
+	"context"
+	"som/internal/domain"
 	"sync"
 )
 
 var (
 	lyricsCacheMu sync.RWMutex
-	lyricsCache   = make(map[string]api.LyricsResp)
+	lyricsCache   = make(map[string]domain.LyricsResp)
 )
 
-func getCachedLyrics(c *api.Client, id, title, artist string, duration int) (api.LyricsResp, error) {
+func getCachedLyrics(p domain.MusicProvider, id, title, artist string, duration int) (domain.LyricsResp, error) {
 	lyricsCacheMu.RLock()
 	if lr, ok := lyricsCache[id]; ok {
 		lyricsCacheMu.RUnlock()
@@ -18,12 +19,11 @@ func getCachedLyrics(c *api.Client, id, title, artist string, duration int) (api
 	}
 	lyricsCacheMu.RUnlock()
 
-	lr, err := c.Lyrics(id, title, artist, duration)
+	lr, err := p.Lyrics(context.Background(), id, title, artist, duration)
 	if err == nil {
 		lyricsCacheMu.Lock()
 		lyricsCache[id] = lr
 		lyricsCacheMu.Unlock()
 	}
-
 	return lr, err
 }

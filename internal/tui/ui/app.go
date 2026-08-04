@@ -7,14 +7,11 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
-	"som/internal/backend"
-	"som/internal/tui/api"
+	"som/internal/domain"
 	"som/internal/tui/player"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,18 +35,18 @@ func animTick() tea.Cmd {
 }
 
 type App struct {
-	client        *api.Client
+	provider      domain.MusicProvider
 	player        *player.Player
+	nowPlay       *domain.Track
 	width         int
 	height        int
 	left          LeftPanel
 	right         RightPanel
-	nowPlay       *api.Track
 	playedAt      time.Time
 	statusMsg     string
 	statusAt      time.Time
 	showHelpPopup bool
-	playlist      []api.Track
+	playlist      []domain.Track
 	currentIdx    int
 	random        bool
 	shuffleHist   []int
@@ -60,26 +57,12 @@ type App struct {
 	palette       CommandPalette
 }
 
-func NewApp(serverURL string) *App {
-	port := freePort()
-	go func() {
-		ytdlpPath := os.Getenv("YTDLP_PATH")
-		if ytdlpPath == "" {
-			ytdlpPath = "yt-dlp"
-		}
-		ctx := context.Background()
-		if err := backend.StartServer(ctx, port, ytdlpPath); err != nil {
-			log.Printf("embedded backend error: %v", err)
-		}
-	}()
-
-	localURL := fmt.Sprintf("http://localhost:%s", port)
-	c := api.New(localURL)
+func NewApp(provider domain.MusicProvider) *App {
 	p := player.New()
 	return &App{
-		client:        c,
+		provider:      provider,
 		player:        p,
-		left:          NewLeftPanel(c),
+		left:          NewLeftPanel(provider),
 		right:         NewRightPanel(p),
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
@@ -264,11 +247,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
 		}
-		a.playlist = make([]api.Track, len(locals))
+		a.playlist = make([]domain.Track, len(locals))
 		a.shuffleHist = nil
 		idx := -1
 		for i, lf := range locals {
-			a.playlist[i] = api.Track{
+			a.playlist[i] = domain.Track{
 				ID:       "local:" + lf.Path,
 				Title:    lf.Name,
 				Artist:   lf.Artist,
@@ -295,7 +278,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.right.SetTrack(&msg.Track, a.playedAt)
 		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
 		if msg.LyricsErr != nil {
-			a.right.SetLyrics(api.LyricsResp{Plain: "(no lyrics available)"}, a.playedAt)
+			a.right.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"}, a.playedAt)
 		} else {
 			a.right.SetLyrics(msg.Lyrics, a.playedAt)
 		}
@@ -521,7 +504,7 @@ func (a *App) renderProgressBar(w int) string {
 	return topBorder + "\n" + controlsLine + "\n" + barLine + "\n" + bottomBorder
 }
 
-func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
+func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.currentIdx = idx
 	a.nowPlay = &t
 	a.syncPlaylistState()
@@ -567,18 +550,18 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 		jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
 		data, err := os.ReadFile(jsonPath)
 		if err == nil {
-			var lr api.LyricsResp
+			var lr domain.LyricsResp
 			if json.Unmarshal(data, &lr) == nil {
 				a.right.SetLyrics(lr, a.playedAt)
 			}
 		} else {
-			a.right.SetLyrics(api.LyricsResp{Plain: "(No lyrics available)"}, a.playedAt)
+			a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"}, a.playedAt)
 		}
 		return nil
 	}
 
 	return func() tea.Msg {
-		directURL, err := a.client.ResolveStream(t.ID)
+		directURL, err := a.provider.ResolveStream(context.Background(), t.ID)
 		if err != nil || directURL == "" {
 			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
 		}
@@ -587,7 +570,7 @@ func (a *App) playTrackAt(idx int, t api.Track) tea.Cmd {
 			return StreamStartedMsg{Err: err}
 		}
 
-		lr, lyricsErr := getCachedLyrics(a.client, t.ID, t.Title, t.Artist, t.Duration)
+		lr, lyricsErr := getCachedLyrics(a.provider, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
 			PlayedAt:  time.Now(),
@@ -734,16 +717,6 @@ func (a *App) resizePanels() {
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
 	a.statusAt = time.Now()
-}
-
-func freePort() string {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "0"
-	}
-	port := l.Addr().(*net.TCPAddr).Port
-	l.Close()
-	return strconv.Itoa(port)
 }
 
 func init() {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"som/internal/tui/api"
+	"som/internal/domain"
 	"som/internal/tui/player"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -12,7 +12,7 @@ import (
 )
 
 type RightPanel struct {
-	lyrics  api.LyricsResp
+	lyrics  domain.LyricsResp
 	loaded  bool
 	curLine int
 	offset  int
@@ -20,7 +20,7 @@ type RightPanel struct {
 	height  int
 
 	player    *player.Player
-	nowPlay   *api.Track
+	nowPlay   *domain.Track
 	playedAt  time.Time
 	elapsed   time.Duration
 	pausedAt  time.Time
@@ -48,7 +48,7 @@ func NewRightPanel(p *player.Player) RightPanel {
 
 func (r *RightPanel) SetSize(w, h int) { r.width = w; r.height = h }
 
-func (r *RightPanel) SetTrack(t *api.Track, playedAt time.Time) {
+func (r *RightPanel) SetTrack(t *domain.Track, playedAt time.Time) {
 	r.nowPlay = t
 	r.playedAt = time.Now()
 	r.elapsed = 0
@@ -62,7 +62,7 @@ func (r *RightPanel) SetTrack(t *api.Track, playedAt time.Time) {
 	r.langCursor = 0
 }
 
-func (r *RightPanel) SetLyrics(lr api.LyricsResp, playedAt time.Time) {
+func (r *RightPanel) SetLyrics(lr domain.LyricsResp, playedAt time.Time) {
 	r.lyrics = lr
 	r.loaded = true
 	r.loadingLyrics = false

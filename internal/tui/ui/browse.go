@@ -1,8 +1,8 @@
 package ui
 
 import (
+	"som/internal/domain"
 	"som/internal/playlist"
-	"som/internal/tui/api"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -11,10 +11,10 @@ import (
 )
 
 type LeftPanel struct {
-	client       *api.Client
+	provider     domain.MusicProvider
 	input        textinput.Model
 	spinner      spinner.Model
-	tracks       []api.Track
+	tracks       []domain.Track
 	locals       []LocalFile
 	searchCursor int
 	searchOffset int
@@ -46,7 +46,7 @@ type LeftPanel struct {
 	deleteMsg         string
 }
 
-func NewLeftPanel(c *api.Client) LeftPanel {
+func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 	ti := textinput.New()
 	ti.CharLimit = 120
 	ti.PromptStyle = InputPromptStyle
@@ -60,8 +60,8 @@ func NewLeftPanel(c *api.Client) LeftPanel {
 	plInput.CharLimit = 50
 	plInput.Prompt = ""
 
-	p := LeftPanel{
-		client:    c,
+	panel := LeftPanel{
+		provider:  prov,
 		input:     ti,
 		spinner:   sp,
 		activeTab: SideDownloads,
@@ -69,14 +69,14 @@ func NewLeftPanel(c *api.Client) LeftPanel {
 	}
 
 	if store, err := playlist.NewStore(); err == nil {
-		p.plStore = store
+		panel.plStore = store
 		if pls, err := store.Load(); err == nil {
-			p.playlists = pls
+			panel.playlists = pls
 		}
 	}
 
-	p.scanLocalFiles()
-	return p
+	panel.scanLocalFiles()
+	return panel
 }
 
 func (p *LeftPanel) SetSize(mainW int, contentH int) {
@@ -230,7 +230,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 					p.loading = true
 					p.errMsg = ""
 					p.tracks = nil
-					cmds = append(cmds, p.spinner.Tick, searchCmd(p.client, q))
+					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q))
 				}
 				return p, tea.Batch(cmds...)
 			}
@@ -251,9 +251,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 			} else if p.activeTab == SidePlaylists {
 				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-					plTracks := make([]api.Track, len(p.activePlaylist.Tracks))
+					plTracks := make([]domain.Track, len(p.activePlaylist.Tracks))
 					for i, pt := range p.activePlaylist.Tracks {
-						plTracks[i] = api.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+						plTracks[i] = domain.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
 					}
 					return p, func() tea.Msg { return PlayPlaylistMsg{Tracks: plTracks, Index: p.plCursor} }
 				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
@@ -349,7 +349,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 					return p, nil
 				}
 				p.loadingDownload = true
-				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.client, t, dir))
+				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, dir))
 			}
 
 		case "/":
@@ -432,7 +432,7 @@ func (p LeftPanel) visibleRows() int {
 	return rows
 }
 
-func (p LeftPanel) isDownloaded(t api.Track) bool {
+func (p LeftPanel) isDownloaded(t domain.Track) bool {
 	if t.ID != "" {
 		for _, f := range p.locals {
 			if f.VideoID == t.ID {

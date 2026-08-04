@@ -1,16 +1,16 @@
 package ui
 
 import (
-	"som/internal/tui/api"
+	"som/internal/domain"
 	"time"
 )
 
 type SearchResultMsg struct {
-	Tracks []api.Track
+	Tracks []domain.Track
 	Err    error
 }
 
-type PlayStartedMsg struct{ Track api.Track }
+type PlayStartedMsg struct{ Track domain.Track }
 
 type PlayLocalMsg struct {
 	Path  string
@@ -21,9 +21,9 @@ type DownloadDoneMsg struct {
 	Err  error
 }
 type StreamStartedMsg struct {
-	Track     api.Track
+	Track     domain.Track
 	PlayedAt  time.Time
-	Lyrics    api.LyricsResp
+	Lyrics    domain.LyricsResp
 	LyricsErr error
 	Err       error
 }
@@ -47,6 +47,6 @@ const (
 )
 
 type PlayPlaylistMsg struct {
-	Tracks []api.Track
+	Tracks []domain.Track
 	Index  int
 }

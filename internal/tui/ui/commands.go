@@ -1,19 +1,19 @@
 package ui
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"som/internal/domain"
 	"strings"
-
-	"som/internal/tui/api"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func searchCmd(c *api.Client, q string) tea.Cmd {
+func searchCmd(p domain.MusicProvider, q string) tea.Cmd {
 	return func() tea.Msg {
-		tracks, err := c.Search(q)
+		tracks, err := p.Search(context.Background(), q)
 		return SearchResultMsg{Tracks: tracks, Err: err}
 	}
 }
@@ -26,19 +26,17 @@ func getDownloadDir() (string, error) {
 	return filepath.Join(homeDir, "Music", "SOM_Downloads"), nil
 }
 
-func downloadCmd(c *api.Client, t api.Track, destDir string) tea.Cmd {
+func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd {
 	return func() tea.Msg {
-		path, err := c.DownloadOPUS(t.ID, t.Title, destDir)
-
+		path, err := p.DownloadOPUS(context.Background(), t.ID, t.Title, destDir)
 		if err == nil {
-			// lr, errLyr := c.Lyrics(t.ID, t.Title, t.Artist, t.Duration)
-			lr, errLyr := getCachedLyrics(c, t.ID, t.Title, t.Artist, t.Duration)
+			lr, errLyr := getCachedLyrics(p, t.ID, t.Title, t.Artist, t.Duration)
 			if errLyr != nil {
-				lr = api.LyricsResp{}
+				lr = domain.LyricsResp{}
+				lr.Artist = t.Artist
+				lr.Title = t.Title
+				lr.VideoID = t.ID
 			}
-			lr.Artist = t.Artist
-			lr.Title = t.Title
-			lr.VideoID = t.ID
 			jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
 			data, _ := json.MarshalIndent(lr, "", "  ")
 			_ = os.WriteFile(jsonPath, data, 0644)
