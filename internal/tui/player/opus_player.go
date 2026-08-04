@@ -112,6 +112,7 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
+		"-af", "loudnorm=I=-16:LRA=11:TP=-1.5",
 		"-v", "error", // chỉ log lỗi thật, không log info/warning rác
 		"-",
 	)
