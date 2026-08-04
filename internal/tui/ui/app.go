@@ -44,6 +44,7 @@ type App struct {
 	playlist      []api.Track
 	currentIdx    int
 	random        bool
+	shuffleHist   []int
 
 	sidebarActive SidebarItem
 	logOffset     int
@@ -103,11 +104,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tick())
 	case PlayPlaylistMsg:
 		a.playlist = msg.Tracks
+		a.shuffleHist = nil
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
-
 		if a.showHelpPopup {
 			switch msg.String() {
 			case "?", "esc", "q":
@@ -193,6 +194,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			a.random = !a.random
+			a.shuffleHist = nil
 			a.syncPlaylistState()
 
 		case "up", "k":
@@ -227,6 +229,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PlayStartedMsg:
 		t := msg.Track
 		a.playlist = a.left.tracks
+		a.shuffleHist = nil
 		a.activeContext = SideSearch
 
 		idx := -1
@@ -249,6 +252,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		a.playlist = make([]api.Track, len(locals))
+		a.shuffleHist = nil
 		idx := -1
 		for i, lf := range locals {
 			a.playlist[i] = api.Track{
@@ -414,7 +418,6 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 
 func (a *App) renderProgressBar(w int) string {
 	dim := ProgressDimStyle
-
 	controls := dim.Render("")
 
 	innerW := w - 4
@@ -587,10 +590,7 @@ func (a *App) playNext() tea.Cmd {
 	}
 	next := a.currentIdx + 1
 	if a.random {
-		next = rand.Intn(len(a.playlist))
-		for next == a.currentIdx && len(a.playlist) > 1 {
-			next = rand.Intn(len(a.playlist))
-		}
+		next = a.pickAntiClumpIndex()
 	}
 	if next >= len(a.playlist) {
 		return nil
@@ -604,15 +604,80 @@ func (a *App) playPrev() tea.Cmd {
 	}
 	prev := a.currentIdx - 1
 	if a.random {
-		prev = rand.Intn(len(a.playlist))
-		for prev == a.currentIdx && len(a.playlist) > 1 {
-			prev = rand.Intn(len(a.playlist))
-		}
+		prev = a.pickAntiClumpIndex()
 	}
 	if prev < 0 {
 		return nil
 	}
 	return a.playTrackAt(prev, a.playlist[prev])
+}
+
+func (a *App) pickAntiClumpIndex() int {
+	n := len(a.playlist)
+	if n <= 1 {
+		return 0
+	}
+	histCap := n / 2
+	if histCap > 8 {
+		histCap = 8
+	}
+
+	recent := make(map[int]bool, len(a.shuffleHist))
+	start := len(a.shuffleHist) - histCap
+	if start < 0 {
+		start = 0
+	}
+	for _, idx := range a.shuffleHist[start:] {
+		recent[idx] = true
+	}
+
+	curArtist := ""
+	if a.currentIdx >= 0 && a.currentIdx < n {
+		curArtist = a.playlist[a.currentIdx].Artist
+	}
+
+	var freshDiffArtist, freshSameArtist, usedDiffArtist []int
+	for i, t := range a.playlist {
+		if i == a.currentIdx {
+			continue
+		}
+		diffArtist := curArtist == "" || t.Artist != curArtist
+		if recent[i] {
+			if diffArtist {
+				usedDiffArtist = append(usedDiffArtist, i)
+			}
+			continue
+		}
+		if diffArtist {
+			freshDiffArtist = append(freshDiffArtist, i)
+		} else {
+			freshSameArtist = append(freshSameArtist, i)
+		}
+	}
+
+	pool := freshDiffArtist
+	if len(pool) == 0 {
+		pool = freshSameArtist
+	}
+	if len(pool) == 0 {
+		pool = usedDiffArtist
+	}
+	if len(pool) == 0 {
+		for i := range a.playlist {
+			if i != a.currentIdx {
+				pool = append(pool, i)
+			}
+		}
+	}
+
+	picked := pool[rand.Intn(len(pool))]
+
+	a.shuffleHist = append(a.shuffleHist, picked)
+	if len(a.shuffleHist) > histCap*2 {
+		a.shuffleHist = a.shuffleHist[len(a.shuffleHist)-histCap:]
+	}
+
+	return picked
 }
 
 func (a *App) syncPlaylistState() {
