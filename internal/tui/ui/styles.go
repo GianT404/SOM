@@ -11,12 +11,7 @@ import (
 // Nerd-font icon codepoints (Material Design via nerd-fonts)
 // Font Awesome (Nerd Font)
 const (
-	IconPrev    = "\uf048"
-	IconPlay    = "\uf04b"
-	IconPause   = "\uf04c"
-	IconNext    = "\uf051"
-	IconShuffle = "\uf074"
-	IconCheck   = "\uf00c"
+	IconCheck = "\uf00c"
 )
 
 var (

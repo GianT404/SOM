@@ -407,26 +407,8 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 }
 
 func (a *App) renderProgressBar(w int) string {
-	state := a.player.State()
-
-	playIcon := IconPlay
-	if state == player.Playing {
-		playIcon = IconPause
-	}
-
 	dim := ProgressDimStyle
-
-	shuffleIcon := dim.Render(IconShuffle)
-	if a.random {
-		shuffleIcon = ProgressFilledStyle.Render(IconShuffle)
-	}
-
-	controls := fmt.Sprintf("  %s  %s  %s  %s ",
-		dim.Render(IconPrev),
-		dim.Render(playIcon),
-		dim.Render(IconNext),
-		shuffleIcon,
-	)
+	controls := dim.Render("")
 
 	innerW := w - 4
 
