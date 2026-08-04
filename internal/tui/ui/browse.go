@@ -38,9 +38,9 @@ type LeftPanel struct {
 	plInput         textinput.Model
 	showPlInput     bool
 
-	showAddPopup bool
-	popupCursor  int
-
+	showAddPopup      bool
+	popupCursor       int
+	animTick          int
 	showDeletePopup   bool
 	deletePopupCursor int
 	deleteMsg         string

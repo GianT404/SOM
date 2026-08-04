@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func (p *LeftPanel) scanLocalFiles() {
@@ -154,9 +155,10 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 			mark = " "
 		}
 		idx := fmt.Sprintf("%*d", idxW, i+1)
-		title := truncate(f.Name, titleW)
-		artist := truncate(f.Artist, artistW)
-		line := mark + idx + "  " + fmt.Sprintf("%-*s", titleW, title) + "  " + fmt.Sprintf("%-*s", artistW, artist)
+		title := marqueeText(f.Name, titleW, p.animTick)
+		safeArtist := truncate(f.Artist, artistW)
+		artistPlain := runewidth.FillRight(safeArtist, artistW)
+		line := mark + idx + "  " + title + "  " + artistPlain
 		if i == p.dlCursor {
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
 		} else {

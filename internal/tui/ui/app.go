@@ -24,8 +24,16 @@ import (
 type tickMsg time.Time
 
 func tick() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(900*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
+	})
+}
+
+type animTickMsg time.Time
+
+func animTick() tea.Cmd {
+	return tea.Tick(270*time.Millisecond, func(t time.Time) tea.Msg {
+		return animTickMsg(t)
 	})
 }
 
@@ -80,7 +88,7 @@ func NewApp(serverURL string) *App {
 }
 
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(a.left.Init(), tick())
+	return tea.Batch(a.left.Init(), tick(), animTick())
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -95,6 +103,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.resizePanels()
 
 	case tickMsg:
+		a.left.animTick++
 		a.right.TickAt(a.playedAt)
 		if !a.left.loadingStream && a.player.State() == player.Stopped && a.nowPlay != nil {
 			a.nowPlay = nil
@@ -138,7 +147,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			targetTab := SidebarItem(msg.String()[0] - '1')
-			a.switchSidebar(targetTab)
+			cmds = append(cmds, a.switchSidebar(targetTab))
 		case ":":
 			if a.left.input.Focused() {
 				break
@@ -154,7 +163,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.left.input.Blur()
 			} else {
 				a.sidebarActive = (a.sidebarActive + 1) % sideCount
-				a.switchSidebar(a.sidebarActive)
+				cmds = append(cmds, a.switchSidebar(a.sidebarActive))
 			}
 
 		case " ":
@@ -241,7 +250,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(idx, t))
-
+	case animTickMsg:
+		if a.sidebarActive == SideDownloads {
+			a.left.animTick++
+			cmds = append(cmds, animTick())
+		}
 	case PlayLocalMsg:
 		locals := a.left.getFilteredLocals()
 		if len(locals) == 0 {
@@ -365,7 +378,7 @@ func (a *App) View() string {
 	if a.random {
 		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
-	help := HelpStyle.Render("  tab:nav  enter:play  [:next  ]:prev  ") +
+	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev  ") +
 		rStyle.Render("r") +
 		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help q:quit")
 
@@ -686,7 +699,8 @@ func (a *App) syncPlaylistState() {
 	}
 }
 
-func (a *App) switchSidebar(item SidebarItem) {
+func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
+	oldTab := a.sidebarActive
 	a.sidebarActive = item
 	a.left.activeTab = item
 
@@ -695,6 +709,12 @@ func (a *App) switchSidebar(item SidebarItem) {
 	} else {
 		a.left.searchOnEnter = false
 	}
+
+	if item == SideDownloads && oldTab != SideDownloads {
+		return animTick()
+	}
+
+	return nil
 }
 
 func (a *App) resizePanels() {
