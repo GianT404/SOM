@@ -71,8 +71,6 @@ func main() {
 		w.Write([]byte(`{"status":"ok","service":"dopus"}`))
 	})
 
-	r.Handle("/docs/*", http.StripPrefix("/docs", docsHandler()))
-
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(backend.APIKeyMiddleware(apiKey))
