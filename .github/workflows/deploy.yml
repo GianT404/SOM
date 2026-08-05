@@ -69,6 +69,9 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             script: |
               cd ~/SOM
+              # Đồng bộ code mới nhất từ repo về VM (file .env gitignored nên không bị mất)
+              git fetch --all
+              git reset --hard origin/main
               # Ép hạ toàn bộ container cũ và dọn dẹp rác mồ côi
               docker compose down --remove-orphans
               docker compose pull
