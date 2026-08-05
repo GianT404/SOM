@@ -1,8 +1,10 @@
 services:
-  backend:
+  som-backend-prod:
     image: gian404/som-backend:latest
     container_name: som-backend-prod
     restart: always
+    env_file:
+      - /etc/som/som.env
     # logging:
     #   driver: gcplogs
     #   options:
