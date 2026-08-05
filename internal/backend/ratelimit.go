@@ -21,7 +21,7 @@ type ipRateLimiter struct {
 	burst    float64
 }
 
-func newIPRateLimiter(rate, burst float64) *ipRateLimiter {
+func NewIPRateLimiter(rate, burst float64) *ipRateLimiter {
 	l := &ipRateLimiter{
 		visitors: make(map[string]*visitor),
 		rate:     rate,
@@ -70,7 +70,6 @@ func (l *ipRateLimiter) cleanupLoop() {
 	}
 }
 
-// Middleware trả về http middleware áp dụng rate limit cho từng IP client.
 func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
@@ -91,9 +90,11 @@ func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For có thể là danh sách "client, proxy1, proxy2" -> lấy IP đầu tiên.
 		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
+		last := strings.TrimSpace(parts[len(parts)-1])
+		if last != "" {
+			return last
+		}
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"som/internal/backend"
 	"som/internal/handler"
 	"som/internal/scraper"
 )
@@ -23,7 +24,11 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
-
+	apiKey := os.Getenv("SOM_API_KEY")
+	if apiKey == "" {
+		slog.Error("Missing environment variable SOM_API_KEY, server refuses to start.")
+		os.Exit(1)
+	}
 	go func() {
 		slog.Info("Starting pprof monitoring", "port", "6060")
 		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
@@ -41,15 +46,15 @@ func main() {
 		ytdlpPath = "yt-dlp"
 	}
 
-	// Create the scraper implementation
 	sc := scraper.NewYtdlpScraper(ytdlpPath)
 
-	// Wire up handlers
 	searchH := &handler.SearchHandler{Scraper: sc}
 	streamH := handler.NewStreamHandler(sc)
 	lyricsH := &handler.LyricsHandler{Scraper: sc}
 	resolveH := &handler.ResolveHandler{Scraper: sc}
 
+	generalLimiter := backend.NewIPRateLimiter(2, 20)
+	heavyLimiter := backend.NewIPRateLimiter(0.2, 5)
 	// Build the chi router
 	r := chi.NewRouter()
 
@@ -67,10 +72,14 @@ func main() {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(backend.APIKeyMiddleware(apiKey))
+		r.Use(generalLimiter.Middleware)
+
 		r.Get("/search", searchH.ServeHTTP)
-		r.Get("/stream", streamH.ServeHTTP)
 		r.Get("/lyrics", lyricsH.ServeHTTP)
-		r.Get("/resolve", resolveH.ServeHTTP)
+
+		r.With(heavyLimiter.Middleware).Get("/stream", streamH.ServeHTTP)
+		r.With(heavyLimiter.Middleware).Get("/resolve", resolveH.ServeHTTP)
 	})
 
 	// Create the HTTP server

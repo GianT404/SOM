@@ -20,6 +20,104 @@ type YtdlpScraper struct {
 	// BinPath is the absolute path to the yt-dlp binary.
 	BinPath string
 }
+type lockEntry struct {
+	mu  sync.Mutex
+	ref int
+}
+
+type keyedLock struct {
+	mu    sync.Mutex
+	locks map[string]*lockEntry
+}
+
+func newKeyedLock() *keyedLock {
+	return &keyedLock{locks: make(map[string]*lockEntry)}
+}
+
+func (k *keyedLock) Lock(key string) func() {
+	k.mu.Lock()
+	e, ok := k.locks[key]
+	if !ok {
+		e = &lockEntry{}
+		k.locks[key] = e
+	}
+	e.ref++
+	k.mu.Unlock()
+
+	e.mu.Lock()
+
+	return func() {
+		e.mu.Unlock()
+		k.mu.Lock()
+		e.ref--
+		if e.ref == 0 {
+			delete(k.locks, key)
+		}
+		k.mu.Unlock()
+	}
+}
+
+var downloadLocks = newKeyedLock()
+
+// cleanup chạy định kỳ suốt vòng đời process, thay vì chỉ chạy 1 lần.
+func init() {
+	go func() {
+		cleanupStaleTempFiles()
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanupStaleTempFiles()
+		}
+	}()
+}
+
+func cleanupStaleTempFiles() {
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus*.opus"))
+	now := time.Now()
+	for _, f := range matches {
+		info, err := os.Stat(f)
+		if err == nil && now.Sub(info.ModTime()) > 1*time.Hour {
+			os.Remove(f)
+		}
+	}
+}
+
+func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
+	unlock := downloadLocks.Lock(videoID)
+	defer unlock()
+
+	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
+
+	if isOpusFile(tempFile) {
+		return tempFile, nil
+	}
+	_ = os.Remove(tempFile)
+	cmd := exec.CommandContext(ctx, y.BinPath,
+		"-f", "bestaudio",
+		"-x", "--audio-format", "opus",
+		"--embed-metadata",
+		"-o", tempFile,
+		"--no-warnings",
+		"--no-check-certificates",
+		"--no-playlist",
+		"--no-part",
+		"--", "https://www.youtube.com/watch?v="+videoID,
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdout = nil
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("yt-dlp download: %w: %s", err, stderr.String())
+	}
+	if !isOpusFile(tempFile) {
+		_ = os.Remove(tempFile)
+		return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
+	}
+
+	return tempFile, nil
+}
 
 func NewYtdlpScraper(binPath string) *YtdlpScraper {
 	if binPath == "" {
@@ -195,54 +293,6 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		URL:   audioURL,
 		Title: title,
 	}, nil
-}
-
-var cleanupOnce sync.Once
-
-func cleanupStaleTempFiles() {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus*.opus"))
-	now := time.Now()
-	for _, f := range matches {
-		info, err := os.Stat(f)
-		if err == nil && now.Sub(info.ModTime()) > 1*time.Hour {
-			os.Remove(f)
-		}
-	}
-}
-
-func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
-	cleanupOnce.Do(cleanupStaleTempFiles)
-	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
-
-	if isOpusFile(tempFile) {
-		return tempFile, nil
-	}
-	_ = os.Remove(tempFile)
-	cmd := exec.CommandContext(ctx, y.BinPath,
-		"-f", "bestaudio",
-		"-x", "--audio-format", "opus",
-		"--embed-metadata",
-		"-o", tempFile,
-		"--no-warnings",
-		"--no-check-certificates",
-		"--no-playlist",
-		"--no-part",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	cmd.Stdout = nil
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("yt-dlp download: %w: %s", err, stderr.String())
-	}
-	if !isOpusFile(tempFile) {
-		_ = os.Remove(tempFile)
-		return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
-	}
-
-	return tempFile, nil
 }
 
 func isOpusFile(path string) bool {
