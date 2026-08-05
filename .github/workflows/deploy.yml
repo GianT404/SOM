@@ -69,9 +69,11 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             script: |
               cd ~/SOM
-              # Đồng bộ code mới nhất từ repo về VM (file .env gitignored nên không bị mất)
+              # Đồng bộ code mới nhất từ repo về VM
               git fetch --all
               git reset --hard origin/main
+              # Ghi .env từ GitHub secret (file này gitignored, không ship qua git)
+              echo "SOM_API_KEY=${{ secrets.SOM_API_KEY }}" > .env
               # Ép hạ toàn bộ container cũ và dọn dẹp rác mồ côi
               docker compose down --remove-orphans
               docker compose pull
