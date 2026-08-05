@@ -1,5 +1,4 @@
 somz.duckdns.org {
-    # Xử lý preflight cho OPTIONS
     @cors_preflight method OPTIONS
     handle @cors_preflight {
         header Access-Control-Allow-Origin "*"
@@ -9,9 +8,5 @@ somz.duckdns.org {
         respond "" 204
     }
     
-    header Access-Control-Allow-Origin "*"
-    header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    header Access-Control-Allow-Headers "*"
-
     reverse_proxy som-backend-prod:8080
 }
