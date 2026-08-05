@@ -1,18 +1,4 @@
 somz.duckdns.org {
-    header {
-        # Xoá header CORS của upstream (Go backend) trước khi set để tránh bị trùng "*, *"
-        -Access-Control-Allow-Origin
-        -Access-Control-Allow-Methods
-        -Access-Control-Allow-Headers
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*"
-    }
-
-    @cors_preflight method OPTIONS
-    handle @cors_preflight {
-        respond "" 204
-    }
-
+    # CORS được xử lý hoàn toàn ở Go backend (middleware) để tránh trùng/thiếu header.
     reverse_proxy som-backend-prod:8080
 }
