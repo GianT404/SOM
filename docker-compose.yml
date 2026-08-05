@@ -4,7 +4,7 @@ services:
     container_name: som-backend-prod
     restart: always
     env_file:
-      - /etc/som/som.env
+      - .env
     # logging:
     #   driver: gcplogs
     #   options:

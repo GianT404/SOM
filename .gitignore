@@ -5,7 +5,7 @@
 *.exe~
 *.test
 /cmd/server/server
-
+.env
 # Node
 node_modules/
 .npm/
