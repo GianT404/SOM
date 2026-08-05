@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -10,6 +11,8 @@ import (
 
 	"som/internal/scraper"
 )
+
+const maxQueryLen = 100
 
 var reVideoID = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
 
@@ -32,9 +35,13 @@ type SearchHandler struct {
 }
 
 func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		writeError(w, http.StatusBadRequest, "missing required parameter: q")
+		return
+	}
+	if len(q) > maxQueryLen {
+		writeError(w, http.StatusBadRequest, "q too long, max 100 characters")
 		return
 	}
 
@@ -43,6 +50,11 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	results, err := h.Scraper.Search(ctx, q)
 	if err != nil {
+		if errors.Is(err, scraper.ErrCircuitOpen) {
+			w.Header().Set("Retry-After", "30")
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

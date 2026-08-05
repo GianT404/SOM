@@ -47,11 +47,12 @@ func main() {
 	}
 
 	sc := scraper.NewYtdlpScraper(ytdlpPath)
+	resilientSc := scraper.NewResilientScraper(sc)
 
-	searchH := &handler.SearchHandler{Scraper: sc}
-	streamH := handler.NewStreamHandler(sc)
-	lyricsH := &handler.LyricsHandler{Scraper: sc}
-	resolveH := &handler.ResolveHandler{Scraper: sc}
+	searchH := &handler.SearchHandler{Scraper: resilientSc}
+	streamH := handler.NewStreamHandler(resilientSc)
+	lyricsH := &handler.LyricsHandler{Scraper: resilientSc}
+	resolveH := &handler.ResolveHandler{Scraper: resilientSc}
 
 	generalLimiter := backend.NewIPRateLimiter(2, 20)
 	heavyLimiter := backend.NewIPRateLimiter(0.2, 5)
@@ -69,6 +70,8 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","service":"dopus"}`))
 	})
+
+	r.Handle("/docs/*", http.StripPrefix("/docs", docsHandler()))
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {

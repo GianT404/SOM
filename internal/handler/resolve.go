@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -9,10 +10,6 @@ import (
 	"som/internal/scraper"
 )
 
-// ResolveHandler handles GET /api/v1/resolve?id={video_id}.
-// It returns the direct audio URL and title for the given video ID,
-// so the client can download the file directly from the CDN
-// without waiting for the server to proxy the entire file.
 type ResolveHandler struct {
 	Scraper scraper.Scraper
 }
@@ -20,7 +17,7 @@ type ResolveHandler struct {
 type resolveResponse struct {
 	URL      string `json:"url"`
 	Title    string `json:"title"`
-	SafeName string `json:"safeName"` // Safe filename (without extension)
+	SafeName string `json:"safeName"`
 }
 
 func (h *ResolveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +32,11 @@ func (h *ResolveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	info, err := h.Scraper.GetStreamInfo(r.Context(), id)
 	if err != nil {
 		log.Printf("resolve: error for %s after %v: %v", id, time.Since(start), err)
+		if errors.Is(err, scraper.ErrCircuitOpen) {
+			w.Header().Set("Retry-After", "30")
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to resolve audio URL")
 		return
 	}
