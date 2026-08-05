@@ -1,3 +1,4 @@
+openapi: 3.0.3
 info:
   title: SOM API
   description: >
@@ -27,14 +28,6 @@ tags:
     description: Lấy direct audio URL để client tự tải/stream
   - name: Lyrics
     description: Lấy lyrics đồng bộ theo thời gian (synced lyrics)
-
-securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
-      description: >
-        Bắt buộc cho mọi endpoint dưới /api/v1. Không cần cho /health và /docs.
 
 security:
   - ApiKeyAuth: []
@@ -252,6 +245,13 @@ paths:
           $ref: "#/components/responses/TooManyRequests"
 
 components:
+  securitySchemes:
+      ApiKeyAuth:
+        type: apiKey
+        in: header
+        name: X-API-Key
+        description: >
+          Bắt buộc cho mọi endpoint dưới /api/v1. Không cần cho /health và /docs.
   responses:
     TooManyRequests:
       description: >
