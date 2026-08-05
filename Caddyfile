@@ -7,5 +7,6 @@ somz.duckdns.org {
         header Access-Control-Max-Age "3600"
         respond "" 204
     }
+    
     reverse_proxy som-backend-prod:8080
 }

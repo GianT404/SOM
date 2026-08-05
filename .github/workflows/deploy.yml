@@ -58,16 +58,18 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/som-backend:latest
 
   deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH vào GCP VM và Kéo Image về chạy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.GCP_VM_IP }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/SOM
-            docker compose pull
-            docker compose up -d
+      needs: build-and-push
+      runs-on: ubuntu-latest
+      steps:
+        - name: SSH vào GCP VM và Kéo Image về chạy
+          uses: appleboy/ssh-action@v1.0.3
+          with:
+            host: ${{ secrets.GCP_VM_IP }}
+            username: ${{ secrets.SSH_USERNAME }}
+            key: ${{ secrets.SSH_PRIVATE_KEY }}
+            script: |
+              cd ~/SOM
+              # Ép hạ toàn bộ container cũ và dọn dẹp rác mồ côi
+              docker compose down --remove-orphans
+              docker compose pull
+              docker compose up -d
