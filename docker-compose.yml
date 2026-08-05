@@ -5,8 +5,6 @@ services:
     restart: always
     env_file:
       - /etc/som/som.env
-    environment:
-      - SOM_API_KEY
     # logging:
     #   driver: gcplogs
     #   options:
