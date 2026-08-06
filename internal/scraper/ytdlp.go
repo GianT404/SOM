@@ -59,6 +59,24 @@ func (k *keyedLock) Lock(key string) func() {
 
 var downloadLocks = newKeyedLock()
 
+// ytdlpSem giới hạn số process yt-dlp chạy đồng thời để bảo vệ VM 1 CPU và
+// tránh vượt pids_limit. Request vượt slot sẽ chờ tới khi có slot hoặc khi
+// context bị hủy/timeout.
+var ytdlpSem = make(chan struct{}, 2)
+
+func acquireYtdlp(ctx context.Context) error {
+	select {
+	case ytdlpSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func releaseYtdlp() {
+	<-ytdlpSem
+}
+
 // maxCachedAudioFiles giới hạn số file opus cache trong temp dir.
 // Quá ngưỡng thì evict các file lâu không dùng nhất (LRU theo modtime),
 // tránh bị bơm đầy disk khi ai đó spam /stream với nhiều videoID độc nhất.
@@ -118,11 +136,50 @@ func cleanupStaleTempFiles() {
 			os.Remove(f)
 		}
 	}
+
+	// Cache bản clean (?clean=1): file .ogg khá lớn, evict file cũ hơn 6h
+	// (khớp vòng đời URL chữ ký) và giới hạn ~20 file.
+	const maxCleanFiles = 20
+	cleanMatches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus-clean-*.ogg"))
+	var cleanFresh []fileEntry
+	for _, f := range cleanMatches {
+		info, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		if now.Sub(info.ModTime()) > 6*time.Hour {
+			os.Remove(f)
+			continue
+		}
+		cleanFresh = append(cleanFresh, fileEntry{path: f, mod: info.ModTime()})
+	}
+	if len(cleanFresh) > maxCleanFiles {
+		sort.Slice(cleanFresh, func(i, j int) bool {
+			return cleanFresh[i].mod.Before(cleanFresh[j].mod)
+		})
+		for _, e := range cleanFresh[:len(cleanFresh)-maxCleanFiles] {
+			os.Remove(e.path)
+		}
+	}
+
+	// Dọn .part còn sót nếu transcode bị kill giữa chừng.
+	partMatches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus-clean-*.part"))
+	for _, f := range partMatches {
+		info, err := os.Stat(f)
+		if err == nil && now.Sub(info.ModTime()) > 1*time.Hour {
+			os.Remove(f)
+		}
+	}
 }
 
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
 	unlock := downloadLocks.Lock(videoID)
 	defer unlock()
+
+	if err := acquireYtdlp(ctx); err != nil {
+		return "", err
+	}
+	defer releaseYtdlp()
 
 	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
 
@@ -140,6 +197,7 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 		"--no-warnings",
 		"--no-playlist",
 		"--no-part",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 
@@ -187,6 +245,11 @@ type ytdlpSearchItem struct {
 
 // Search runs yt-dlp to find 7 results for the keyword.
 func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResult, error) {
+	if err := acquireYtdlp(ctx); err != nil {
+		return nil, err
+	}
+	defer releaseYtdlp()
+
 	query := fmt.Sprintf("ytsearch7:%s", keyword)
 	cmd := exec.CommandContext(ctx, y.BinPath,
 		query,
@@ -261,67 +324,41 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
-	titleCmd := exec.CommandContext(ctx, y.BinPath,
-		"--print", "%(title)s",
+	if err := acquireYtdlp(ctx); err != nil {
+		return nil, err
+	}
+	defer releaseYtdlp()
+
+	// Một lần gọi duy nhất lấy cả title lẫn URL trực tiếp (trước đây spawn 2
+	// process song song, nhân đôi thời gian + pid trên VM 1 CPU).
+	cmd := exec.CommandContext(ctx, y.BinPath,
+		"--print", "%(title)s\t%(url)s",
 		"-f", "bestaudio",
 		"--no-warnings",
 		"--no-playlist",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 
-	var titleOut, titleErr bytes.Buffer
-	titleCmd.Stdout = &titleOut
-	titleCmd.Stderr = &titleErr
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 
-	urlCmd := exec.CommandContext(ctx, y.BinPath,
-		"-g",
-		"-f", "bestaudio",
-		"--no-warnings",
-		"--no-playlist",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
-
-	var urlOut, urlErr bytes.Buffer
-	urlCmd.Stdout = &urlOut
-	urlCmd.Stderr = &urlErr
-
-	// Run both in parallel via goroutines.
-	type cmdResult struct {
-		output string
-		err    error
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("yt-dlp stream info: %w: %s", err, stderr.String())
 	}
 
-	titleCh := make(chan cmdResult, 1)
-	urlCh := make(chan cmdResult, 1)
-
-	go func() {
-		err := titleCmd.Run()
-		titleCh <- cmdResult{strings.TrimSpace(titleOut.String()), err}
-	}()
-
-	go func() {
-		err := urlCmd.Run()
-		urlCh <- cmdResult{strings.TrimSpace(urlOut.String()), err}
-	}()
-
-	urlResult := <-urlCh
-	if urlResult.err != nil {
-		return nil, fmt.Errorf("yt-dlp stream URL: %w: %s", urlResult.err, urlErr.String())
-	}
-
-	audioURL := urlResult.output
-	if audioURL == "" {
+	line := strings.TrimSpace(out.String())
+	title, audioURL, found := strings.Cut(line, "\t")
+	if !found || audioURL == "" {
 		return nil, fmt.Errorf("yt-dlp returned empty URL for %s", videoID)
 	}
 
-	// yt-dlp may return multiple lines (video+audio); take the first.
+	// yt-dlp có thể in nhiều dòng (video+audio); lấy dòng đầu.
 	if idx := strings.Index(audioURL, "\n"); idx > 0 {
 		audioURL = audioURL[:idx]
 	}
-
-	titleResult := <-titleCh
-	title := titleResult.output
-	if title == "" {
+	if title == "" || title == "NA" {
 		title = videoID // fallback to video ID
 	}
 
@@ -349,11 +386,17 @@ func isOpusFile(path string) bool {
 
 // VideoTitle returns the title of the video.
 func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, error) {
+	if err := acquireYtdlp(ctx); err != nil {
+		return "", err
+	}
+	defer releaseYtdlp()
+
 	cmd := exec.CommandContext(ctx, y.BinPath,
 		"--print", "%(title)s",
 		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 
@@ -373,6 +416,11 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 }
 
 func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (MusicMetadata, error) {
+	if err := acquireYtdlp(ctx); err != nil {
+		return MusicMetadata{}, err
+	}
+	defer releaseYtdlp()
+
 	metaCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
@@ -381,6 +429,7 @@ func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (Music
 		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 
@@ -425,6 +474,11 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 	}
 
 	// Fallback to yt-dlp if direct fetch fails.
+	if err := acquireYtdlp(ctx); err != nil {
+		return nil, err
+	}
+	defer releaseYtdlp()
+
 	ytdlpCtx, ytdlpCancel := context.WithTimeout(ctx, 6*time.Second)
 	defer ytdlpCancel()
 
@@ -448,6 +502,7 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		"-o", outTmpl,
 		"--no-warnings",
 		"--no-playlist",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 
@@ -536,6 +591,11 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 	return result, nil
 }
 func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
+	if err := acquireYtdlp(ctx); err != nil {
+		return ""
+	}
+	defer releaseYtdlp()
+
 	langCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(langCtx, binPath,
@@ -543,6 +603,7 @@ func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
 		"--skip-download",
 		"--no-warnings",
 		"--no-playlist",
+		"--force-ipv4",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
 	var out bytes.Buffer

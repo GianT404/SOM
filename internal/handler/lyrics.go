@@ -7,11 +7,17 @@ import (
 	"strconv"
 	"time"
 
+	"som/internal/cache"
 	"som/internal/scraper"
 )
 
 type LyricsHandler struct {
 	Scraper scraper.Scraper
+
+	// cache lưu kết quả lyrics đã merge (LRCLib + YouTube) theo key video.
+	// Lời gắn với video hiếm khi đổi nên cache 7 ngày, tránh spawn yt-dlp
+	// mỗi lần chơi lại bài cũ.
+	cache *cache.TTLCache[[]scraper.LyricsData]
 }
 
 func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +37,18 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		duration = d
+	}
+
+	// Cache key kèm hint từ client để tránh phục vụ nhầm lyrics khi metadata
+	// truyền lên khác nhau.
+	cacheKey := id + "|" + title + "|" + artist + "|" + durationStr
+	if h.cache == nil {
+		h.cache = cache.NewTTL[[]scraper.LyricsData](500, 7*24*time.Hour)
+	}
+	if v, ok := h.cache.Get(cacheKey); ok {
+		log.Printf("lyrics: cache hit for %s", id)
+		writeJSON(w, http.StatusOK, v)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
@@ -100,6 +118,7 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if len(combined) > 0 {
 		log.Printf("lyrics: OK for %s (%d language track(s))", id, len(combined))
+		h.cache.Put(cacheKey, combined)
 		writeJSON(w, http.StatusOK, combined)
 		return
 	}
@@ -113,5 +132,8 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("lyrics: both LRCLib and YouTube CC failed for %s (lrclib_err=%v youtube_err=%v)",
 		id, lrclibErr, youtubeErr)
-	writeJSON(w, http.StatusOK, []scraper.LyricsData{})
+	// Cache cả kết quả rỗng để không phải spawn yt-dlp lại cho bài không có lời.
+	empty := []scraper.LyricsData{}
+	h.cache.Put(cacheKey, empty)
+	writeJSON(w, http.StatusOK, empty)
 }

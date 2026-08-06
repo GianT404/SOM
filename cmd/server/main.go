@@ -148,6 +148,9 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(3 * time.Minute))
 	r.Use(corsMiddleware)
+	// gzip cho payload JSON nhỏ (search/lyrics/resolve/register). Không liệt
+	// kê audio/ogg nên endpoint /stream không bị nén (tránh buffer/độ trễ).
+	r.Use(middleware.Compress(5, "application/json", "text/html", "text/plain"))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"som/internal/scraper"
 )
@@ -38,6 +41,50 @@ func NewStreamHandler(sc scraper.Scraper) *StreamHandler {
 // silenceremoveFilter cắt mọi khoảng lặng < -50dB kéo dài >= 1s.
 // stop_periods=-1 nghĩa là trim TẤT CẢ các khoảng lặng (đầu, giữa, cuối).
 var silenceremoveFilter = "silenceremove=start_periods=1:start_threshold=-50dB:start_duration=1:stop_periods=-1:stop_threshold=-50dB:stop_duration=1"
+
+// cleanCacheTTL khớp vòng đời URL chữ ký YouTube (~6h). Bản clean chỉ phụ
+// thuộc videoID nên có thể cache theo videoID mà không cần đối chiếu URL.
+const cleanCacheTTL = 6 * time.Hour
+
+// cleanLocks chặn 2 request ?clean=1 cùng transcode cho một video.
+var cleanLocks = newKeyedLock()
+
+type lockEntry struct {
+	mu  sync.Mutex
+	ref int
+}
+
+type keyedLock struct {
+	mu    sync.Mutex
+	locks map[string]*lockEntry
+}
+
+func newKeyedLock() *keyedLock {
+	return &keyedLock{locks: make(map[string]*lockEntry)}
+}
+
+func (k *keyedLock) Lock(key string) func() {
+	k.mu.Lock()
+	e, ok := k.locks[key]
+	if !ok {
+		e = &lockEntry{}
+		k.locks[key] = e
+	}
+	e.ref++
+	k.mu.Unlock()
+
+	e.mu.Lock()
+
+	return func() {
+		e.mu.Unlock()
+		k.mu.Lock()
+		e.ref--
+		if e.ref == 0 {
+			delete(k.locks, key)
+		}
+		k.mu.Unlock()
+	}
+}
 
 // safeFilename strips characters that are invalid in filenames.
 // \x00-\x1f loại bỏ control characters (gồm CRLF) để chống header injection
@@ -112,10 +159,24 @@ func (c *cappedBuffer) String() string {
 }
 
 // proxyClean tải CDN URL rồi pipe qua ffmpeg silenceremove, stream kết quả
-// về client dưới dạng ogg/opus. Dùng context tách khỏi timeout 3 phút của
-// router (stream dài), nhưng vẫn bị cắt khi client ngắt kết nối.
+// về client dưới dạng ogg/opus. Kết quả được ghi vào /tmp/dopus-clean-<id>.ogg
+// để lần sau serve thẳng (đỡ tốn CPU transcode lại). Dùng context tách khỏi
+// timeout 3 phút của router (stream dài), nhưng vẫn bị cắt khi client ngắt.
 func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcURL, filename string) {
 	ctx := context.WithoutCancel(r.Context())
+	videoID := r.URL.Query().Get("id")
+	cleanPath := filepath.Join(os.TempDir(), fmt.Sprintf("dopus-clean-%s.ogg", videoID))
+
+	if h.serveCachedClean(w, r, filename, cleanPath) {
+		return
+	}
+
+	// Tránh 2 request cùng lúc cùng transcode cho 1 video.
+	unlock := cleanLocks.Lock(videoID)
+	defer unlock()
+	if h.serveCachedClean(w, r, filename, cleanPath) {
+		return
+	}
 
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-hide_banner", "-loglevel", "error",
@@ -141,6 +202,13 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcUR
 		return
 	}
 
+	// Ghi đồng thời ra client và file cache (rename khi transcode thành công).
+	partPath := cleanPath + ".part"
+	cacheOut, cerr := os.Create(partPath)
+	if cerr != nil {
+		cacheOut = nil // không cache được thì vẫn stream như cũ
+	}
+
 	w.Header().Set("Content-Type", "audio/ogg")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.WriteHeader(http.StatusOK)
@@ -153,6 +221,13 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcUR
 			if _, werr := w.Write(buf[:n]); werr != nil {
 				_ = cmd.Process.Kill()
 				break
+			}
+			if cacheOut != nil {
+				if _, cerr := cacheOut.Write(buf[:n]); cerr != nil {
+					_ = cacheOut.Close()
+					_ = os.Remove(partPath)
+					cacheOut = nil
+				}
 			}
 			if flusher != nil {
 				flusher.Flush()
@@ -169,5 +244,31 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcUR
 		} else {
 			log.Printf("stream: ffmpeg clean error: %v", err)
 		}
+		if cacheOut != nil {
+			_ = cacheOut.Close()
+		}
+		_ = os.Remove(partPath)
+		return
 	}
+
+	if cacheOut != nil {
+		_ = cacheOut.Close()
+		if err := os.Rename(partPath, cleanPath); err != nil {
+			log.Printf("stream: cache rename error: %v", err)
+		}
+	}
+}
+
+// serveCachedClean serve thẳng file clean nếu có bản còn tươi. Trả về true
+// nếu đã serve xong.
+func (h *StreamHandler) serveCachedClean(w http.ResponseWriter, r *http.Request, filename, path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil || time.Since(fi.ModTime()) > cleanCacheTTL {
+		return false
+	}
+	log.Printf("stream: serving cached clean file for %s", r.URL.Query().Get("id"))
+	w.Header().Set("Content-Type", "audio/ogg")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	http.ServeFile(w, r, path)
+	return true
 }

@@ -4,11 +4,22 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"som/internal/cache"
 )
 
 const (
 	searchCacheTTL = 5 * time.Minute
-	streamCacheTTL = 50 * time.Minute
+	// URL chữ ký YouTube sống ~6h nên cache 4h là an toàn, giảm đáng kể số
+	// lần phải chạy lại yt-dlp khi replay một bài.
+	streamCacheTTL = 4 * time.Hour
+
+	// Lời bài hát/caption gắn với video hiếm khi đổi nên cache lâu, bỏ hẳn
+	// việc spawn yt-dlp khi chơi lại bài cũ.
+	lyricsCacheTTL   = 7 * 24 * time.Hour
+	maxLyricsCache   = 500
+	metadataCacheTTL = 24 * time.Hour
+	maxMetadataCache = 1000
 )
 
 type searchCacheEntry struct {
@@ -38,6 +49,9 @@ type ResilientScraper struct {
 	streamMu    sync.Mutex
 	streamCache map[string]streamCacheEntry
 
+	lyricsCache *cache.TTLCache[[]LyricsData]
+	metaCache   *cache.TTLCache[MusicMetadata]
+
 	searchCB *circuitBreaker
 	streamCB *circuitBreaker
 
@@ -50,6 +64,8 @@ func NewResilientScraper(inner Scraper) *ResilientScraper {
 		inner:        inner,
 		searchCache:  make(map[string]searchCacheEntry),
 		streamCache:  make(map[string]streamCacheEntry),
+		lyricsCache:  cache.NewTTL[[]LyricsData](maxLyricsCache, lyricsCacheTTL),
+		metaCache:    cache.NewTTL[MusicMetadata](maxMetadataCache, metadataCacheTTL),
 		searchCB:     newCircuitBreaker(5, 30*time.Second),
 		streamCB:     newCircuitBreaker(5, 30*time.Second),
 		searchFlight: make(map[string]*searchFlight),
@@ -161,9 +177,25 @@ func (s *ResilientScraper) VideoTitle(ctx context.Context, videoID string) (stri
 }
 
 func (s *ResilientScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData, error) {
-	return s.inner.Lyrics(ctx, videoID)
+	if v, ok := s.lyricsCache.Get(videoID); ok {
+		return v, nil
+	}
+	data, err := s.inner.Lyrics(ctx, videoID)
+	if err != nil {
+		return nil, err
+	}
+	s.lyricsCache.Put(videoID, data)
+	return data, nil
 }
 
 func (s *ResilientScraper) VideoMetadata(ctx context.Context, videoID string) (MusicMetadata, error) {
-	return s.inner.VideoMetadata(ctx, videoID)
+	if v, ok := s.metaCache.Get(videoID); ok {
+		return v, nil
+	}
+	meta, err := s.inner.VideoMetadata(ctx, videoID)
+	if err != nil {
+		return MusicMetadata{}, err
+	}
+	s.metaCache.Put(videoID, meta)
+	return meta, nil
 }
