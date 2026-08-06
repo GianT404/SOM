@@ -73,6 +73,9 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	safe := strings.ReplaceAll(msg, `"`, `\"`)
-	w.Write([]byte(`{"error":"` + safe + `"}`))
+	body, err := json.Marshal(map[string]string{"error": msg})
+	if err != nil {
+		body = []byte(`{"error":"internal error"}`)
+	}
+	w.Write(body)
 }
