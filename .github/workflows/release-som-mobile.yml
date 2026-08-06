@@ -49,17 +49,44 @@ jobs:
         run: |
           npx expo prebuild -p android --no-install
 
+      # Tạo keystore release. Nếu có secret ANDROID_KEYSTORE_BASE64 thì dùng
+      # keystore cố định (không đổi chữ ký giữa các bản), ngược lại tự sinh một
+      # keystore dùng 1 lần (vẫn build được, nhưng mỗi bản một chữ ký khác nhau).
+      #
+      # Cách tạo keystore cố định:
+      #   keytool -genkeypair -v -keystore som-release.jks -alias upload \
+      #     -keyalg RSA -keysize 2048 -validity 10000
+      #   base64 -w0 som-release.jks   # đem giá trị này đặt vào secret
+      - name: Setup release signing keystore
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
+            echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
+              -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass changeit -keypass changeit \
+              -dname "CN=SOM, OU=Dev, O=SOM, L=HCM, ST=VN, C=VN" >/dev/null 2>&1
+            echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=changeit" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=upload" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=changeit" >> "$GITHUB_ENV"
+          fi
+
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: app/android
         run: |
-          ./gradlew :app:assembleDebug --no-daemon
+          ./gradlew :app:assembleRelease --no-daemon
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/android/app/build/outputs/apk/debug/app-debug.apk
+            app/android/app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
