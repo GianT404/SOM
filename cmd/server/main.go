@@ -53,51 +53,11 @@ func main() {
 	sc := scraper.NewYtdlpScraper(ytdlpPath)
 	resilientSc := scraper.NewResilientScraper(sc)
 
-	searchH := &handler.SearchHandler{Scraper: resilientSc}
-	streamH := handler.NewStreamHandler(resilientSc)
-	lyricsH := &handler.LyricsHandler{Scraper: resilientSc}
-	resolveH := &handler.ResolveHandler{Scraper: resilientSc}
-
-	generalLimiter := backend.NewIPRateLimiter(2, 20)
-	heavyLimiter := backend.NewIPRateLimiter(0.2, 5)
-
 	// Device registry: per-device token auth cho mobile app.
 	deviceReg := backend.NewDeviceRegistry()
 	deviceReg.BanFromEnv(os.Getenv("BANNED_DEVICES"))
-	registerLimiter := backend.NewIPRateLimiter(1, 5)
 
-	// Build the chi router
-	r := chi.NewRouter()
-
-	// Middleware stack
-	// r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(3 * time.Minute))
-	r.Use(corsMiddleware)
-
-	// Health check
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","service":"dopus"}`))
-	})
-
-	// API v1 routes
-	r.Route("/api/v1", func(r chi.Router) {
-		// Register là endpoint công khai để app xin token per-device.
-		// Rate limit riêng theo IP chống spam đăng ký.
-		r.With(registerLimiter.Middleware).Post("/auth/register", registerHandler(deviceReg))
-
-		// Mọi route còn lại yêu cầu X-API-Key (key tĩnh trên server) hoặc
-		// X-Device-Token hợp lệ. Rate limit theo device_id khi đã xác thực.
-		r.Use(backend.AuthMiddleware(apiKey, deviceReg))
-		r.Use(generalLimiter.Middleware)
-
-		r.Get("/search", searchH.ServeHTTP)
-		r.Get("/lyrics", lyricsH.ServeHTTP)
-
-		r.With(heavyLimiter.Middleware).Get("/stream", streamH.ServeHTTP)
-		r.With(heavyLimiter.Middleware).Get("/resolve", resolveH.ServeHTTP)
-	})
+	r := newRouter(resilientSc, apiKey, deviceReg)
 
 	// Create the HTTP server
 	srv := &http.Server{
@@ -169,6 +129,52 @@ func serverAddr(host string, port string) string {
 		return ":" + port
 	}
 	return net.JoinHostPort(host, port)
+}
+
+// newRouter dựng toàn bộ chi router (tách riêng để test wiring mà không cần
+// khởi động server). Lưu ý: chi yêu cầu Use() phải đặt TRƯỚC khi khai route
+// trên cùng một mux — các route cần auth phải nằm trong Group().
+func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.DeviceRegistry) http.Handler {
+	searchH := &handler.SearchHandler{Scraper: sc}
+	streamH := handler.NewStreamHandler(sc)
+	lyricsH := &handler.LyricsHandler{Scraper: sc}
+	resolveH := &handler.ResolveHandler{Scraper: sc}
+
+	generalLimiter := backend.NewIPRateLimiter(2, 20)
+	heavyLimiter := backend.NewIPRateLimiter(0.2, 5)
+	registerLimiter := backend.NewIPRateLimiter(1, 5)
+
+	r := chi.NewRouter()
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(3 * time.Minute))
+	r.Use(corsMiddleware)
+
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","service":"dopus"}`))
+	})
+
+	// API v1 routes
+	r.Route("/api/v1", func(r chi.Router) {
+		// Register là endpoint công khai để app xin token per-device.
+		// Rate limit riêng theo IP chống spam đăng ký.
+		r.With(registerLimiter.Middleware).Post("/auth/register", registerHandler(deviceReg))
+
+		// Mọi route còn lại yêu cầu X-API-Key (key tĩnh trên server) hoặc
+		// X-Device-Token hợp lệ. Rate limit theo device_id khi đã xác thực.
+		r.Group(func(r chi.Router) {
+			r.Use(backend.AuthMiddleware(apiKey, deviceReg))
+			r.Use(generalLimiter.Middleware)
+
+			r.Get("/search", searchH.ServeHTTP)
+			r.Get("/lyrics", lyricsH.ServeHTTP)
+
+			r.With(heavyLimiter.Middleware).Get("/stream", streamH.ServeHTTP)
+			r.With(heavyLimiter.Middleware).Get("/resolve", resolveH.ServeHTTP)
+		})
+	})
+
+	return r
 }
 
 // registerHandler cấp token per-device. Body: {"device_id": "..."}.
