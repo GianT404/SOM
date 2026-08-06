@@ -48,15 +48,6 @@ jobs:
         working-directory: app
         run: |
           npx expo prebuild -p android --no-install
-
-      # Tạo keystore release. Nếu có secret ANDROID_KEYSTORE_BASE64 thì dùng
-      # keystore cố định (không đổi chữ ký giữa các bản), ngược lại tự sinh một
-      # keystore dùng 1 lần (vẫn build được, nhưng mỗi bản một chữ ký khác nhau).
-      #
-      # Cách tạo keystore cố định:
-      #   keytool -genkeypair -v -keystore som-release.jks -alias upload \
-      #     -keyalg RSA -keysize 2048 -validity 10000
-      #   base64 -w0 som-release.jks   # đem giá trị này đặt vào secret
       - name: Setup release signing keystore
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
