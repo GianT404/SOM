@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -52,10 +53,11 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, scraper.ErrCircuitOpen) {
 			w.Header().Set("Retry-After", "30")
-			writeError(w, http.StatusServiceUnavailable, err.Error())
+			writeError(w, http.StatusServiceUnavailable, "search temporarily unavailable, try again later")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("search: error for %q: %v", q, err)
+		writeError(w, http.StatusInternalServerError, "search failed, please try again later")
 		return
 	}
 
