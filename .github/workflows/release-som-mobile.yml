@@ -48,23 +48,49 @@ jobs:
         working-directory: app
         run: |
           npx expo prebuild -p android --no-install
+      # Tạo keystore release. Nếu có secret ANDROID_KEYSTORE_BASE64 hợp lệ thì
+      # dùng keystore cố định (không đổi chữ ký giữa các bản), ngược lại tự sinh
+      # một keystore dùng 1 lần (vẫn build được, nhưng mỗi bản một chữ ký khác nhau).
+      #
+      # Cách tạo keystore cố định:
+      #   keytool -genkeypair -v -keystore som-release.jks -alias upload \
+      #     -keyalg RSA -keysize 2048 -validity 10000
+      #   base64 -w0 som-release.jks   # đem giá trị này đặt vào secret
       - name: Setup release signing keystore
         run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
-            echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
-          else
-            keytool -genkeypair -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
+          set -e
+          KEYS="$GITHUB_WORKSPACE"
+          gen_temp() {
+            keytool -genkeypair -v -keystore "$KEYS/release.keystore" \
               -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass changeit -keypass changeit \
               -dname "CN=SOM, OU=Dev, O=SOM, L=HCM, ST=VN, C=VN" >/dev/null 2>&1
-            echo "ANDROID_KEYSTORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_FILE=$KEYS/release.keystore" >> "$GITHUB_ENV"
             echo "ANDROID_KEYSTORE_PASSWORD=changeit" >> "$GITHUB_ENV"
             echo "ANDROID_KEY_ALIAS=upload" >> "$GITHUB_ENV"
             echo "ANDROID_KEY_PASSWORD=changeit" >> "$GITHUB_ENV"
+          }
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            BASE64=$(printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '[:space:]')
+            if printf '%s' "$BASE64" | base64 -d > "$KEYS/keystore.jks" 2>/dev/null && [ -s "$KEYS/keystore.jks" ]; then
+              if keytool -list -keystore "$KEYS/keystore.jks" \
+                -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+                -alias "${{ secrets.ANDROID_KEY_ALIAS }}" >/dev/null 2>&1; then
+                echo "ANDROID_KEYSTORE_FILE=$KEYS/keystore.jks" >> "$GITHUB_ENV"
+                echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+                echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+                echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+              else
+                echo "::warning::Keystore đọc được nhưng password/alias không khớp, tự sinh keystore tạm"
+                gen_temp
+              fi
+            else
+              echo "::warning::ANDROID_KEYSTORE_BASE64 không decode được, tự sinh keystore tạm"
+              gen_temp
+            fi
+          else
+            echo "::warning::Chưa đặt ANDROID_KEYSTORE_BASE64, tự sinh keystore tạm"
+            gen_temp
           fi
 
       - name: Cache Gradle
