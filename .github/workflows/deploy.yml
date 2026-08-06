@@ -16,7 +16,7 @@ on:
           - 'Dockerfile'
           - 'docker-compose.yml'
           - 'Caddyfile'
-          - '.github/workflows/**'
+          - '.github/workflows/deploy.yml'
           
 jobs:
   test:
