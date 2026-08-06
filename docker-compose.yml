@@ -5,6 +5,10 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      # Chỉ Caddy (cùng docker network) mới chạm được backend; tin XFF từ
+      # network này để lấy IP client thật. Mặc định không tin XFF nếu thiếu.
+      - TRUSTED_PROXIES=172.16.0.0/12
     mem_limit: 512m
     cpus: "1.0"
     pids_limit: 128

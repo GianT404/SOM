@@ -59,6 +59,11 @@ func (k *keyedLock) Lock(key string) func() {
 
 var downloadLocks = newKeyedLock()
 
+// maxCachedAudioFiles giới hạn số file opus cache trong temp dir.
+// Quá ngưỡng thì evict các file lâu không dùng nhất (LRU theo modtime),
+// tránh bị bơm đầy disk khi ai đó spam /stream với nhiều videoID độc nhất.
+const maxCachedAudioFiles = 50
+
 // cleanup chạy định kỳ suốt vòng đời process, thay vì chỉ chạy 1 lần.
 func init() {
 	go func() {
@@ -74,10 +79,32 @@ func init() {
 func cleanupStaleTempFiles() {
 	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus*.opus"))
 	now := time.Now()
+
+	type fileEntry struct {
+		path string
+		mod  time.Time
+	}
+	var fresh []fileEntry
 	for _, f := range matches {
 		info, err := os.Stat(f)
-		if err == nil && now.Sub(info.ModTime()) > 1*time.Hour {
+		if err != nil {
+			continue
+		}
+		// File cũ hơn 1h: xóa hẳn (cache không còn giá trị).
+		if now.Sub(info.ModTime()) > 1*time.Hour {
 			os.Remove(f)
+			continue
+		}
+		fresh = append(fresh, fileEntry{path: f, mod: info.ModTime()})
+	}
+
+	// Vẫn vượt ngưỡng: evict các file cũ nhất tới khi đủ dưới cap.
+	if len(fresh) > maxCachedAudioFiles {
+		sort.Slice(fresh, func(i, j int) bool {
+			return fresh[i].mod.Before(fresh[j].mod)
+		})
+		for _, e := range fresh[:len(fresh)-maxCachedAudioFiles] {
+			os.Remove(e.path)
 		}
 	}
 }
@@ -91,6 +118,8 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	if isOpusFile(tempFile) {
 		return tempFile, nil
 	}
+	// Sắp tạo file mới: trước tiên dọn bớt nếu đã vượt cap.
+	cleanupStaleTempFiles()
 	_ = os.Remove(tempFile)
 	cmd := exec.CommandContext(ctx, y.BinPath,
 		"-f", "bestaudio",

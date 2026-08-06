@@ -4,10 +4,51 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 )
+
+// trustedProxies là danh sách IP/CIDR được phép cung cấp X-Forwarded-For,
+// cấu hình qua biến môi trường TRUSTED_PROXIES (phân cách bằng dấu phẩy).
+// Rỗng = KHÔNG tin XFF, chỉ dùng IP kết nối trực tiếp (an toàn mặc định).
+var trustedProxies = parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"))
+
+func parseTrustedProxies(s string) []*net.IPNet {
+	var out []*net.IPNet
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.Contains(p, "/") {
+			if _, ipnet, err := net.ParseCIDR(p); err == nil {
+				out = append(out, ipnet)
+			}
+			continue
+		}
+		ip := net.ParseIP(p)
+		if ip == nil {
+			continue
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		out = append(out, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+	return out
+}
+
+func isTrustedProxy(ip net.IP) bool {
+	for _, n := range trustedProxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
 
 type visitor struct {
 	tokens   float64
@@ -89,17 +130,24 @@ func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 }
 
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		last := strings.TrimSpace(parts[len(parts)-1])
-		if last != "" {
-			return last
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+
+	peer := net.ParseIP(host)
+	// Chỉ tin XFF khi peer trực tiếp là proxy đã cấu hình (vd Caddy trong
+	// docker network). Nếu backend bị lộ ra ngoài, attacker không thể tự đặt
+	// XFF để giả IP nữa vì peer của nó không nằm trong trustedProxies.
+	if peer != nil && isTrustedProxy(peer) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			last := strings.TrimSpace(parts[len(parts)-1])
+			if last != "" {
+				return last
+			}
 		}
 	}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
 	return host
 }
