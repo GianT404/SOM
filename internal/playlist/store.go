@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type Playlist struct {
 
 type Store struct {
 	filePath string
+	mu       sync.Mutex
 }
 
 func NewStore() (*Store, error) {
@@ -41,8 +43,13 @@ func NewStore() (*Store, error) {
 	}, nil
 }
 
-// Load đọc tất cả playlist từ file
 func (s *Store) Load() ([]Playlist, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.load()
+}
+
+func (s *Store) load() ([]Playlist, error) {
 	data, err := os.ReadFile(s.filePath)
 	if os.IsNotExist(err) {
 		return []Playlist{}, nil
@@ -58,15 +65,55 @@ func (s *Store) Load() ([]Playlist, error) {
 }
 
 func (s *Store) Save(playlists []Playlist) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.save(playlists)
+}
+
+// save ghi atomic: ghi ra file tạm cùng thư mục rồi rename đè lên file đích.
+// os.Rename là 1 syscall duy nhất trên cùng filesystem, nên nếu process crash
+// hoặc mất điện giữa lúc ghi, playlists.json cũ vẫn nguyên vẹn (không bao giờ
+// ở trạng thái ghi dở dang) thay vì bị hỏng như os.WriteFile trực tiếp trước đây.
+func (s *Store) save(playlists []Playlist) error {
 	data, err := json.MarshalIndent(playlists, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.filePath, data, 0o644)
+
+	dir := filepath.Dir(s.filePath)
+	tmp, err := os.CreateTemp(dir, ".playlists-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if err := os.Rename(tmpPath, s.filePath); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func (s *Store) CreatePlaylist(name string) (Playlist, error) {
-	playlists, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	playlists, err := s.load()
 	if err != nil {
 		return Playlist{}, err
 	}
@@ -77,14 +124,17 @@ func (s *Store) CreatePlaylist(name string) (Playlist, error) {
 	}
 
 	playlists = append(playlists, pl)
-	if err := s.Save(playlists); err != nil {
+	if err := s.save(playlists); err != nil {
 		return Playlist{}, err
 	}
 	return pl, nil
 }
 
 func (s *Store) DeletePlaylist(id string) error {
-	playlists, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	playlists, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -96,32 +146,37 @@ func (s *Store) DeletePlaylist(id string) error {
 		}
 	}
 
-	return s.Save(filtered)
+	return s.save(filtered)
 }
 
 func (s *Store) AddTrack(playlistID string, track Track) error {
-	playlists, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	playlists, err := s.load()
 	if err != nil {
 		return err
 	}
 
 	for i, p := range playlists {
 		if p.ID == playlistID {
-			// Kiểm tra trùng lặp
 			for _, t := range p.Tracks {
 				if t.ID == track.ID {
 					return fmt.Errorf("bài hát đã có trong playlist")
 				}
 			}
 			playlists[i].Tracks = append(playlists[i].Tracks, track)
-			return s.Save(playlists)
+			return s.save(playlists)
 		}
 	}
 	return fmt.Errorf("không tìm thấy playlist")
 }
 
 func (s *Store) RemoveTrack(playlistID string, trackID string) error {
-	playlists, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	playlists, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -135,7 +190,7 @@ func (s *Store) RemoveTrack(playlistID string, trackID string) error {
 				}
 			}
 			playlists[i].Tracks = filtered
-			return s.Save(playlists)
+			return s.save(playlists)
 		}
 	}
 	return fmt.Errorf("không tìm thấy playlist")

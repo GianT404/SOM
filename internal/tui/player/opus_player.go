@@ -87,10 +87,10 @@ func (p *Player) Play(filePath string) error {
 }
 
 func (p *Player) playFrom(filePath string, startSec int) error {
-	p.Stop()
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	p.stopLocked()
 
 	if p.otoCtx == nil {
 		return fmt.Errorf("oto context is not initialized")
@@ -150,7 +150,10 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 func (p *Player) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.stopLocked()
 
+}
+func (p *Player) stopLocked() {
 	if p.state != Stopped {
 		if p.player != nil {
 			_ = p.player.Close()
@@ -162,7 +165,6 @@ func (p *Player) Stop() {
 		p.currentPath = ""
 	}
 }
-
 func (p *Player) TogglePause() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
