@@ -6,19 +6,19 @@ INSTALL_DIR="/usr/local/bin"
 
 info()  { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 warn()  { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
-error() { printf '\033[1;31mLỖI:\033[0m %s\n' "$1" >&2; exit 1; }
+error() { printf '\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
 
 install_deps() {
-	# 1. Kéo yt-dlp
+	# 1. Fetch yt-dlp
 	if ! command -v yt-dlp >/dev/null 2>&1; then
 		info "Downloading yt-dlp..."
 		sudo curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o /usr/local/bin/yt-dlp
 		sudo chmod a+rx /usr/local/bin/yt-dlp
 	else
-		warn "yt-dlp đã có — bỏ qua tự cập nhật (lệnh 'yt-dlp -U' hay bị GitHub rate-limit; muốn cập nhật thì chạy riêng: yt-dlp -U)"
+		warn "yt-dlp already installed — skipping self-update ('yt-dlp -U' often hits GitHub rate limits; update manually with: yt-dlp -U)"
 	fi
 
-	# 2. Kéo FFmpeg Static Build
+	# 2. Fetch FFmpeg static build
 	if ! command -v ffmpeg >/dev/null 2>&1; then
 		info "Downloading FFmpeg static build..."
 		if [ "$(uname -s)" = "Linux" ]; then
@@ -33,10 +33,13 @@ install_deps() {
 			rm /tmp/ffmpeg.zip
 		fi
 	else
-		info "FFmpeg already."
+		info "FFmpeg already installed."
 	fi
 }
 
+# Find the newest release that actually contains an asset named <name>.
+# Avoids the GitHub API (rate-limited, 403) by reading the releases.atom feed
+# and probing each tag's asset URL with a HEAD request.
 latest_release_with_asset() {
 	local name="$1"
 	curl -fsSL "https://github.com/$REPO/releases.atom" |
@@ -51,7 +54,7 @@ latest_release_with_asset() {
 }
 
 install_som() {
-	local os arch asset tag tmp url
+	local os arch asset tag tmp url resolved
 	case "$(uname -s)" in
 		Linux)  os="linux" ;;
 		Darwin) os="darwin" ;;
@@ -64,22 +67,31 @@ install_som() {
 	esac
 
 	asset="som-${os}-${arch}"
-	info "Tìm bản mới nhất của ($asset)..."
+	info "Looking for the latest build of ($asset)..."
 
+	# "releases/latest" points to the most recently created release (e.g. a
+	# mobile APK release without the TUI binary), so resolve the tag ourselves.
 	tag="$(latest_release_with_asset "$asset")"
 	if [ -z "$tag" ]; then
-		error "Không tìm thấy release nào có asset $asset (workflow TUI chưa build cho platform này?)"
+		error "No release found containing asset $asset (TUI workflow not built for this platform?)"
 	fi
 
 	tmp="$(mktemp -d)"
 	url="https://github.com/$REPO/releases/download/$tag/$asset"
-	info "($asset) ← $tag"
+	info "($asset) <- $tag"
 	curl -fsSL "$url" -o "$tmp/som"
 	chmod +x "$tmp/som"
 
-	info "Install $INSTALL_DIR/som ..."
+	info "Installing $INSTALL_DIR/som ..."
 	sudo mv "$tmp/som" "$INSTALL_DIR/som"
 	rm -rf "$tmp"
+
+	# Warn if an older som earlier in PATH shadows the one we just installed.
+	resolved="$(type -P som 2>/dev/null || true)"
+	if [ -n "$resolved" ] && [ "$resolved" != "$INSTALL_DIR/som" ]; then
+		warn "PATH prefers '$resolved' (an old copy) over the new $INSTALL_DIR/som."
+		warn "Remove the old copy to use the new one:  rm \"$resolved\""
+	fi
 }
 
 install_deps
