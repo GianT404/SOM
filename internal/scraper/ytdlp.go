@@ -107,6 +107,17 @@ func cleanupStaleTempFiles() {
 			os.Remove(e.path)
 		}
 	}
+
+	// Subtitle files (dopus<id>.*.vtt) chỉ dùng nhất thời trong lúc parse;
+	// nếu process bị kill giữa chừng chúng thành rác vĩnh viễn. File đang
+	// được xử lý luôn mới (< 10 phút) nên xóa bản cũ hơn là an toàn.
+	vttMatches, _ := filepath.Glob(filepath.Join(os.TempDir(), "dopus*.vtt"))
+	for _, f := range vttMatches {
+		info, err := os.Stat(f)
+		if err == nil && now.Sub(info.ModTime()) > 10*time.Minute {
+			os.Remove(f)
+		}
+	}
 }
 
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {

@@ -52,23 +52,51 @@ func buildCandidateList(meta MusicMetadata, rawTitle string) []lyricsCandidate {
 // FetchLyrics là entrypoint DUY NHẤT để lấy lyrics từ LRCLib.
 //
 // Pipeline: build danh sách candidate (metadata trước, title-parsing sau) ->
-// với từng candidate: /api/get (exact) rồi fallback /api/search, chấm điểm và
-// validate confidence (xem lookupLRCLibCandidate) -> trả kết quả tin cậy đầu
-// tiên tìm được, hoặc lỗi nếu không candidate nào đủ tin cậy.
+// chạy SONG SONG tối đa maxLRCLibCandidates candidate (mỗi candidate thử
+// /api/get rồi /api/search, chấm điểm và validate confidence) -> trả kết quả
+// tin cậy đầu tiên tìm được, hoặc lỗi nếu không candidate nào đủ tin cậy.
+//
+// Song song + giới hạn số candidate giúp không cháy toàn bộ budget HTTP của
+// request vào LRCLib (trước đây thử tuần tự hàng chục candidate, mỗi candidate
+// 2 call HTTP).
+const maxLRCLibCandidates = 5
+
 func FetchLyrics(ctx context.Context, meta MusicMetadata, rawTitle string, durationSec float64) ([]LyricsData, error) {
 	candidates := buildCandidateList(meta, rawTitle)
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("lrclib: không có candidate nào (thiếu cả metadata và title)")
 	}
+	if len(candidates) > maxLRCLibCandidates {
+		candidates = candidates[:maxLRCLibCandidates]
+	}
+
+	// Cancel các request LRCLib còn dang dở ngay khi tìm thấy kết quả đầu tiên.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type candResult struct {
+		cand lyricsCandidate
+		data []LyricsData
+		err  error
+	}
+	results := make(chan candResult, len(candidates))
+	for _, c := range candidates {
+		go func(c lyricsCandidate) {
+			data, err := lookupLRCLibCandidate(ctx, c.track, c.artist, durationSec)
+			results <- candResult{cand: c, data: data, err: err}
+		}(c)
+	}
 
 	var lastErr error
-	for _, c := range candidates {
-		data, err := lookupLRCLibCandidate(ctx, c.track, c.artist, durationSec)
-		if err == nil && len(data) > 0 {
-			log.Printf("lrclib: matched via %s candidate track=%q artist=%q", c.source, c.track, c.artist)
-			return data, nil
+	for i := 0; i < len(candidates); i++ {
+		r := <-results
+		if r.err == nil && len(r.data) > 0 {
+			log.Printf("lrclib: matched via %s candidate track=%q artist=%q", r.cand.source, r.cand.track, r.cand.artist)
+			return r.data, nil
 		}
-		lastErr = err
+		if r.err != nil {
+			lastErr = r.err
+		}
 	}
 
 	return nil, fmt.Errorf("lrclib: không tìm thấy lyrics đủ tin cậy cho %q (%w)", rawTitle, lastErr)

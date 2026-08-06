@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -82,15 +83,20 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		log.Printf("WindowSizeMsg: width=%d height=%d", msg.Width, msg.Height)
 		a.resizePanels()
 
 	case tickMsg:
 		a.left.animTick++
 		a.right.TickAt(a.playedAt)
 		if !a.left.loadingStream && a.player.State() == player.Stopped && a.nowPlay != nil {
+			playErr := a.player.PlaybackError()
 			a.nowPlay = nil
-			cmds = append(cmds, a.playNext())
+			if playErr != nil {
+				// Stream/file lỗi giữa chừng: dừng, không tự nhảy bài tiếp.
+				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
+			} else {
+				cmds = append(cmds, a.playNext())
+			}
 		}
 
 		cmds = append(cmds, tick())
@@ -721,10 +727,11 @@ func (a *App) setStatus(s string) {
 
 func init() {
 	home, _ := os.UserHomeDir()
-	logPath := home + "/som_debug.log"
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		panic("CANNOT OPEN LOG FILE: " + err.Error())
+	writers := []io.Writer{LogBuf}
+	if f, err := os.OpenFile(filepath.Join(home, "som_debug.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+		writers = append(writers, f)
+	} else {
+		log.Printf("warn: cannot open log file: %v", err)
 	}
-	log.SetOutput(io.MultiWriter(f, LogBuf))
+	log.SetOutput(io.MultiWriter(writers...))
 }

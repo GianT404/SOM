@@ -25,7 +25,12 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	durationStr := r.URL.Query().Get("duration")
 	var duration float64
 	if durationStr != "" {
-		duration, _ = strconv.ParseFloat(durationStr, 64)
+		d, err := strconv.ParseFloat(durationStr, 64)
+		if err != nil || d < 0 {
+			writeError(w, http.StatusBadRequest, "invalid duration")
+			return
+		}
+		duration = d
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)

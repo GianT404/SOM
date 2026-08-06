@@ -35,7 +35,9 @@ func NewStreamHandler(sc scraper.Scraper) *StreamHandler {
 }
 
 // safeFilename strips characters that are invalid in filenames.
-var reUnsafe = regexp.MustCompile(`[<>:"/\\|?*]`)
+// \x00-\x1f loại bỏ control characters (gồm CRLF) để chống header injection
+// trong Content-Disposition.
+var reUnsafe = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
 
 func safeFilename(title string) string {
 	safe := reUnsafe.ReplaceAllString(title, "")

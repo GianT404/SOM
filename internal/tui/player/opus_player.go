@@ -53,6 +53,8 @@ type Player struct {
 	currentPath string
 	startTime   time.Time
 	pauseOffset time.Duration
+	lastErr     error    // lỗi của lần phát vừa kết thúc; nil = phát hoàn tất bình thường
+	stopped     bool     // đánh dấu user chủ động stop/kill, không tính là lỗi
 	stderrBuf   syncBuffer // stderr thật của ffmpeg, để debug khi decode lỗi
 }
 
@@ -99,6 +101,8 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	p.currentPath = filePath
 	p.startTime = time.Now().Add(-time.Duration(startSec) * time.Second)
 	p.pauseOffset = 0
+	p.lastErr = nil
+	p.stopped = false
 
 	var args []string
 	if strings.HasPrefix(filePath, "http://") {
@@ -136,10 +140,15 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	p.state = Playing
 
 	go func(cmd *exec.Cmd) {
-		_ = cmd.Wait()
+		err := cmd.Wait()
 		p.mu.Lock()
 		if p.decoder == cmd {
+			// Chỉ tính là lỗi khi không phải user chủ động dừng (stop/seek/next).
+			if err != nil && !p.stopped {
+				p.lastErr = err
+			}
 			p.state = Stopped
+			p.stopped = false
 		}
 		p.mu.Unlock()
 	}(p.decoder)
@@ -155,6 +164,7 @@ func (p *Player) Stop() {
 }
 func (p *Player) stopLocked() {
 	if p.state != Stopped {
+		p.stopped = true
 		if p.player != nil {
 			_ = p.player.Close()
 		}
@@ -164,6 +174,14 @@ func (p *Player) stopLocked() {
 		p.state = Stopped
 		p.currentPath = ""
 	}
+}
+
+// PlaybackError trả về lỗi của lần phát vừa kết thúc nếu ffmpeg thoát do lỗi
+// (stream chết giữa chừng, file hỏng...). Nil nếu phát hoàn tất hoặc user dừng.
+func (p *Player) PlaybackError() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastErr
 }
 func (p *Player) TogglePause() {
 	p.mu.Lock()
