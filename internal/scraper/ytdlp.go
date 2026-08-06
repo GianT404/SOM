@@ -98,7 +98,6 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 		"--embed-metadata",
 		"-o", tempFile,
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--no-part",
 		"--", "https://www.youtube.com/watch?v="+videoID,
@@ -154,7 +153,6 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 		"--dump-json",
 		"--flat-playlist",
 		"--no-warnings",
-		"--no-check-certificates",
 	)
 
 	var stderr bytes.Buffer
@@ -227,7 +225,6 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		"--print", "%(title)s",
 		"-f", "bestaudio",
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
@@ -240,7 +237,6 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		"-g",
 		"-f", "bestaudio",
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
@@ -316,7 +312,6 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 	cmd := exec.CommandContext(ctx, y.BinPath,
 		"--print", "%(title)s",
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--skip-download",
 		"--", "https://www.youtube.com/watch?v="+videoID,
@@ -344,7 +339,6 @@ func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (Music
 	cmd := exec.CommandContext(metaCtx, y.BinPath,
 		"--print", "%(track)s|||%(artist)s",
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--skip-download",
 		"--", "https://www.youtube.com/watch?v="+videoID,
@@ -413,7 +407,6 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		"--socket-timeout", "20",
 		"-o", outTmpl,
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)
@@ -509,7 +502,6 @@ func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
 		"--print", "%(original_language)s",
 		"--skip-download",
 		"--no-warnings",
-		"--no-check-certificates",
 		"--no-playlist",
 		"--", "https://www.youtube.com/watch?v="+videoID,
 	)

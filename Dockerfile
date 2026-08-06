@@ -11,12 +11,15 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o som-backend ./cmd/server/main.go
 
 FROM alpine:latest
 
-RUN apk add --no-cache python3 py3-pip ffmpeg \
-    && pip install --no-cache-dir --break-system-packages yt-dlp
+RUN apk add --no-cache python3 py3-pip ffmpeg ca-certificates \
+    && pip install --no-cache-dir --break-system-packages yt-dlp \
+    && adduser -D -u 10001 somuser
 
-WORKDIR /root/
+WORKDIR /app
 
 COPY --from=builder /app/som-backend .
+
+USER somuser
 
 EXPOSE 8080
 
