@@ -19,10 +19,12 @@
     "expo-av": "~16.0.8",
     "expo-blur": "~55.0.8",
     "expo-build-properties": "^55.0.9",
+    "expo-crypto": "~55.0.17",
     "expo-file-system": "~55.0.10",
     "expo-font": "~55.0.4",
     "expo-linear-gradient": "~55.0.8",
     "expo-media-control": "^1.0.12",
+    "expo-secure-store": "~55.0.16",
     "expo-status-bar": "~55.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -34,9 +36,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "@types/react": "~18.3.12",
+    "@types/react": "~19.1.10",
     "patch-package": "^8.0.1",
-    "typescript": "~5.3.0"
+    "typescript": "~5.5.4"
   },
   "private": true
 }

@@ -162,7 +162,7 @@ export const downloadAndAdd = async (
     const downloadResumable = FileSystem.createDownloadResumable(
         streamUrl,
         localUri,
-        {},
+        { headers: await api.getStreamHeaders() },
         (downloadProgress: any) => {
             const written = downloadProgress.totalBytesWritten;
             const total = downloadProgress.totalBytesExpectedToWrite;

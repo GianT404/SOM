@@ -111,11 +111,18 @@ func (l *ipRateLimiter) cleanupLoop() {
 	}
 }
 
+// rateLimitKey ưu tiên device_id đã xác thực (trong context từ AuthMiddleware),
+// fallback về IP. Tránh việc nhiều thiết bị sau cùng NAT bị chặn lẫn nhau.
+func rateLimitKey(r *http.Request) string {
+	if id := DeviceIDFromContext(r.Context()); id != "" {
+		return "dev:" + id
+	}
+	return "ip:" + clientIP(r)
+}
+
 func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := clientIP(r)
-
-		if !l.allow(ip) {
+		if !l.allow(rateLimitKey(r)) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)

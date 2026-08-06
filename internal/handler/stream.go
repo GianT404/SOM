@@ -1,37 +1,29 @@
 package handler
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
-	"time"
 
 	"som/internal/scraper"
 )
 
+// StreamHandler redirects to the direct audio URL resolved by yt-dlp.
+// Trước đây endpoint này tải cả file về temp rồi mới serve -> first byte
+// phải chờ toàn bộ quá trình download (30s+). Giờ nó 302 sang URL CDN mà
+// yt-dlp đã resolve sẵn (đã qua xử lý signature/throttling) và được cache
+// 50 phút trong ResilientScraper: client nhận response tức thì, backend
+// không còn proxy nguyên file qua mạng.
 type StreamHandler struct {
 	Scraper scraper.Scraper
-
-	// Title cache to avoid extra yt-dlp calls.
-	cacheMu sync.RWMutex
-	cache   map[string]*titleCache
-}
-
-type titleCache struct {
-	title     string
-	expiresAt time.Time
 }
 
 // NewStreamHandler creates a StreamHandler.
 func NewStreamHandler(sc scraper.Scraper) *StreamHandler {
-	return &StreamHandler{
-		Scraper: sc,
-		cache:   make(map[string]*titleCache),
-	}
+	return &StreamHandler{Scraper: sc}
 }
 
 // safeFilename strips characters that are invalid in filenames.
@@ -48,63 +40,26 @@ func safeFilename(title string) string {
 	return safe
 }
 
-// getCachedTitle returns a cached title or fetches it.
-func (h *StreamHandler) getCachedTitle(ctx context.Context, id string) string {
-	h.cacheMu.RLock()
-	if cached, ok := h.cache[id]; ok && time.Now().Before(cached.expiresAt) {
-		h.cacheMu.RUnlock()
-		return cached.title
-	}
-	h.cacheMu.RUnlock()
-
-	title, err := h.Scraper.VideoTitle(ctx, id)
-	if err != nil {
-		return id // fallback
-	}
-
-	h.cacheMu.Lock()
-	h.cache[id] = &titleCache{
-		title:     title,
-		expiresAt: time.Now().Add(1 * time.Hour),
-	}
-	h.cacheMu.Unlock()
-
-	return title
-}
-
 func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id, ok := validateVideoID(w, r)
 	if !ok {
 		return
 	}
 
-	// Get the title (with 10s timeout, runs in parallel with stream start).
-	titleCtx, titleCancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer titleCancel()
-
-	titleCh := make(chan string, 1)
-	go func() {
-		titleCh <- h.getCachedTitle(titleCtx, id)
-	}()
-
-	log.Printf("stream: starting download for %s", id)
-	start := time.Now()
-
-	tempFile, err := h.Scraper.DownloadAudio(r.Context(), id)
+	info, err := h.Scraper.GetStreamInfo(r.Context(), id)
 	if err != nil {
-		log.Printf("stream: download error for %s after %v: %v", id, time.Since(start), err)
-		writeError(w, http.StatusInternalServerError, "failed to download audio")
+		log.Printf("stream: resolve error for %s: %v", id, err)
+		if errors.Is(err, scraper.ErrCircuitOpen) {
+			w.Header().Set("Retry-After", "30")
+			writeError(w, http.StatusServiceUnavailable, "stream temporarily unavailable, try again later")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to resolve audio URL")
 		return
 	}
 
-	log.Printf("stream: downloaded %s to %s in %v", id, tempFile, time.Since(start))
-
-	title := <-titleCh
-	filename := safeFilename(title) + ".opus"
-
+	filename := safeFilename(info.Title) + ".opus"
 	w.Header().Set("Content-Type", "audio/ogg")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-
-	// Serve the file (supports Range requests automatically)
-	http.ServeFile(w, r, tempFile)
+	http.Redirect(w, r, info.URL, http.StatusFound)
 }

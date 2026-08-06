@@ -21,6 +21,14 @@ type streamCacheEntry struct {
 	expiresAt time.Time
 }
 
+// searchFlight gộp các request trùng keyword đang chạy cùng lúc thành 1 lần
+// gọi yt-dlp duy nhất (request coalescing / single-flight).
+type searchFlight struct {
+	done    chan struct{}
+	results []SearchResult
+	err     error
+}
+
 type ResilientScraper struct {
 	inner Scraper
 
@@ -32,15 +40,19 @@ type ResilientScraper struct {
 
 	searchCB *circuitBreaker
 	streamCB *circuitBreaker
+
+	searchFlightMu sync.Mutex
+	searchFlight   map[string]*searchFlight
 }
 
 func NewResilientScraper(inner Scraper) *ResilientScraper {
 	s := &ResilientScraper{
-		inner:       inner,
-		searchCache: make(map[string]searchCacheEntry),
-		streamCache: make(map[string]streamCacheEntry),
-		searchCB:    newCircuitBreaker(5, 30*time.Second),
-		streamCB:    newCircuitBreaker(5, 30*time.Second),
+		inner:        inner,
+		searchCache:  make(map[string]searchCacheEntry),
+		streamCache:  make(map[string]streamCacheEntry),
+		searchCB:     newCircuitBreaker(5, 30*time.Second),
+		streamCB:     newCircuitBreaker(5, 30*time.Second),
+		searchFlight: make(map[string]*searchFlight),
 	}
 	go s.cleanupLoop()
 	return s
@@ -82,8 +94,28 @@ func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]Search
 		return nil, ErrCircuitOpen
 	}
 
+	// Single-flight: nếu đã có request trùng keyword đang chạy, chờ kết quả
+	// của nó thay vì spawn thêm 1 process yt-dlp nữa.
+	s.searchFlightMu.Lock()
+	if inf, ok := s.searchFlight[keyword]; ok {
+		s.searchFlightMu.Unlock()
+		<-inf.done
+		return inf.results, inf.err
+	}
+	inf := &searchFlight{done: make(chan struct{})}
+	s.searchFlight[keyword] = inf
+	s.searchFlightMu.Unlock()
+
 	results, err := s.inner.Search(ctx, keyword)
 	s.searchCB.recordResult(err)
+
+	s.searchFlightMu.Lock()
+	inf.results = results
+	inf.err = err
+	close(inf.done)
+	delete(s.searchFlight, keyword)
+	s.searchFlightMu.Unlock()
+
 	if err != nil {
 		return nil, err
 	}

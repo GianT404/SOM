@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -56,6 +60,12 @@ func main() {
 
 	generalLimiter := backend.NewIPRateLimiter(2, 20)
 	heavyLimiter := backend.NewIPRateLimiter(0.2, 5)
+
+	// Device registry: per-device token auth cho mobile app.
+	deviceReg := backend.NewDeviceRegistry()
+	deviceReg.BanFromEnv(os.Getenv("BANNED_DEVICES"))
+	registerLimiter := backend.NewIPRateLimiter(1, 5)
+
 	// Build the chi router
 	r := chi.NewRouter()
 
@@ -73,7 +83,13 @@ func main() {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(backend.APIKeyMiddleware(apiKey))
+		// Register là endpoint công khai để app xin token per-device.
+		// Rate limit riêng theo IP chống spam đăng ký.
+		r.With(registerLimiter.Middleware).Post("/auth/register", registerHandler(deviceReg))
+
+		// Mọi route còn lại yêu cầu X-API-Key (key tĩnh trên server) hoặc
+		// X-Device-Token hợp lệ. Rate limit theo device_id khi đã xác thực.
+		r.Use(backend.AuthMiddleware(apiKey, deviceReg))
 		r.Use(generalLimiter.Middleware)
 
 		r.Get("/search", searchH.ServeHTTP)
@@ -155,12 +171,46 @@ func serverAddr(host string, port string) string {
 	return net.JoinHostPort(host, port)
 }
 
+// registerHandler cấp token per-device. Body: {"device_id": "..."}.
+func registerHandler(reg *backend.DeviceRegistry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			DeviceID string `json:"device_id"`
+		}
+		defer r.Body.Close()
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+
+		token, err := reg.Register(strings.TrimSpace(req.DeviceID))
+		if err != nil {
+			if errors.Is(err, backend.ErrDeviceBanned) {
+				writeJSONError(w, http.StatusForbidden, "device is banned")
+				return
+			}
+			writeJSONError(w, http.StatusBadRequest, "invalid device_id")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
+	}
+}
+
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 // corsMiddleware adds CORS headers for the web/OpenAPI docs on GitHub Pages
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-Key")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-Key, X-Device-Token")
 		w.Header().Set("Access-Control-Max-Age", "3600")
 
 		if r.Method == http.MethodOptions {

@@ -3,7 +3,6 @@
   "compilerOptions": {
     "strict": true,
     "rootDir": "./src",
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

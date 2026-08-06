@@ -286,7 +286,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const fileInfo = await FileSystem.getInfoAsync(tempUri);
                 if (!fileInfo.exists) {
                     const streamUrl = api.getStreamUrl(track.id);
-                    await FileSystem.downloadAsync(streamUrl, tempUri);
+                    await FileSystem.downloadAsync(streamUrl, tempUri, {
+                        headers: await api.getStreamHeaders(),
+                    });
                 }
                 audioUri = tempUri;
             }

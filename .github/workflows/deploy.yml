@@ -74,6 +74,8 @@ jobs:
               git reset --hard origin/main
               # Ghi .env từ GitHub secret (file này gitignored, không ship qua git)
               echo "SOM_API_KEY=${{ secrets.SOM_API_KEY }}" > .env
+              # Ban thủ công: thêm secret BANNED_DEVICES (phân cách phẩy) nếu muốn
+              echo "BANNED_DEVICES=${{ secrets.BANNED_DEVICES }}" >> .env
               # Ép hạ toàn bộ container cũ và dọn dẹp rác mồ côi
               docker compose down --remove-orphans
               docker compose pull
