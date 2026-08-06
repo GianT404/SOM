@@ -146,8 +146,13 @@ class ApiService {
         return res.json();
     }
 
-    getStreamUrl(videoId: string): string {
-        return `${this.baseUrl}/api/v1/stream?id=${encodeURIComponent(videoId)}`;
+    /**
+     * URL stream audio. clean=true → backend chạy ffmpeg silenceremove
+     * (cắt khoảng lặng < -50dB kéo dài >= 1s) — chậm hơn vì transcode realtime.
+     */
+    getStreamUrl(videoId: string, clean = false): string {
+        const url = `${this.baseUrl}/api/v1/stream?id=${encodeURIComponent(videoId)}`;
+        return clean ? `${url}&clean=1` : url;
     }
 
     async resolveUrl(videoId: string): Promise<{ url: string; title: string; safeName: string }> {

@@ -76,7 +76,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const playlistCacheRef = useRef<OfflineTrack[]>([]);
 
     // Audio engine settings (loaded from AsyncStorage)
-    const audioSettingsRef = useRef<AudioSettings>({ bufferSize: 'balanced', sampleRate: 'auto' });
+    const audioSettingsRef = useRef<AudioSettings>({ bufferSize: 'balanced', sampleRate: 'auto', smartSilenceSkip: false });
 
     // Refresh playlist cache periodically and on track change
     const refreshPlaylistCache = useCallback(async () => {
@@ -285,7 +285,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const tempUri = `${FileSystem.cacheDirectory}temp_${track.id}.m4a`;
                 const fileInfo = await FileSystem.getInfoAsync(tempUri);
                 if (!fileInfo.exists) {
-                    const streamUrl = api.getStreamUrl(track.id);
+                    const settings = await getAudioSettings();
+                    audioSettingsRef.current = settings;
+                    const streamUrl = api.getStreamUrl(track.id, settings.smartSilenceSkip);
                     await FileSystem.downloadAsync(streamUrl, tempUri, {
                         headers: await api.getStreamHeaders(),
                     });

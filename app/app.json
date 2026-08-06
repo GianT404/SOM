@@ -35,6 +35,7 @@
     },
     "plugins": [
       "expo-secure-store",
+      "./plugins/withReleaseSigning",
       [
         "expo-media-control",
         {

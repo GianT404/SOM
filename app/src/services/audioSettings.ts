@@ -8,6 +8,8 @@ export type SampleRate = 'auto' | '44100' | '48000' | '96000';
 export interface AudioSettings {
     bufferSize: BufferSize;
     sampleRate: SampleRate;
+    /** Smart Silence Skip: cắt khoảng lặng dưới -50dB kéo dài >= 1s (backend ffmpeg). */
+    smartSilenceSkip: boolean;
 }
 
 export const BUFFER_SIZE_OPTIONS: { key: BufferSize; label: string; samples: number }[] = [
@@ -26,6 +28,7 @@ export const SAMPLE_RATE_OPTIONS: { key: SampleRate; label: string }[] = [
 const DEFAULT_SETTINGS: AudioSettings = {
     bufferSize: 'balanced',
     sampleRate: 'auto',
+    smartSilenceSkip: false,
 };
 
 export const getAudioSettings = async (): Promise<AudioSettings> => {

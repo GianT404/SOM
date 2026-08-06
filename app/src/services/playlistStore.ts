@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import api from './api';
+import { getAudioSettings } from './audioSettings';
 
 const PLAYLIST_KEY = 'dm4a_offline_playlist';
 const DELETED_PLAYLIST_KEY = 'dm4a_deleted_playlist';
@@ -156,7 +157,8 @@ export const downloadAndAdd = async (
 
     // Download via server /stream endpoint — yt-dlp handles n-parameter throttle
     // decryption internally, so we get full CDN speed (vs ~30KB/s on raw URL).
-    const streamUrl = api.getStreamUrl(track.id);
+    const settings = await getAudioSettings();
+    const streamUrl = api.getStreamUrl(track.id, settings.smartSilenceSkip);
     console.log('[downloadAndAdd] Downloading via /stream for', track.id);
 
     const downloadResumable = FileSystem.createDownloadResumable(

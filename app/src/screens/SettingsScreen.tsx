@@ -129,6 +129,7 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [audioSettings, setAudioSettings] = useState<AudioSettings>({
         bufferSize: 'balanced',
         sampleRate: 'auto',
+        smartSilenceSkip: false,
     });
     const [tooltipVisible, setTooltipVisible] = useState(false);
     const [tooltipContent, setTooltipContent] = useState({ title: '', body: '' });
@@ -252,6 +253,21 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                             />
                         </View>
                     </View>
+
+                    {/* Smart Silence Skip */}
+                    <SettingRow
+                        icon="content-cut"
+                        iconBg={COLORS.secondary + '20'}
+                        iconColor={COLORS.secondary}
+                        label="Cắt khoảng lặng"
+                        subtitle="Tự động cắt khoảng lặng dưới -50dB kéo dài hơn 1 giây (chậm hơn khi tải)"
+                        value={audioSettings.smartSilenceSkip}
+                        onToggle={(val) => updateSetting('smartSilenceSkip', val)}
+                        onPress={() => showTooltip(
+                            'Cắt khoảng lặng',
+                            'Bật tính năng này, server sẽ dùng FFmpeg tự quét luồng âm thanh và cắt bỏ mọi chỗ âm lượng dưới -50dB kéo dài quá 1 giây — giúp bỏ đoạn im lặng đầu/cuối bài hoặc khoảng nghỉ giữa bài.\n\nLưu ý: khi bật, quá trình tải bài sẽ chậm hơn vì server phải xử lý lại âm thanh (transcode).'
+                        )}
+                    />
                 </View>
 
                 {/* Version */}

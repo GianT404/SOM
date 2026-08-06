@@ -116,7 +116,9 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
-		"-af", "loudnorm=I=-16:LRA=11:TP=-1.5",
+		// Smart Silence Skip: cắt mọi khoảng lặng dưới -50dB kéo dài >= 1s.
+		// Đặt TRƯỚC loudnorm để ngưỡng -50dB áp dụng trên tín hiệu gốc.
+		"-af", "silenceremove=start_periods=1:start_threshold=-50dB:start_duration=1:stop_periods=-1:stop_threshold=-50dB:stop_duration=1,loudnorm=I=-16:LRA=11:TP=-1.5",
 		"-v", "error", // chỉ log lỗi thật, không log info/warning rác
 		"-",
 	)
