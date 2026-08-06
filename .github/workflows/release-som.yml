@@ -3,7 +3,7 @@ name: Release SOM TUI
 on:
   push:
     tags:
-      - "v*"
+      - "tui-v*"
 
 permissions:
   contents: write

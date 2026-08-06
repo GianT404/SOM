@@ -3,7 +3,7 @@ name: Release SOM Mobile APK
 on:
   push:
     tags:
-      - "v*"
+      - "app-v*"
 
 permissions:
   contents: write

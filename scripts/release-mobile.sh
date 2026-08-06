@@ -1,22 +1,25 @@
-# ./scripts/release.sh v0.x.x "cmt"
+#!/usr/bin/env bash
+# ./scripts/release-mobile.sh v0.x.x "cmt" — chỉ build/release APK mobile
+# (chạy lệnh cần thiết, không cần sudo)
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-	echo "Dùng: ./scripts/release.sh <version> [commit message]"
-	echo "Ví dụ: ./scripts/release.sh v0.1.2 \"sửa lỗi mpv\""
+	echo "Dùng: ./scripts/release-mobile.sh <version> [commit message]"
+	echo "Ví dụ: ./scripts/release-mobile.sh v0.1.2 \"thêm màn hình lyrics\""
 	exit 1
 fi
 
 VERSION="$1"
-MSG="${2:-release ${VERSION}}"
+MSG="${2:-release mobile ${VERSION}}"
+TAG="app-${VERSION}"
 
 if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 	echo "LỖI: version phải theo dạng vX.Y.Z (ví dụ v0.1.2), bạn đưa: ${VERSION}"
 	exit 1
 fi
 
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-	echo "LỖI: tag ${VERSION} đã tồn tại rồi, dùng số khác."
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+	echo "LỖI: tag ${TAG} đã tồn tại rồi, dùng số khác."
 	exit 1
 fi
 
@@ -32,11 +35,11 @@ fi
 echo "==> Push code lên nhánh hiện tại..."
 git push
 
-echo "==> Tạo tag ${VERSION}..."
-git tag "$VERSION"
+echo "==> Tạo tag ${TAG} (chỉ trigger workflow mobile)..."
+git tag "$TAG"
 
 echo "==> Push tag..."
-git push origin "$VERSION"
+git push origin "$TAG"
 
 echo
-echo "Xong!"
+echo "Xong! Tag ${TAG} đã kích hoạt release-som-mobile.yml (APK)."
