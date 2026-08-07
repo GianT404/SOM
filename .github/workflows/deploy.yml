@@ -5,30 +5,31 @@ on:
     branches:
       - main
     paths:
-          - 'cmd/server/**'
-          - 'internal/handler/**'
-          - 'internal/scraper/**'
-          - 'internal/cleaner/**'
-          - 'internal/backend/**'
-          - 'internal/playlist/**'
-          - 'go.mod'
-          - 'go.sum'
-          - 'Dockerfile'
-          - 'docker-compose.yml'
-          - 'Caddyfile'
-          - '.github/workflows/deploy.yml'
-          
+      - 'cmd/server/**'
+      - 'internal/handler/**'
+      - 'internal/scraper/**'
+      - 'internal/cleaner/**'
+      - 'internal/backend/**'
+      - 'internal/playlist/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'Caddyfile'
+      - '.github/workflows/deploy.yml'
+
 jobs:
   test:
-    runs-on: ubuntu-lastest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5 
         with:
           go-version: '1.26' 
+
       - name: Install ALSA Dependencies
         run: |
           sudo apt-get update
@@ -58,25 +59,24 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/som-backend:latest
 
   deploy:
-      needs: build-and-push
-      runs-on: ubuntu-lasest
-      steps:
-        - name: SSH vào GCP VM và Kéo Image về chạy
-          uses: appleboy/ssh-action@v1.0.3
-          with:
-            host: ${{ secrets.GCP_VM_IP }}
-            username: ${{ secrets.SSH_USERNAME }}
-            key: ${{ secrets.SSH_PRIVATE_KEY }}
-            script: |
-              cd ~/SOM
-              # Đồng bộ code mới nhất từ repo về VM
-              git fetch --all
-              git reset --hard origin/main
-              # Ghi .env từ GitHub secret (file này gitignored, không ship qua git)
-              echo "SOM_API_KEY=${{ secrets.SOM_API_KEY }}" > .env
-              # Ban thủ công: thêm secret BANNED_DEVICES (phân cách phẩy) nếu muốn
-              echo "BANNED_DEVICES=${{ secrets.BANNED_DEVICES }}" >> .env
-              # Ép hạ toàn bộ container cũ và dọn dẹp rác mồ côi
-              docker compose down --remove-orphans
-              docker compose pull
-              docker compose up -d
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH vào GCP VM và Kéo Image về chạy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/SOM
+            git fetch --all
+            git reset --hard origin/main
+            
+            # Ghi file .env an toàn hơn
+            echo "SOM_API_KEY=${{ secrets.SOM_API_KEY }}" > .env
+            echo "BANNED_DEVICES=${{ secrets.BANNED_DEVICES }}" >> .env
+            
+            docker compose down --remove-orphans
+            docker compose pull
+            docker compose up -d
