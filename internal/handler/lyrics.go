@@ -51,7 +51,8 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	// Budget tổng < timeout ~10s của app, để app không timeout.
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 
 	type result struct {
@@ -59,80 +60,49 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		data   []scraper.LyricsData
 		err    error
 	}
-	resCh := make(chan result, 2)
 
+	// Ưu tiên LRCLib: dùng hint title/artist/duration TỪ CLIENT luôn, không
+	// spawn yt-dlp (vừa nhanh vừa không chiếm slot) — app đã truyền sẵn các
+	// field này từ kết quả search.
+	lrCh := make(chan result, 1)
 	go func() {
-		// VideoMetadata trả track/artist rỗng nếu video không có metadata
-		// YouTube Music (rất phổ biến với video tự upload/rap/indie) - khi đó
-		// FetchLyrics tự rơi xuống candidate parse từ title, không cần xử lý
-		// rẽ nhánh ở đây nữa.
-		meta, metaErr := h.Scraper.VideoMetadata(ctx, id)
-		if metaErr != nil {
-			meta = scraper.MusicMetadata{}
-		}
-		// artist truyền từ client (vd uploader/tên kênh) dùng làm hint dự phòng
-		// nếu metadata YouTube Music không có sẵn artist.
-		if meta.Artist == "" && artist != "" {
-			meta.Artist = artist
-		}
-		log.Printf("lyrics: fetching for %s (metadata track=%q artist=%q, title=%q)",
-			id, meta.Track, meta.Artist, title)
+		meta := scraper.MusicMetadata{Artist: artist}
 		data, err := scraper.FetchLyrics(ctx, meta, title, duration)
-		resCh <- result{source: "lrclib", data: data, err: err}
+		lrCh <- result{source: "lrclib", data: data, err: err}
 	}()
 
+	// YouTube captions chạy song song làm fallback khi LRCLib không có.
+	ytCh := make(chan result, 1)
 	go func() {
-		log.Printf("lyrics: trying YouTube captions for %s", id)
 		data, err := h.Scraper.Lyrics(ctx, id)
-		resCh <- result{source: "youtube", data: data, err: err}
+		ytCh <- result{source: "youtube", data: data, err: err}
 	}()
+	log.Printf("lyrics: fetch for %s (title=%q artist=%q)", id, title, artist)
 
-	var lrclibRes, youtubeRes *result
-	for i := 0; i < 2; i++ {
-		res := <-resCh
-		switch res.source {
-		case "lrclib":
-			lrclibRes = &res
-		case "youtube":
-			youtubeRes = &res
-		}
-	}
-
-	var combined []scraper.LyricsData
-	if lrclibRes != nil && lrclibRes.err == nil && len(lrclibRes.data) > 0 {
-		combined = append(combined, lrclibRes.data...)
-	}
-	if youtubeRes != nil && youtubeRes.err == nil && len(youtubeRes.data) > 0 {
-		seen := make(map[string]bool, len(combined))
-		for _, d := range combined {
-			seen[d.Language] = true
-		}
-		for _, d := range youtubeRes.data {
-			if seen[d.Language] {
-				continue
-			}
-			seen[d.Language] = true
-			combined = append(combined, d)
-		}
-	}
-
-	if len(combined) > 0 {
-		log.Printf("lyrics: OK for %s (%d language track(s))", id, len(combined))
-		h.cache.Put(cacheKey, combined)
-		writeJSON(w, http.StatusOK, combined)
+	// LRCLib là nguồn chính: đã có kết quả tin cậy → trả ngay, không chờ
+	// YouTube. Goroutine YouTube bị hủy qua ctx khi hàm return.
+	lr := <-lrCh
+	if lr.err == nil && len(lr.data) > 0 {
+		log.Printf("lyrics: OK for %s via %s (%d track(s))", id, lr.source, len(lr.data))
+		h.cache.Put(cacheKey, lr.data)
+		writeJSON(w, http.StatusOK, lr.data)
 		return
 	}
 
-	var lrclibErr, youtubeErr error
-	if lrclibRes != nil {
-		lrclibErr = lrclibRes.err
+	// LRCLib rỗng → dùng YouTube captions (đang chạy song song).
+	select {
+	case yt := <-ytCh:
+		if yt.err == nil && len(yt.data) > 0 {
+			log.Printf("lyrics: OK for %s via %s (%d track(s))", id, yt.source, len(yt.data))
+			h.cache.Put(cacheKey, yt.data)
+			writeJSON(w, http.StatusOK, yt.data)
+			return
+		}
+	case <-ctx.Done():
 	}
-	if youtubeRes != nil {
-		youtubeErr = youtubeRes.err
-	}
-	log.Printf("lyrics: both LRCLib and YouTube CC failed for %s (lrclib_err=%v youtube_err=%v)",
-		id, lrclibErr, youtubeErr)
-	// Cache cả kết quả rỗng để không phải spawn yt-dlp lại cho bài không có lời.
+
+	log.Printf("lyrics: no lyrics for %s (lrclib_err=%v, youtube cut or empty)", id, lr.err)
+	// Cache cả kết quả rỗng để không phải spawn lại cho bài không có lời.
 	empty := []scraper.LyricsData{}
 	h.cache.Put(cacheKey, empty)
 	writeJSON(w, http.StatusOK, empty)

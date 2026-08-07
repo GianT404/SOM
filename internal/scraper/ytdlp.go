@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kkdai/youtube/v2"
 )
 
 type YtdlpScraper struct {
@@ -59,10 +62,15 @@ func (k *keyedLock) Lock(key string) func() {
 
 var downloadLocks = newKeyedLock()
 
-// ytdlpSem giới hạn số process yt-dlp chạy đồng thời để bảo vệ VM 1 CPU và
-// tránh vượt pids_limit. Request vượt slot sẽ chờ tới khi có slot hoặc khi
-// context bị hủy/timeout.
-var ytdlpSem = make(chan struct{}, 2)
+// ytdlpSem giới hạn số process yt-dlp "nhẹ" (resolve/search/metadata/lyrics)
+// chạy đồng thời. Tách riêng khỏi download nặng để một phiên chơi nhạc đang
+// tải file không chặn đứng search/resolve/lyrics (trước đây 2 pool chung, mỗi
+// download ~8s chiếm 1 slot → resolve & lyrics phải chờ, app timeout 10s).
+var ytdlpSem = make(chan struct{}, 3)
+
+// ytdlpDownloadSem giới hạn số luồng download nặng (DownloadAudio ~8s) cùng
+// lúc. Giới hạn 2 slot → 2 phiên chơi song song OK, không lấn sang pool light.
+var ytdlpDownloadSem = make(chan struct{}, 2)
 
 func acquireYtdlp(ctx context.Context) error {
 	select {
@@ -75,6 +83,19 @@ func acquireYtdlp(ctx context.Context) error {
 
 func releaseYtdlp() {
 	<-ytdlpSem
+}
+
+func acquireYtdlpDownload(ctx context.Context) error {
+	select {
+	case ytdlpDownloadSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func releaseYtdlpDownload() {
+	<-ytdlpDownloadSem
 }
 
 // maxCachedAudioFiles giới hạn số file opus cache trong temp dir.
@@ -176,10 +197,10 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	unlock := downloadLocks.Lock(videoID)
 	defer unlock()
 
-	if err := acquireYtdlp(ctx); err != nil {
+	if err := acquireYtdlpDownload(ctx); err != nil {
 		return "", err
 	}
-	defer releaseYtdlp()
+	defer releaseYtdlpDownload()
 
 	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
 
@@ -329,6 +350,13 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
+	// Fast path: youtube/v2 chạy trong Go (không spawn yt-dlp, không cần JS
+	// challenge). Lấy title + URL audio ~2s thay vì ~9s, và không chiếm slot
+	// semaphore. Fallback về yt-dlp khi thư viện không xử lý được video.
+	if info := fetchStreamInfoLib(ctx, videoID); info != nil {
+		return info, nil
+	}
+
 	if err := acquireYtdlp(ctx); err != nil {
 		return nil, err
 	}
@@ -371,6 +399,72 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		URL:   audioURL,
 		Title: title,
 	}, nil
+}
+
+// fetchStreamInfoLib resolve title + URL audio trực tiếp bằng lib youtube/v2
+// (chạy trong process, không spawn yt-dlp). Trả nil nếu bất kỳ bước nào thất
+// bại để caller dùng fallback yt-dlp.
+func fetchStreamInfoLib(ctx context.Context, videoID string) *StreamInfo {
+	libCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+
+	client := youtube.Client{}
+	v, err := client.GetVideoContext(libCtx, videoID)
+	if err != nil {
+		log.Printf("fastpath: %s getvideo err: %v", videoID, err)
+		return nil
+	}
+	if v.Title == "" {
+		log.Printf("fastpath: %s empty title", videoID)
+		return nil
+	}
+	best := bestAudioLibFormat(v.Formats)
+	if best == nil {
+		log.Printf("fastpath: %s no audio format", videoID)
+		return nil
+	}
+	url, err := client.GetStreamURLContext(libCtx, v, best)
+	if err != nil {
+		log.Printf("fastpath: %s streamurl itag=%d err: %v", videoID, best.ItagNo, err)
+		return nil
+	}
+	if url == "" {
+		log.Printf("fastpath: %s empty url", videoID)
+		return nil
+	}
+	return &StreamInfo{URL: url, Title: v.Title}
+}
+
+// bestAudioLibFormat chọn format audio-only tốt nhất (ops: 251 > 250 >
+// 249; mp4 aac: 140 > 139; còn lại theo bitrate giảm dần).
+func bestAudioLibFormat(fl youtube.FormatList) *youtube.Format {
+	var best *youtube.Format
+	for _, f := range fl {
+		if !isAudioOnlyLibFormat(f.MimeType) {
+			continue
+		}
+		if best == nil || libAudioRank(f) > libAudioRank(*best) {
+			c := f
+			best = &c
+		}
+	}
+	return best
+}
+
+func isAudioOnlyLibFormat(mime string) bool {
+	return strings.Contains(mime, "audio/") && !strings.Contains(mime, "video")
+}
+
+func libAudioRank(f youtube.Format) int {
+	rank := map[int]int{251: 100, 250: 90, 140: 80, 249: 70, 260: 60, 139: 50}[f.ItagNo]
+	if rank != 0 {
+		return rank
+	}
+	// Mime type chứa "opus" ưu tiên hơn aac khi itag lạ.
+	if strings.Contains(f.MimeType, "opus") {
+		return 40
+	}
+	return 10
 }
 
 func isOpusFile(path string) bool {
