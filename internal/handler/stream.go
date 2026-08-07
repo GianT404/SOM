@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,17 +17,23 @@ import (
 	"som/internal/scraper"
 )
 
-// StreamHandler redirects to the direct audio URL resolved by yt-dlp.
-// Trước đây endpoint này tải cả file về temp rồi mới serve -> first byte
-// phải chờ toàn bộ quá trình download (30s+). Giờ nó 302 sang URL CDN mà
-// yt-dlp đã resolve sẵn (đã qua xử lý signature/throttling) và được cache
-// 50 phút trong ResilientScraper: client nhận response tức thì, backend
-// không còn proxy nguyên file qua mạng.
+// StreamHandler serves audio for playback.
 //
-// Khi query ?clean=1, endpoint proxy stream qua ffmpeg với filter
-// silenceremove (Smart Silence Skip): cắt mọi khoảng lặng dưới -50dB kéo
-// dài hơn 1 giây (gồm cả ở giữa và cuối bài). Chế độ này chậm hơn vì
-// backend phải transcode realtime, chỉ dùng khi client yêu cầu.
+// Trước đây endpoint 302 thẳng sang URL CDN googlevideo mà yt-dlp resolve.
+// Cách đó nhanh (không tốn server) nhưng phụ thuộc vào client tự xử lý
+// redirect + Range: CDN throttle download thường (~30KB/s), và một số client
+// không seek được / bị cắt giữa chừng.
+//
+// Giờ endpoint tải audio về file cục bộ (DownloadAudio, cache theo videoID)
+// rồi serve qua http.ServeContent: có Range/206 nên seek được, tốc độ tải
+// là tốc độ đường truyền thật (không bị CDN throttle), và chơi lại bài cũ
+// thì trả file cached ngay.
+//
+// Khi query ?clean=1, endpoint transcode file cục bộ qua ffmpeg silenceremove
+// (Smart Silence Skip): cắt mọi khoảng lặng dưới -50dB kéo dài hơn 1 giây.
+// Kết quả được cache ở /tmp/dopus-clean-<id>.ogg để lần sau không transcode
+// lại. Transcode từ file cục bộ nên không còn lỗi 403 khi ffmpeg fetch thẳng
+// URL CDN (vấn đề IP-binding/multi-IP trước đây).
 type StreamHandler struct {
 	Scraper scraper.Scraper
 }
@@ -106,6 +111,7 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Lấy title (cached 4h trong ResilientScraper) chỉ để đặt tên file.
 	info, err := h.Scraper.GetStreamInfo(r.Context(), id)
 	if err != nil {
 		log.Printf("stream: resolve error for %s: %v", id, err)
@@ -117,54 +123,52 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to resolve audio URL")
 		return
 	}
-
 	filename := safeFilename(info.Title) + ".opus"
 
 	if r.URL.Query().Get("clean") == "1" {
-		h.proxyClean(w, r, info.URL, filename)
+		h.proxyClean(w, r, id, filename)
+		return
+	}
+
+	// Tải file opus về local (cache theo videoID) rồi serve có Range.
+	path, err := h.Scraper.DownloadAudio(r.Context(), id)
+	if err != nil {
+		log.Printf("stream: download error for %s: %v", id, err)
+		writeError(w, http.StatusInternalServerError, "failed to prepare audio")
+		return
+	}
+	serveAudioFile(w, r, path, filename)
+}
+
+// serveAudioFile serve file audio cục bộ qua ServeContent để hỗ trợ
+// Range/206 (seek) và If-Range.
+func serveAudioFile(w http.ResponseWriter, r *http.Request, path, filename string) {
+	f, err := os.Open(path)
+	if err != nil {
+		log.Printf("stream: open audio %s: %v", path, err)
+		writeError(w, http.StatusInternalServerError, "audio file unavailable")
+		return
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		log.Printf("stream: stat audio %s: %v", path, err)
+		writeError(w, http.StatusInternalServerError, "audio file unavailable")
 		return
 	}
 
 	w.Header().Set("Content-Type", "audio/ogg")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	http.Redirect(w, r, info.URL, http.StatusFound)
+	http.ServeContent(w, r, filename, fi.ModTime(), f)
 }
 
-// cappedBuffer ghi stderr của ffmpeg nhưng chỉ giữ tối đa maxBytes cuối cùng
-// để không tích tụ log rác, phục vụ debug khi ffmpeg lỗi.
-type cappedBuffer struct {
-	mu   sync.Mutex
-	buf  bytes.Buffer
-	max  int
-	drop bool
-}
-
-func (c *cappedBuffer) Write(p []byte) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.buf.Len()+len(p) > c.max {
-		c.buf.Reset()
-		c.drop = true
-	}
-	return c.buf.Write(p)
-}
-
-func (c *cappedBuffer) String() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.drop {
-		return "(truncated) " + c.buf.String()
-	}
-	return c.buf.String()
-}
-
-// proxyClean tải CDN URL rồi pipe qua ffmpeg silenceremove, stream kết quả
-// về client dưới dạng ogg/opus. Kết quả được ghi vào /tmp/dopus-clean-<id>.ogg
-// để lần sau serve thẳng (đỡ tốn CPU transcode lại). Dùng context tách khỏi
-// timeout 3 phút của router (stream dài), nhưng vẫn bị cắt khi client ngắt.
-func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcURL, filename string) {
+// proxyClean transcode file opus cục bộ qua ffmpeg silenceremove rồi serve
+// bản đã cache. Cache tại /tmp/dopus-clean-<id>.ogg; lần sau serve thẳng.
+// Dùng context tách khỏi timeout 3 phút của router vì transcode dài, nhưng
+// vẫn bị hủy khi client ngắt kết nối.
+func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, videoID, filename string) {
 	ctx := context.WithoutCancel(r.Context())
-	videoID := r.URL.Query().Get("id")
 	cleanPath := filepath.Join(os.TempDir(), fmt.Sprintf("dopus-clean-%s.ogg", videoID))
 
 	if h.serveCachedClean(w, r, filename, cleanPath) {
@@ -178,85 +182,42 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, srcUR
 		return
 	}
 
+	// Nguồn transcode là file cục bộ (đã download qua yt-dlp) — ổn định hơn
+	// hẳn việc để ffmpeg tự fetch URL CDN.
+	srcPath, err := h.Scraper.DownloadAudio(ctx, videoID)
+	if err != nil {
+		log.Printf("stream: clean download error for %s: %v", videoID, err)
+		writeError(w, http.StatusInternalServerError, "failed to prepare audio")
+		return
+	}
+
+	partPath := cleanPath + ".part"
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-hide_banner", "-loglevel", "error",
-		"-i", srcURL,
+		"-y",
+		"-i", srcPath,
 		"-vn",
 		"-af", silenceremoveFilter,
 		"-c:a", "libopus", "-b:a", "160k",
 		"-f", "ogg",
-		"pipe:1",
+		partPath,
 	)
 
-	stderr := &cappedBuffer{max: 4 << 10}
-	cmd.Stderr = stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start audio processing")
-		return
-	}
-	if err := cmd.Start(); err != nil {
-		log.Printf("stream: ffmpeg start error: %v", err)
-		writeError(w, http.StatusInternalServerError, "failed to start audio processing")
-		return
-	}
-
-	// Ghi đồng thời ra client và file cache (rename khi transcode thành công).
-	partPath := cleanPath + ".part"
-	cacheOut, cerr := os.Create(partPath)
-	if cerr != nil {
-		cacheOut = nil // không cache được thì vẫn stream như cũ
-	}
-
-	w.Header().Set("Content-Type", "audio/ogg")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	w.WriteHeader(http.StatusOK)
-
-	flusher, _ := w.(http.Flusher)
-	buf := make([]byte, 32*1024)
-	for {
-		n, rerr := stdout.Read(buf)
-		if n > 0 {
-			if _, werr := w.Write(buf[:n]); werr != nil {
-				_ = cmd.Process.Kill()
-				break
-			}
-			if cacheOut != nil {
-				if _, cerr := cacheOut.Write(buf[:n]); cerr != nil {
-					_ = cacheOut.Close()
-					_ = os.Remove(partPath)
-					cacheOut = nil
-				}
-			}
-			if flusher != nil {
-				flusher.Flush()
-			}
-		}
-		if rerr != nil {
-			break
-		}
-	}
-
-	if err := cmd.Wait(); err != nil {
-		if msg := stderr.String(); msg != "" {
-			log.Printf("stream: ffmpeg clean error: %v; stderr: %s", err, msg)
-		} else {
-			log.Printf("stream: ffmpeg clean error: %v", err)
-		}
-		if cacheOut != nil {
-			_ = cacheOut.Close()
-		}
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		log.Printf("stream: ffmpeg clean error for %s: %v; stderr: %s", videoID, err, stderr.String())
 		_ = os.Remove(partPath)
+		writeError(w, http.StatusInternalServerError, "audio processing failed")
 		return
 	}
 
-	if cacheOut != nil {
-		_ = cacheOut.Close()
-		if err := os.Rename(partPath, cleanPath); err != nil {
-			log.Printf("stream: cache rename error: %v", err)
-		}
+	if err := os.Rename(partPath, cleanPath); err != nil {
+		log.Printf("stream: cache rename error for %s: %v", videoID, err)
+		_ = os.Remove(partPath)
 	}
+
+	h.serveCachedClean(w, r, filename, cleanPath)
 }
 
 // serveCachedClean serve thẳng file clean nếu có bản còn tươi. Trả về true
@@ -267,8 +228,6 @@ func (h *StreamHandler) serveCachedClean(w http.ResponseWriter, r *http.Request,
 		return false
 	}
 	log.Printf("stream: serving cached clean file for %s", r.URL.Query().Get("id"))
-	w.Header().Set("Content-Type", "audio/ogg")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	http.ServeFile(w, r, path)
+	serveAudioFile(w, r, path, filename)
 	return true
 }

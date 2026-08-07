@@ -44,11 +44,26 @@ func (h *ResolveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("resolve: got URL for %s in %v", id, time.Since(start))
 
 	resp := resolveResponse{
-		URL:      info.URL,
+		// Trả URL xử lý qua chính backend (serve file cached có Range/seek)
+		// thay vì URL CDN gốc — CDN gốc bị throttle + client không seek được.
+		URL:      streamURL(r, id),
 		Title:    info.Title,
 		SafeName: safeFilename(info.Title),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// streamURL dựng URL /api/v1/stream bằng đúng scheme+host mà client gọi tới
+// (Caddy đã set X-Forwarded-Proto ở reverse proxy).
+func streamURL(r *http.Request, id string) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if fp := r.Header.Get("X-Forwarded-Proto"); fp == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host + "/api/v1/stream?id=" + id
 }

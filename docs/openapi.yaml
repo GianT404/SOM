@@ -157,12 +157,13 @@ paths:
   /api/v1/resolve:
     get:
       tags: [Resolve]
-      summary: Resolve direct audio URL
+      summary: Resolve URL stream (seekable)
       description: >
-        Trả về link audio trực tiếp (CDN của Google/YouTube) cùng tiêu đề,
-        giúp client tự tải/stream mà không cần chờ server proxy toàn bộ
-        file. Nhanh hơn `/stream` vì server chỉ trích xuất URL, không tải
-        nội dung audio.
+        Trả về URL stream đi qua chính backend (`/api/v1/stream?id=...`) cùng
+        tiêu đề, kèm thông tin tên file. Backend serve file audio đã download
+        về cache có hỗ trợ Range/seek nên client stream ổn định (không bị
+        throttle hay cắt giữa chừng như khi lấy URL CDN gốc của Google).
+        Nếu cần chọn ngôn ngữ/silence-skip sử dụng endpoint `/stream`.
       operationId: resolveStreamUrl
       parameters:
         - $ref: "#/components/parameters/VideoId"

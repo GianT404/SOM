@@ -256,6 +256,11 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 		"--dump-json",
 		"--flat-playlist",
 		"--no-warnings",
+		// Chạy IPv4 ổn định + timeout mỗi socket để không kẹt vô hạn khi
+		// host có IPv6 route lỗi (search không được nhanh cũng phải fail
+		// sớm chứ không kéo dài tới timeout của app).
+		"--force-ipv4",
+		"--socket-timeout", "15",
 	)
 
 	var stderr bytes.Buffer
