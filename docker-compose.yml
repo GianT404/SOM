@@ -11,7 +11,7 @@ services:
     volumes:
       - ytdlp_cache:/var/cache/som/yt-dlp
     mem_limit: 512m
-    cpus: "1.0"
+    cpus: "1.8"
     pids_limit: 128
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
