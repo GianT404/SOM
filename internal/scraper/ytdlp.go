@@ -38,6 +38,9 @@ func resolveYtdlpCacheDir() string {
 	return dir
 }
 
+// cacheDirArgs trả flag --cache-dir nếu thư mục cache khả dụng. Nếu không
+// tạo được (permission, disk...), trả rỗng thay vì chặn cả app — yt-dlp
+// tự lo cache mặc định, chỉ mất tính persistent chứ không mất chức năng.
 func cacheDirArgs() []string {
 	if ytdlpCacheDir == "" {
 		return nil
@@ -88,7 +91,7 @@ var downloadLocks = newKeyedLock()
 // chạy đồng thời. Tách riêng khỏi download nặng để một phiên chơi nhạc đang
 // tải file không chặn đứng search/resolve/lyrics (trước đây 2 pool chung, mỗi
 // download ~8s chiếm 1 slot → resolve & lyrics phải chờ, app timeout 10s).
-var ytdlpSem = make(chan struct{}, 3)
+var ytdlpSem = make(chan struct{}, 4)
 
 // ytdlpDownloadSem giới hạn số luồng download nặng (DownloadAudio ~8s) cùng
 // lúc. Giới hạn 2 slot → 2 phiên chơi song song OK, không lấn sang pool light.
@@ -376,21 +379,17 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
-	// Fast path: youtube/v2 chạy trong Go (không spawn yt-dlp, không cần JS
-	// challenge). Lấy title + URL audio ~2s thay vì ~9s, và không chiếm slot
-	// semaphore. Fallback về yt-dlp khi thư viện không xử lý được video.
-	if info := fetchStreamInfoLib(ctx, videoID); info != nil {
-		return info, nil
-	}
-	// Log để đo tỷ lệ fastpath miss thực tế trên VM — đừng đoán, so sánh
-	// dòng này với tổng số resolve trước khi quyết định đầu tư thêm vào
-	// fastpath hay bỏ hẳn.
-	log.Printf("resolve: fastpath miss for %s, falling back to yt-dlp", videoID)
 
 	if err := acquireYtdlp(ctx); err != nil {
 		return nil, err
 	}
 	defer releaseYtdlp()
+
+	if info := fetchStreamInfoLib(ctx, videoID); info != nil {
+		return info, nil
+	}
+
+	log.Printf("resolve: fastpath miss for %s, falling back to yt-dlp", videoID)
 
 	// Một lần gọi duy nhất lấy cả title lẫn URL trực tiếp (trước đây spawn 2
 	// process song song, nhân đôi thời gian + pid trên VM 1 CPU).
