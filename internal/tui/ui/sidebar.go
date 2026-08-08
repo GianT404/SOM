@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"math"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -18,6 +20,16 @@ const (
 )
 
 const sidebarWidth = 22
+
+const sidebarGhostDuration = 120 * time.Millisecond
+
+type sidebarAnimState struct {
+	on    bool
+	from  SidebarItem
+	to    SidebarItem
+	start time.Time
+	end   time.Time
+}
 
 func (s SidebarItem) String() string {
 	switch s {
@@ -43,9 +55,11 @@ var (
 
 	sidebarInactiveStyle = lipgloss.NewStyle().
 				Foreground(colorSubtle2)
+
+	ghostStrongStyle = lipgloss.NewStyle().Foreground(ghostStrong)
 )
 
-func renderSidebar(active SidebarItem, height int) string {
+func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string {
 	var b strings.Builder
 
 	items := []SidebarItem{SideSearch, SideDownloads, SidePlaylists, SideLyrics, SideLogs}
@@ -58,14 +72,22 @@ func renderSidebar(active SidebarItem, height int) string {
 		if padding < 0 {
 			padding = 0
 		}
-		if item == active {
+		switch {
+		case item == active:
+			// Con trỏ chính: hiện ngay ở tab mới.
 			b.WriteString("  ")
 			b.WriteString(sidebarActiveStyle.Render("| " + label))
 			b.WriteString(strings.Repeat(" ", padding))
-		} else {
-			b.WriteString("  ")
-			b.WriteString(sidebarInactiveStyle.Render("  " + label))
-			b.WriteString(strings.Repeat(" ", padding))
+		default:
+			if gi := ghostIntensity(item, active, anim); gi > 0 {
+				b.WriteString("  ")
+				b.WriteString(ghostStyle(gi).Render("| " + label))
+				b.WriteString(strings.Repeat(" ", padding))
+			} else {
+				b.WriteString("  ")
+				b.WriteString(sidebarInactiveStyle.Render("  " + label))
+				b.WriteString(strings.Repeat(" ", padding))
+			}
 		}
 	}
 
@@ -79,6 +101,59 @@ func renderSidebar(active SidebarItem, height int) string {
 	}
 
 	return b.String()
+}
+
+func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
+	if !anim.on {
+		return 0
+	}
+	now := time.Now()
+	if !now.Before(anim.end) {
+		return 0
+	}
+
+	// Vệt chỉ nằm giữa tab cũ (from, bao gồm) và tab đích (to, loại trừ —
+	// tab đích vốn đã hiện con trỏ chính).
+	if anim.to > anim.from {
+		if item < anim.from || item >= anim.to {
+			return 0
+		}
+	} else {
+		if item > anim.from || item <= anim.to {
+			return 0
+		}
+	}
+
+	p := float64(now.Sub(anim.start)) / float64(anim.end.Sub(anim.start))
+	if p > 1 {
+		p = 1
+	}
+	if p < 0 {
+		p = 0
+	}
+
+	span := math.Abs(float64(anim.to) - float64(anim.from))
+	if span < 1 {
+		span = 1
+	}
+	drow := math.Abs(float64(item) - float64(anim.to))
+
+	gi := (1-p)*0.9 - 0.3*drow/span
+	if gi <= 0 {
+		return 0
+	}
+	if gi > 1 {
+		gi = 1
+	}
+	return gi
+}
+
+func ghostStyle(gi float64) lipgloss.Style {
+	switch {
+	case gi >= 0.7:
+		return ghostStrongStyle
+	}
+	return lipgloss.NewStyle().Foreground(ghostStrong).Faint(true)
 }
 
 func renderSOMLogo() string {

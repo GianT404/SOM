@@ -36,6 +36,12 @@ func animTick() tea.Cmd {
 	})
 }
 
+func sidebarAnimTick() tea.Cmd {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+		return animTickMsg(t)
+	})
+}
+
 type App struct {
 	provider      domain.MusicProvider
 	player        *player.Player
@@ -54,6 +60,7 @@ type App struct {
 	shuffleHist   []int
 
 	sidebarActive SidebarItem
+	sidebarAnim   sidebarAnimState
 	logOffset     int
 	activeContext SidebarItem
 	palette       CommandPalette
@@ -152,8 +159,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.left.input.Focused() {
 				a.left.input.Blur()
 			} else {
-				a.sidebarActive = (a.sidebarActive + 1) % sideCount
-				cmds = append(cmds, a.switchSidebar(a.sidebarActive))
+				next := (a.sidebarActive + 1) % sideCount
+				cmds = append(cmds, a.switchSidebar(next))
 			}
 
 		case " ":
@@ -259,6 +266,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(idx, t))
 	case animTickMsg:
+		// Duy trì ticker ghost khi animation sidebar còn chạy.
+		if a.sidebarAnim.on && time.Now().Before(a.sidebarAnim.end) {
+			cmds = append(cmds, sidebarAnimTick())
+		} else if a.sidebarAnim.on {
+			a.sidebarAnim.on = false
+		}
 		if a.sidebarActive == SideDownloads {
 			a.left.animTick++
 			cmds = append(cmds, animTick())
@@ -359,7 +372,7 @@ func (a *App) View() string {
 
 	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
 
-	sideView := renderSidebar(a.sidebarActive, sideH)
+	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH)
 
 	inputNotFocused := !a.left.input.Focused()
 	var mainView string
@@ -718,11 +731,27 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 		a.left.searchOnEnter = false
 	}
 
+	var cmds []tea.Cmd
+
 	if item == SideDownloads && oldTab != SideDownloads {
-		return animTick()
+		cmds = append(cmds, animTick())
 	}
 
-	return nil
+	if item != oldTab {
+		a.sidebarAnim = sidebarAnimState{
+			on:    true,
+			from:  oldTab,
+			to:    item,
+			start: time.Now(),
+			end:   time.Now().Add(sidebarGhostDuration),
+		}
+		cmds = append(cmds, sidebarAnimTick())
+	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
 }
 
 func (a *App) resizePanels() {

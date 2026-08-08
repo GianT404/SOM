@@ -137,6 +137,8 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	}
 
 	p.player = p.otoCtx.NewPlayer(pcmOut)
+	p.player.SetVolume(p.volume)
+
 	p.player.Play()
 	p.state = Playing
 
