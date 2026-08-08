@@ -30,7 +30,6 @@ import (
 // thì trả file cached ngay.
 //
 // Khi query ?clean=1, endpoint transcode file cục bộ qua ffmpeg silenceremove
-// (Smart Silence Skip): cắt mọi khoảng lặng dưới -50dB kéo dài hơn 1 giây.
 // Kết quả được cache ở /tmp/dopus-clean-<id>.ogg để lần sau không transcode
 // lại. Transcode từ file cục bộ nên không còn lỗi 403 khi ffmpeg fetch thẳng
 // URL CDN (vấn đề IP-binding/multi-IP trước đây).
@@ -42,10 +41,6 @@ type StreamHandler struct {
 func NewStreamHandler(sc scraper.Scraper) *StreamHandler {
 	return &StreamHandler{Scraper: sc}
 }
-
-// silenceremoveFilter cắt mọi khoảng lặng < -50dB kéo dài >= 1s.
-// stop_periods=-1 nghĩa là trim TẤT CẢ các khoảng lặng (đầu, giữa, cuối).
-var silenceremoveFilter = "silenceremove=start_periods=1:start_threshold=-50dB:start_duration=1:stop_periods=-1:stop_threshold=-50dB:stop_duration=1"
 
 // cleanCacheTTL khớp vòng đời URL chữ ký YouTube (~6h). Bản clean chỉ phụ
 // thuộc videoID nên có thể cache theo videoID mà không cần đối chiếu URL.
@@ -197,7 +192,6 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, video
 		"-y",
 		"-i", srcPath,
 		"-vn",
-		"-af", silenceremoveFilter,
 		"-c:a", "libopus", "-b:a", "160k",
 		"-f", "ogg",
 		partPath,
