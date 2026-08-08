@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,8 +50,10 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 			continue
 		}
 
-		// Add vtt format query
-		vttUrl := baseUrl + "&fmt=vtt"
+		// baseURL từ player response thường đã chứa sẵn "fmt=3" (timedtext XML).
+		// Chỉ nối thêm "&fmt=vtt" thì YouTube vẫn trả XML, và ParseVTT trả 0
+		// dòng -> lyrics rỗng. Phải THAY tham số fmt thành vtt.
+		vttUrl := withVTTFormat(baseUrl)
 
 		req, err := http.NewRequestWithContext(ctx, "GET", vttUrl, nil)
 		if err != nil {
@@ -66,6 +70,7 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 			if resp != nil {
 				resp.Body.Close()
 			}
+			log.Printf("direct_subs: %s fetch failed (code=%v)", langCode, resp.StatusCode)
 			continue
 		}
 
@@ -145,6 +150,18 @@ func GetDirectAudio(ctx context.Context, videoID string, destPath string) error 
 
 	return nil
 }
+
+var fmtParamRe = regexp.MustCompile(`([?&])fmt=[^&]*`)
+
+// withVTTFormat chuyển caption URL về định dạng VTT: nếu baseURL đã có tham
+// số fmt (thường fmt=3 = timedtext XML) thì thay nó, ngược lại mới nối thêm.
+func withVTTFormat(baseURL string) string {
+	if fmtParamRe.MatchString(baseURL) {
+		return fmtParamRe.ReplaceAllString(baseURL, "${1}fmt=vtt")
+	}
+	return baseURL + "&fmt=vtt"
+}
+
 func reorderTracks(tracks []youtube.CaptionTrack, preferredLang string) []youtube.CaptionTrack {
 	var preferred, rest []youtube.CaptionTrack
 	for _, t := range tracks {
