@@ -23,6 +23,28 @@ type YtdlpScraper struct {
 	// BinPath is the absolute path to the yt-dlp binary.
 	BinPath string
 }
+
+var ytdlpCacheDir = resolveYtdlpCacheDir()
+
+func resolveYtdlpCacheDir() string {
+	dir := os.Getenv("YTDLP_CACHE_DIR")
+	if dir == "" {
+		dir = "/var/cache/som/yt-dlp"
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Printf("ytdlp: khong tao duoc cache dir %s: %v — dung cache mac dinh cua yt-dlp (khong persistent)", dir, err)
+		return ""
+	}
+	return dir
+}
+
+func cacheDirArgs() []string {
+	if ytdlpCacheDir == "" {
+		return nil
+	}
+	return []string{"--cache-dir", ytdlpCacheDir}
+}
+
 type lockEntry struct {
 	mu  sync.Mutex
 	ref int
@@ -210,7 +232,7 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	// Sắp tạo file mới: trước tiên dọn bớt nếu đã vượt cap.
 	cleanupStaleTempFiles()
 	_ = os.Remove(tempFile)
-	cmd := exec.CommandContext(ctx, y.BinPath,
+	args := []string{
 		"-f", "bestaudio",
 		"-x", "--audio-format", "opus",
 		"--embed-metadata",
@@ -219,8 +241,10 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 		"--no-playlist",
 		"--no-part",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -272,7 +296,7 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 	defer releaseYtdlp()
 
 	query := fmt.Sprintf("ytsearch7:%s", keyword)
-	cmd := exec.CommandContext(ctx, y.BinPath,
+	args := []string{
 		query,
 		"--dump-json",
 		"--flat-playlist",
@@ -282,7 +306,9 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 		// sớm chứ không kéo dài tới timeout của app).
 		"--force-ipv4",
 		"--socket-timeout", "15",
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -356,6 +382,10 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 	if info := fetchStreamInfoLib(ctx, videoID); info != nil {
 		return info, nil
 	}
+	// Log để đo tỷ lệ fastpath miss thực tế trên VM — đừng đoán, so sánh
+	// dòng này với tổng số resolve trước khi quyết định đầu tư thêm vào
+	// fastpath hay bỏ hẳn.
+	log.Printf("resolve: fastpath miss for %s, falling back to yt-dlp", videoID)
 
 	if err := acquireYtdlp(ctx); err != nil {
 		return nil, err
@@ -364,14 +394,16 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 
 	// Một lần gọi duy nhất lấy cả title lẫn URL trực tiếp (trước đây spawn 2
 	// process song song, nhân đôi thời gian + pid trên VM 1 CPU).
-	cmd := exec.CommandContext(ctx, y.BinPath,
+	args := []string{
 		"--print", "%(title)s\t%(url)s",
 		"-f", "bestaudio",
 		"--no-warnings",
 		"--no-playlist",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -490,14 +522,16 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 	}
 	defer releaseYtdlp()
 
-	cmd := exec.CommandContext(ctx, y.BinPath,
+	args := []string{
 		"--print", "%(title)s",
 		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -523,14 +557,16 @@ func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (Music
 	metaCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(metaCtx, y.BinPath,
+	args := []string{
 		"--print", "%(track)s|||%(artist)s",
 		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(metaCtx, y.BinPath, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -590,7 +626,7 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		_ = os.Remove(f)
 	}
 
-	cmd := exec.CommandContext(ytdlpCtx, y.BinPath,
+	args := []string{
 		"--write-subs",
 		"--write-auto-subs",
 		"--skip-download",
@@ -602,8 +638,10 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		"--no-warnings",
 		"--no-playlist",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(ytdlpCtx, y.BinPath, args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -697,14 +735,16 @@ func detectVideoLanguage(ctx context.Context, binPath, videoID string) string {
 
 	langCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(langCtx, binPath,
+	args := []string{
 		"--print", "%(original_language)s",
 		"--skip-download",
 		"--no-warnings",
 		"--no-playlist",
 		"--force-ipv4",
-		"--", "https://www.youtube.com/watch?v="+videoID,
-	)
+	}
+	args = append(args, cacheDirArgs()...)
+	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+	cmd := exec.CommandContext(langCtx, binPath, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if cmd.Run() == nil {

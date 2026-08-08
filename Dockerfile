@@ -13,7 +13,9 @@ FROM alpine:latest
 
 RUN apk add --no-cache python3 py3-pip ffmpeg ca-certificates \
     && pip install --no-cache-dir --break-system-packages yt-dlp \
-    && adduser -D -u 10001 somuser
+    && adduser -D -u 10001 somuser \
+    && mkdir -p /var/cache/som/yt-dlp \
+    && chown -R somuser:somuser /var/cache/som/yt-dlp
 
 WORKDIR /app
 

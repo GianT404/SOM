@@ -12,14 +12,13 @@ const (
 	searchCacheTTL = 5 * time.Minute
 	// URL chữ ký YouTube sống ~6h nên cache 4h là an toàn, giảm đáng kể số
 	// lần phải chạy lại yt-dlp khi replay một bài.
-	streamCacheTTL = 4 * time.Hour
-
-	// Lời bài hát/caption gắn với video hiếm khi đổi nên cache lâu, bỏ hẳn
-	// việc spawn yt-dlp khi chơi lại bài cũ.
+	streamCacheTTL   = 4 * time.Hour
 	lyricsCacheTTL   = 7 * 24 * time.Hour
 	maxLyricsCache   = 500
 	metadataCacheTTL = 24 * time.Hour
 	maxMetadataCache = 1000
+
+	bgWorkTimeout = 50 * time.Second
 )
 
 type searchCacheEntry struct {
@@ -32,12 +31,16 @@ type streamCacheEntry struct {
 	expiresAt time.Time
 }
 
-// searchFlight gộp các request trùng keyword đang chạy cùng lúc thành 1 lần
-// gọi yt-dlp duy nhất (request coalescing / single-flight).
 type searchFlight struct {
 	done    chan struct{}
 	results []SearchResult
 	err     error
+}
+
+type streamFlight struct {
+	done chan struct{}
+	info *StreamInfo
+	err  error
 }
 
 type ResilientScraper struct {
@@ -57,6 +60,9 @@ type ResilientScraper struct {
 
 	searchFlightMu sync.Mutex
 	searchFlight   map[string]*searchFlight
+
+	streamFlightMu sync.Mutex
+	streamFlight   map[string]*streamFlight
 }
 
 func NewResilientScraper(inner Scraper) *ResilientScraper {
@@ -69,6 +75,7 @@ func NewResilientScraper(inner Scraper) *ResilientScraper {
 		searchCB:     newCircuitBreaker(5, 30*time.Second),
 		streamCB:     newCircuitBreaker(5, 30*time.Second),
 		searchFlight: make(map[string]*searchFlight),
+		streamFlight: make(map[string]*streamFlight),
 	}
 	go s.cleanupLoop()
 	return s
@@ -115,32 +122,51 @@ func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]Search
 	s.searchFlightMu.Lock()
 	if inf, ok := s.searchFlight[keyword]; ok {
 		s.searchFlightMu.Unlock()
-		<-inf.done
-		return inf.results, inf.err
+		// Chờ theo deadline của CHÍNH caller này, không phải deadline của
+		// caller đã tạo ra flight (caller đó có thể đã bỏ cuộc từ lâu).
+		select {
+		case <-inf.done:
+			return inf.results, inf.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 	inf := &searchFlight{done: make(chan struct{})}
 	s.searchFlight[keyword] = inf
 	s.searchFlightMu.Unlock()
 
-	results, err := s.inner.Search(ctx, keyword)
-	s.searchCB.recordResult(err)
+	// Context nền tách khỏi ctx của request: client hủy/timeout không được
+	// phép kill process giữa chừng. Để yt-dlp chạy hết, ghi cache lại —
+	// request retry ngay sau đó (hoặc waiter khác đang chờ flight) ăn luôn
+	// kết quả thay vì phải cold-start lại từ đầu.
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), bgWorkTimeout)
 
-	s.searchFlightMu.Lock()
-	inf.results = results
-	inf.err = err
-	close(inf.done)
-	delete(s.searchFlight, keyword)
-	s.searchFlightMu.Unlock()
+	go func() {
+		defer bgCancel()
 
-	if err != nil {
-		return nil, err
+		results, err := s.inner.Search(bgCtx, keyword)
+		s.searchCB.recordResult(err)
+
+		s.searchFlightMu.Lock()
+		inf.results = results
+		inf.err = err
+		close(inf.done)
+		delete(s.searchFlight, keyword)
+		s.searchFlightMu.Unlock()
+
+		if err == nil {
+			s.searchMu.Lock()
+			s.searchCache[keyword] = searchCacheEntry{results: results, expiresAt: time.Now().Add(searchCacheTTL)}
+			s.searchMu.Unlock()
+		}
+	}()
+
+	select {
+	case <-inf.done:
+		return inf.results, inf.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-
-	s.searchMu.Lock()
-	s.searchCache[keyword] = searchCacheEntry{results: results, expiresAt: time.Now().Add(searchCacheTTL)}
-	s.searchMu.Unlock()
-
-	return results, nil
 }
 
 func (s *ResilientScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
@@ -155,17 +181,47 @@ func (s *ResilientScraper) GetStreamInfo(ctx context.Context, videoID string) (*
 		return nil, ErrCircuitOpen
 	}
 
-	info, err := s.inner.GetStreamInfo(ctx, videoID)
-	s.streamCB.recordResult(err)
-	if err != nil {
-		return nil, err
+	s.streamFlightMu.Lock()
+	if inf, ok := s.streamFlight[videoID]; ok {
+		s.streamFlightMu.Unlock()
+		select {
+		case <-inf.done:
+			return inf.info, inf.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
+	inf := &streamFlight{done: make(chan struct{})}
+	s.streamFlight[videoID] = inf
+	s.streamFlightMu.Unlock()
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), bgWorkTimeout)
 
-	s.streamMu.Lock()
-	s.streamCache[videoID] = streamCacheEntry{info: info, expiresAt: time.Now().Add(streamCacheTTL)}
-	s.streamMu.Unlock()
+	go func() {
+		defer bgCancel()
 
-	return info, nil
+		info, err := s.inner.GetStreamInfo(bgCtx, videoID)
+		s.streamCB.recordResult(err)
+
+		s.streamFlightMu.Lock()
+		inf.info = info
+		inf.err = err
+		close(inf.done)
+		delete(s.streamFlight, videoID)
+		s.streamFlightMu.Unlock()
+
+		if err == nil {
+			s.streamMu.Lock()
+			s.streamCache[videoID] = streamCacheEntry{info: info, expiresAt: time.Now().Add(streamCacheTTL)}
+			s.streamMu.Unlock()
+		}
+	}()
+
+	select {
+	case <-inf.done:
+		return inf.info, inf.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 func (s *ResilientScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {

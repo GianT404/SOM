@@ -6,9 +6,10 @@ services:
     env_file:
       - .env
     environment:
-      # Chỉ Caddy (cùng docker network) mới chạm được backend; tin XFF từ
-      # network này để lấy IP client thật. Mặc định không tin XFF nếu thiếu.
       - TRUSTED_PROXIES=172.16.0.0/12
+      - YTDLP_CACHE_DIR=/var/cache/som/yt-dlp
+    volumes:
+      - ytdlp_cache:/var/cache/som/yt-dlp
     mem_limit: 512m
     cpus: "1.0"
     pids_limit: 128
@@ -39,3 +40,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  ytdlp_cache:
