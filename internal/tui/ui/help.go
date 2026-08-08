@@ -34,6 +34,7 @@ var helpSections = []helpSection{
 			{"] / [", "Next / Prev"},
 			{"r", "Toggle Random"},
 			{"←/→", "Seek +/- 5s"},
+			{"+/−", "Volume Up / Down"},
 		},
 	},
 	{

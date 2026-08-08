@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -207,7 +208,25 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.logOffset--
 				}
 			}
+		case "+", "=":
+			if a.left.input.Focused() {
+				break
+			}
+			v := a.player.Volume() + 0.05
+			a.player.SetVolume(v)
+			a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
 
+		case "-", "_":
+			if a.left.input.Focused() {
+				break
+			}
+			v := a.player.Volume() - 0.05
+			a.player.SetVolume(v)
+			if v <= 0.01 {
+				a.setStatus(StatusMsgStyle.Render("Volume: MUTE"))
+			} else {
+				a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
+			}
 		case "?":
 			if a.left.input.Focused() {
 				break
@@ -367,7 +386,7 @@ func (a *App) View() string {
 	if a.random {
 		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
-	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev  ") +
+	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev +/-:volume ") +
 		rStyle.Render("r") +
 		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help q:quit")
 

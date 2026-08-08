@@ -56,6 +56,7 @@ type Player struct {
 	lastErr     error      // lỗi của lần phát vừa kết thúc; nil = phát hoàn tất bình thường
 	stopped     bool       // đánh dấu user chủ động stop/kill, không tính là lỗi
 	stderrBuf   syncBuffer // stderr thật của ffmpeg, để debug khi decode lỗi
+	volume      float64
 }
 
 func New() *Player {
@@ -75,6 +76,7 @@ func New() *Player {
 	return &Player{
 		otoCtx: ctx,
 		state:  Stopped,
+		volume: 1.0,
 	}
 }
 
@@ -225,4 +227,27 @@ func (p *Player) SeekBy(seconds int) {
 
 func (p *Player) Stderr() string {
 	return p.stderrBuf.String()
+}
+
+func (p *Player) SetVolume(v float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if v < 0.0 {
+		v = 0.0
+	}
+	if v > 2.0 {
+		v = 2.0
+	}
+
+	p.volume = v
+	if p.player != nil {
+		p.player.SetVolume(v)
+	}
+}
+
+func (p *Player) Volume() float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.volume
 }
