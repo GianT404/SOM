@@ -321,6 +321,7 @@ func lrclibTrackToLyricsData(t lrclibTrack) []LyricsData {
 				Lines:      lines,
 				TrackName:  t.TrackName,
 				ArtistName: t.ArtistName,
+				Source:     "lrclib",
 			})
 		}
 	}
@@ -340,6 +341,7 @@ func lrclibTrackToLyricsData(t lrclibTrack) []LyricsData {
 				Lines:      lines,
 				TrackName:  t.TrackName,
 				ArtistName: t.ArtistName,
+				Source:     "lrclib",
 			})
 		}
 	}

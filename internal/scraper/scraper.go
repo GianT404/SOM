@@ -39,6 +39,10 @@ type LyricsData struct {
 
 	TrackName  string `json:"trackName,omitempty"`
 	ArtistName string `json:"artistName,omitempty"`
+
+	// Source cho biết lyrics đến từ đâu ("lrclib" hoặc "youtube"), để client
+	// có thể chọn hiển thị theo nguồn.
+	Source string `json:"source,omitempty"`
 }
 
 // Scraper abstracts the video/audio data source.

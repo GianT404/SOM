@@ -56,6 +56,7 @@ export interface LyricLine {
 export interface LyricsData {
     language: string;
     lines: LyricLine[];
+    source?: string;
 }
 
 class ApiService {
@@ -164,12 +165,14 @@ class ApiService {
 
     async getLyrics(
         videoId: string,
-        meta?: { title?: string; artist?: string; duration?: number }
+        meta?: { title?: string; artist?: string; duration?: number },
+        source?: 'lrclib' | 'youtube'
     ): Promise<LyricsData[]> {
         const params = new URLSearchParams({ id: videoId });
         if (meta?.title) params.set('title', meta.title);
         if (meta?.artist) params.set('artist', meta.artist);
         if (meta?.duration) params.set('duration', String(Math.round(meta.duration)));
+        if (source) params.set('source', source);
 
         const url = `${this.baseUrl}/api/v1/lyrics?${params.toString()}`;
         const res = await this.fetchWithFallback(url);

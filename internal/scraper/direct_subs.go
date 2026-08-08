@@ -89,6 +89,7 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 		results = append(results, LyricsData{
 			Language: langCode,
 			Lines:    mappedLines,
+			Source:   "youtube",
 		})
 	}
 

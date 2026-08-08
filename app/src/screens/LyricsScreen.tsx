@@ -66,11 +66,13 @@ const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedLanguage, setSelectedLanguage] = useState<string>('vi');
+    // Nguồn lyrics: auto (ưu tiên LRCLib, fallback YT captions) hoặc ép theo nguồn
+    const [lyricsSource, setLyricsSource] = useState<'auto' | 'lrclib' | 'youtube'>('auto');
     const currentSec = position / 1000;
     const progress = duration > 0 ? position / duration : 0;
 
-    // Cache lyrics mỗi bài để tránh re-fetch khi chuyển bài
-    const lyricsCache = useRef<{ [trackId: string]: LyricsData[] }>({});
+    // Cache lyrics mỗi bài theo (track, source) để tránh re-fetch khi đổi nguồn/bài
+    const lyricsCache = useRef<{ [key: string]: LyricsData[] }>({});
     const trackIdRef = useRef<string>('');
 
     useEffect(() => {
@@ -78,9 +80,6 @@ const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         // Cập nhật track ID ref để tránh race condition
         trackIdRef.current = currentTrack.id;
-
-        setLoading(true);
-        setError('');
 
         // Ưu tiên 1: Lyrics đã tải về từ offline cache (từ playlist)
         if (currentTrack.lyrics && Array.isArray(currentTrack.lyrics) && currentTrack.lyrics.length > 0) {
@@ -98,28 +97,37 @@ const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             } else {
                 setLyricsData([{ language: 'vi', lines: currentTrack.lyrics }]);
             }
-            lyricsCache.current[currentTrack.id] = data;
+            lyricsCache.current[`${currentTrack.id}|auto`] = data;
+            setError('');
             setLoading(false);
             return;
         }
 
-        // Ưu tiên 2: Kiểm tra cache đã fetch trước đó
-        if (lyricsCache.current[currentTrack.id]) {
-            setLyricsData(lyricsCache.current[currentTrack.id]);
+        // Ưu tiên 2: Kiểm tra cache đã fetch trước đó (theo track + source)
+        const cacheKey = `${currentTrack.id}|${lyricsSource}`;
+        if (lyricsCache.current[cacheKey]) {
+            setLyricsData(lyricsCache.current[cacheKey]);
+            setError('');
             setLoading(false);
             return;
         }
 
         // Ưu tiên 3: Fetch từ API (chỉ khi không phải offline track)
         const currentTrackId = currentTrack.id;
-        
-        api.getLyrics(currentTrack.id)
+        setLoading(true);
+        setError('');
+
+        api.getLyrics(
+            currentTrackId,
+            { title: currentTrack.title, artist: currentTrack.uploader, duration: currentTrack.duration },
+            lyricsSource === 'auto' ? undefined : lyricsSource
+        )
             .then(data => {
                 // Chỉ update nếu vẫn là track này (tránh bug race condition)
                 if (trackIdRef.current === currentTrackId) {
                     if (data && data.length > 0) {
                         setLyricsData(data);
-                        lyricsCache.current[currentTrackId] = data;
+                        lyricsCache.current[cacheKey] = data;
                     } else {
                         setLyricsData([]);
                     }
@@ -147,7 +155,7 @@ const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     setLoading(false);
                 }
             });
-    }, [currentTrack?.id]);
+    }, [currentTrack?.id, lyricsSource]);
 
     if (!currentTrack) {
         return (
@@ -199,6 +207,20 @@ const LyricsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 </View>
             ) : (
                 <>
+                    {/* Source Selector: chọn nguồn lyrics (auto/LRCLib/YouTube captions) */}
+                    <View style={styles.sourceSelector}>
+                        {(['auto', 'lrclib', 'youtube'] as const).map((src) => (
+                            <TouchableOpacity
+                                key={src}
+                                style={[styles.langBtn, lyricsSource === src && styles.langBtnActive]}
+                                onPress={() => setLyricsSource(src)}
+                            >
+                                <Text style={[styles.langBtnText, lyricsSource === src && styles.langBtnTextActive]}>
+                                    {src === 'auto' ? 'Auto' : src === 'lrclib' ? 'LRCLib' : 'YouTube Captions'}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                     {/* Language Selector */}
                     {lyricsData.length > 1 && (
                         <View style={styles.languageSelector}>
@@ -279,6 +301,10 @@ const styles = StyleSheet.create({
     languageSelector: {
         flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
         justifyContent: 'center', alignItems: 'center',
+    },
+    sourceSelector: {
+        flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingTop: SPACING.md,
+        justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap',
     },
     langBtn: {
         paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, backgroundColor: COLORS.card,

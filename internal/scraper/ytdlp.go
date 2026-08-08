@@ -713,6 +713,7 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 		result = append(result, LyricsData{
 			Language: code,
 			Lines:    lines,
+			Source:   "youtube",
 		})
 	}
 
