@@ -166,9 +166,6 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		}
 		b.WriteString("\n")
 	}
-	if len(locals) > vis {
-		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.dlCursor+1, len(locals))))
-		b.WriteString("\n")
-	}
+
 	return b.String()
 }

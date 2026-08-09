@@ -91,7 +91,7 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 		b.WriteString("\n")
 		written++
 	}
-	return b.String()
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 func (r RightPanel) renderLyrics(innerW int) string {
@@ -113,7 +113,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		for i := pad + 1; i < lyrH; i++ {
 			b.WriteString("\n")
 		}
-		return b.String()
+		return strings.TrimSuffix(b.String(), "\n")
 	}
 
 	if !r.loaded {
@@ -131,7 +131,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		for i := pad + 1; i < lyrH; i++ {
 			b.WriteString("\n")
 		}
-		return b.String()
+		return strings.TrimSuffix(b.String(), "\n")
 	}
 
 	if len(r.lyrics.Synced) > 0 {
@@ -172,7 +172,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 			b.WriteString("\n")
 			written++
 		}
-		return b.String()
+		return strings.TrimSuffix(b.String(), "\n")
 	}
 
 	if r.lyrics.Plain != "" {
@@ -193,7 +193,7 @@ func (r RightPanel) renderLyrics(innerW int) string {
 			b.WriteString("\n")
 			written++
 		}
-		return b.String()
+		return strings.TrimSuffix(b.String(), "\n")
 	}
 
 	for i := 0; i < lyrH; i++ {
@@ -207,12 +207,11 @@ func (r RightPanel) renderLyrics(innerW int) string {
 		}
 		b.WriteString("\n")
 	}
-	return b.String()
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 func (r RightPanel) lyricsHeight() int {
-	playerTotal := 7
-	h := r.height - playerTotal - 2
+	h := r.height - 2
 	if h < 5 {
 		return 5
 	}

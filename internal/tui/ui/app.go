@@ -348,20 +348,26 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, tea.Batch(cmds...)
 }
 
+func (a *App) mainContentHeight() int {
+	statusH := 0
+	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
+		statusH = 1
+	}
+	// somRow(6) + sep(1) + progressBar(4) + help(1) + status
+	overhead := 6 + 1 + 4 + 1 + statusH
+	contentH := a.height - overhead
+	if contentH < 5 {
+		contentH = 5
+	}
+	return contentH
+}
+
 func (a *App) View() string {
 	if a.width == 0 {
 		return "Loading..."
 	}
 
-	statusH := 0
-	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
-		statusH = 1
-	}
-	overhead := 7 + 1 + statusH + 4 + 1
-	contentH := a.height - overhead
-	if contentH < 5 {
-		contentH = 5
-	}
+	contentH := a.mainContentHeight()
 	sideH := contentH
 	mainW := a.width - sidebarWidth
 	if mainW < 10 {
@@ -440,8 +446,8 @@ func (a *App) View() string {
 func (a *App) renderLyricsView(w, h int, focused bool) string {
 	if a.nowPlay == nil {
 		return lipgloss.NewStyle().
-			Width(w - 2).
-			Height(h - 2).
+			Width(w).
+			Height(h).
 			Render(DimItemStyle.Render(" Play a track to see lyrics..."))
 	}
 
@@ -759,11 +765,7 @@ func (a *App) resizePanels() {
 	if mainW < 10 {
 		mainW = 10
 	}
-	overhead := 6 + 1 + 1 + 1
-	contentH := a.height - overhead
-	if contentH < 5 {
-		contentH = 5
-	}
+	contentH := a.mainContentHeight()
 	a.left.SetSize(mainW, contentH)
 	a.right.SetSize(mainW, contentH)
 }

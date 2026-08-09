@@ -425,7 +425,7 @@ func (p LeftPanel) itemCount() int {
 }
 
 func (p LeftPanel) visibleRows() int {
-	rows := p.height - 12
+	rows := p.height - 7
 	if rows < 3 {
 		return 3
 	}
