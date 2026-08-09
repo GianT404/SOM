@@ -303,7 +303,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				} else if p.activeTab == SideDownloads {
 					if p.dlCursor < items-1 {
 						p.dlCursor++
-						if p.dlCursor >= p.dlOffset+p.visibleRows() {
+						if p.dlCursor >= p.dlOffset+p.visibleRows()+1 {
 							p.dlOffset++
 						}
 					}

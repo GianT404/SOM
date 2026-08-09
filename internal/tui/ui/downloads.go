@@ -127,7 +127,8 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		return DimItemStyle.Render(" No downloaded files in ~/Music/SOM_Downloads/") + "\n"
 	}
 	var b strings.Builder
-	vis := p.visibleRows()
+	// +1: reclaim the row previously wasted by the trailing blank line below
+	vis := p.visibleRows() + 1
 	end := p.dlOffset + vis
 	if end > len(locals) {
 		end = len(locals)
@@ -147,7 +148,6 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 	header := fmt.Sprintf("  %*s  %-*s  %s", idxW, "#", titleW, "Title", "Artist")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
-	b.WriteString("\n")
 	for i := p.dlOffset; i < end; i++ {
 		f := locals[i]
 		mark := "  "
@@ -159,12 +159,12 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		safeArtist := truncate(f.Artist, artistW)
 		artistPlain := runewidth.FillRight(safeArtist, artistW)
 		line := mark + idx + "  " + title + "  " + artistPlain
+		b.WriteString("\n")
 		if i == p.dlCursor {
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
 		} else {
 			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
 		}
-		b.WriteString("\n")
 	}
 
 	return b.String()
