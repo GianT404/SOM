@@ -1,0 +1,14 @@
+[Unit]
+Description=SOM backend
+After=network.target
+
+[Service]
+Type=simple
+User=gian
+EnvironmentFile=/etc/som/som.env
+ExecStart=/usr/local/bin/SOM
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
