@@ -38,6 +38,10 @@ type LeftPanel struct {
 	plInput         textinput.Model
 	showPlInput     bool
 
+	inputSearch   string
+	inputDownload string
+	inputPlaylist string
+
 	showAddPopup      bool
 	popupCursor       int
 	animTick          int
@@ -474,4 +478,26 @@ func (p LeftPanel) getFilteredLocals() []LocalFile {
 		}
 	}
 	return filtered
+}
+
+func saveInputForTab(p *LeftPanel, tab SidebarItem) {
+	switch tab {
+	case SideSearch:
+		p.inputSearch = p.input.Value()
+	case SideDownloads:
+		p.inputDownload = p.input.Value()
+	case SidePlaylists:
+		p.inputPlaylist = p.input.Value()
+	}
+}
+
+func loadInputForTab(p *LeftPanel, tab SidebarItem) {
+	switch tab {
+	case SideSearch:
+		p.input.SetValue(p.inputSearch)
+	case SideDownloads:
+		p.input.SetValue(p.inputDownload)
+	case SidePlaylists:
+		p.input.SetValue(p.inputPlaylist)
+	}
 }

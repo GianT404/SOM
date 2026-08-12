@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"strings"
 	"github.com/charmbracelet/lipgloss"
+	"strings"
 )
 
 func renderBox(w int, title string, content string, borderColor lipgloss.TerminalColor) string {

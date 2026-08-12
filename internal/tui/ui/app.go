@@ -728,8 +728,13 @@ func (a *App) syncPlaylistState() {
 
 func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	oldTab := a.sidebarActive
+	if oldTab != item {
+		// Giữ value input riêng cho từng tab.
+		saveInputForTab(&a.left, oldTab)
+	}
 	a.sidebarActive = item
 	a.left.activeTab = item
+	loadInputForTab(&a.left, item)
 
 	if item == SideSearch {
 		a.left.searchOnEnter = true
