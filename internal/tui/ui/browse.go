@@ -361,7 +361,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 			} else if !p.input.Focused() {
 				p.input.Focus()
-				p.input.SetValue("")
 			}
 			return p, nil
 		}
