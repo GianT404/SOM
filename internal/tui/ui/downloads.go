@@ -137,16 +137,17 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	if len(locals) >= 1000 {
 		idxW = 4
 	}
+	durW := 6
 	artistW := 27
-	titleW := innerW - idxW - artistW - 6
+	titleW := innerW - idxW - artistW - durW - 8
 	if titleW < 10 {
 		titleW = 10
-		artistW = innerW - idxW - titleW - 6
+		artistW = innerW - idxW - titleW - durW - 8
 		if artistW < 0 {
 			artistW = 0
 		}
 	}
-	header := fmt.Sprintf("  %*s  %-*s  %s", idxW, "#", titleW, "Title", "Artist")
+	header := fmt.Sprintf("  %*s  %-*s  %-*s  %*s", idxW, "#", titleW, "Title", artistW, "Artist", durW, "Time")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	for i := p.dlOffset; i < end; i++ {
 		f := locals[i]
@@ -158,7 +159,8 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		title := marqueeText(f.Name, titleW, p.animTick)
 		safeArtist := truncate(f.Artist, artistW)
 		artistPlain := runewidth.FillRight(safeArtist, artistW)
-		line := mark + idx + "  " + title + "  " + artistPlain
+		dur := fmt.Sprintf("%*s", durW, FormatDuration(f.Duration))
+		line := mark + idx + "  " + title + "  " + artistPlain + "  " + dur
 		b.WriteString("\n")
 		if i == p.dlCursor {
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
