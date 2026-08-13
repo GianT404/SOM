@@ -274,7 +274,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				p.plOffset = 0
 			}
 
-		case "up", "k":
+		case "up":
 			if focused && !p.input.Focused() {
 				if p.activeTab == SideSearch && p.searchCursor > 0 {
 					p.searchCursor--
@@ -294,7 +294,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 			}
 
-		case "down", "j":
+		case "down":
+			if p.input.Focused() {
+				if p.activeTab == SideSearch || p.activeTab == SideDownloads {
+					p.input.Blur()
+				}
+				return p, nil
+			}
 			if focused && !p.input.Focused() {
 				items := p.itemCount()
 				if p.activeTab == SideSearch {
@@ -324,7 +330,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		case "a":
 			if !p.input.Focused() && (p.activeTab == SideSearch || p.activeTab == SideDownloads) {
 				if len(p.playlists) == 0 {
-					p.errMsg = "Chưa có playlist nào! Hãy sang tab Playlists bấm '/' để tạo."
+					p.errMsg = "No playlists available. Press '/' to create one."
 				} else {
 					p.showAddPopup = true
 					p.popupCursor = 0
@@ -334,11 +340,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		case "delete":
 			if focused && !p.input.Focused() && p.activeTab == SidePlaylists && p.plStore != nil {
 				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-					p.deleteMsg = "Xóa bài hát này khỏi playlist?"
+					p.deleteMsg = "Delete track from playlist?"
 					p.showDeletePopup = true
 					p.deletePopupCursor = 0
 				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
-					p.deleteMsg = "Xóa playlist này?"
+					p.deleteMsg = "Delete playlist?"
 					p.showDeletePopup = true
 					p.deletePopupCursor = 0
 				}
