@@ -3,47 +3,13 @@ package ui
 import (
 	"fmt"
 	"strings"
-	"sync"
+
+	"som/internal/tui/logbuf"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-// LogBuffer is a thread-safe ring buffer that captures log output.
-type LogBuffer struct {
-	mu    sync.Mutex
-	lines []string
-	max   int
-}
-
-func NewLogBuffer(max int) *LogBuffer {
-	return &LogBuffer{max: max}
-}
-
-func (b *LogBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.lines = append(b.lines, strings.TrimRight(string(p), "\n"))
-	if len(b.lines) > b.max {
-		b.lines = b.lines[len(b.lines)-b.max:]
-	}
-	return len(p), nil
-}
-
-func (b *LogBuffer) Lines() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	result := make([]string, len(b.lines))
-	copy(result, b.lines)
-	return result
-}
-
-func (b *LogBuffer) Len() int {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return len(b.lines)
-}
-
-var LogBuf = NewLogBuffer(500)
+var LogBuf = logbuf.New(logbuf.DefaultCapacity)
 
 func renderLogsView(logOffset int, w, h int, focused bool) string {
 	borderColor := lipgloss.Color("#7c7986")
@@ -81,7 +47,6 @@ func renderLogsView(logOffset int, w, h int, focused bool) string {
 		b.WriteString("\n")
 	}
 
-	// pad remaining lines
 	for i := len(visible); i < innerH; i++ {
 		b.WriteString(strings.Repeat(" ", innerW) + "\n")
 	}

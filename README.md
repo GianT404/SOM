@@ -216,8 +216,13 @@ go build -o som .
 - Local `.opus` file scanning with `ffprobe` duration detection
 - Live audio visualizer (`:`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
-- Logs tab for backend debugging
 - Built-in self-installer and self-updater (see below)
+
+**Logging (`5` / Logs tab):**
+
+- Captures **all** `log` output in-process (TUI + backend) into a thread-safe in-memory ring buffer (last 2000 lines) — search, stream, download, and lyrics actions are logged on the happy path in local mode.
+- Logs live **only in RAM** — quitting normally (`q`/`Ctrl+C`) never touches the disk; the old `~/som_debug.log` file was removed.
+- On a **crash (panic)** or **SIGQUIT**, the ring buffer is dumped synchronously to `~/crash_som_tui_<timestamp>.log` for debugging.
 
 **Cross-platform builds:**
 

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/signal"
+	"runtime/debug"
+	"syscall"
 
 	"som/internal/domain"
 	"som/internal/local"
@@ -67,12 +71,43 @@ func main() {
 
 	app := ui.NewApp(provider)
 
+	defer func() {
+		if r := recover(); r != nil {
+			path := ui.LogBuf.DumpCrash(fmt.Sprintf("panic: %v", r))
+			fmt.Fprintf(os.Stderr, "\nsom: crash detected; log dumped to %s\n", path)
+			fmt.Fprintf(os.Stderr, "panic: %v\n%s", r, debug.Stack())
+			os.Exit(2)
+		}
+	}()
+
 	p := tea.NewProgram(
 		app,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		for s := range sigCh {
+			switch s {
+			case syscall.SIGQUIT:
+				path := ui.LogBuf.DumpCrash("SIGQUIT received")
+				fmt.Fprintf(os.Stderr, "\nsom: SIGQUIT; log dumped to %s\n", path)
+				os.Exit(130)
+			default:
+				p.Quit()
+			}
+		}
+	}()
+	defer signal.Stop(sigCh)
+
 	if _, err := p.Run(); err != nil {
+		if errors.Is(err, tea.ErrProgramPanic) {
+			path := ui.LogBuf.DumpCrash("program panic (stack printed above)")
+			fmt.Fprintf(os.Stderr, "\nsom: crash detected; log dumped to %s\n", path)
+			os.Exit(2)
+		}
 		fmt.Fprintf(os.Stderr, "Error TUI: %v\n", err)
 		os.Exit(1)
 	}

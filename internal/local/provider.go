@@ -4,22 +4,25 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"som/internal/domain"
 	"som/internal/scraper"
 )
 
-// DirectProvider giao tiếp thẳng với core scraper, không qua mạng.
 type DirectProvider struct {
 	Scraper scraper.Scraper
 }
 
 func (p *DirectProvider) Search(ctx context.Context, q string) ([]domain.Track, error) {
+	start := time.Now()
 	results, err := p.Scraper.Search(ctx, q)
 	if err != nil {
+		log.Printf("search: error for %q after %v: %v", q, time.Since(start), err)
 		return nil, err
 	}
 
@@ -33,10 +36,12 @@ func (p *DirectProvider) Search(ctx context.Context, q string) ([]domain.Track, 
 			Thumbnail: r.Thumbnail,
 		})
 	}
+	log.Printf("search: %q -> %d result(s) in %v", q, len(tracks), time.Since(start))
 	return tracks, nil
 }
 
 func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, duration int) (domain.LyricsResp, error) {
+	start := time.Now()
 	var lr domain.LyricsResp
 	lr.Title = title
 	lr.VideoID = id
@@ -74,6 +79,7 @@ func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, d
 	}
 
 	if len(combined) == 0 {
+		log.Printf("lyrics: none for %s (%q) in %v", id, title, time.Since(start))
 		return lr, fmt.Errorf("không tìm thấy lyrics")
 	}
 	seen := make(map[string]bool)
@@ -105,14 +111,23 @@ func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, d
 		lr.SelectLanguage(0)
 	}
 
+	lineCount := 0
+	for _, t := range lr.AllTracks {
+		lineCount += len(t.Synced)
+	}
+	log.Printf("lyrics: %d track(s), %d line(s) for %s in %v", len(lr.AllTracks), lineCount, id, time.Since(start))
+
 	return lr, nil
 }
 
 func (p *DirectProvider) ResolveStream(ctx context.Context, id string) (string, error) {
+	start := time.Now()
 	info, err := p.Scraper.GetStreamInfo(ctx, id)
 	if err != nil {
+		log.Printf("stream: resolve error for %s after %v: %v", id, time.Since(start), err)
 		return "", err
 	}
+	log.Printf("stream: url ready for %s in %v", id, time.Since(start))
 	return info.URL, nil
 }
 
@@ -121,8 +136,10 @@ func (p *DirectProvider) DownloadOPUS(ctx context.Context, id, title, destDir st
 		return "", fmt.Errorf("mkdir %s: %w", destDir, err)
 	}
 
+	start := time.Now()
 	tmpFile, err := p.Scraper.DownloadAudio(ctx, id)
 	if err != nil {
+		log.Printf("download: error for %s after %v: %v", id, time.Since(start), err)
 		return "", err
 	}
 
@@ -136,6 +153,7 @@ func (p *DirectProvider) DownloadOPUS(ctx context.Context, id, title, destDir st
 		return "", err
 	}
 
+	log.Printf("download: %q saved to %s in %v", title, dest, time.Since(start))
 	return dest, nil
 }
 

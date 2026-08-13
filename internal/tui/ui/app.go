@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -781,12 +779,6 @@ func (a *App) setStatus(s string) {
 }
 
 func init() {
-	home, _ := os.UserHomeDir()
-	writers := []io.Writer{LogBuf}
-	if f, err := os.OpenFile(filepath.Join(home, "som_debug.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
-		writers = append(writers, f)
-	} else {
-		log.Printf("warn: cannot open log file: %v", err)
-	}
-	log.SetOutput(io.MultiWriter(writers...))
+	// Toàn bộ log chỉ đi vào ring buffer trong RAM, không ghi file đĩa nào cả. Khi crash, ring buffer mới được dump ra file.
+	log.SetOutput(LogBuf)
 }
