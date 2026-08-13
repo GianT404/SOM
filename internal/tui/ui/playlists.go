@@ -9,23 +9,11 @@ import (
 
 func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 	innerW := w - 4
-	inputFocused := p.input.Focused()
-	searchBorder := lipgloss.Color("#7c7986")
 	contentBorder := lipgloss.Color("#7c7986")
-
-	if inputFocused {
-		searchBorder = lipgloss.Color("#e8593c")
-	} else {
+	if p.input.Focused() {
 		contentBorder = lipgloss.Color("#e8593c")
 	}
 
-	inputRow := " " + p.input.View()
-	if p.loading {
-		inputRow += " " + p.spinner.View()
-	}
-	searchContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
-
-	searchBox := renderBox(w, "Playlists", searchContent, searchBorder)
 	var listContent string
 	if p.activePlaylist != nil {
 		listContent = p.renderPlaylistDetail(innerW)
@@ -33,9 +21,7 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 		listContent = p.renderPlaylistList(innerW)
 	}
 
-	listBox := renderBox(w, "Playlist List", listContent, contentBorder)
-
-	return searchBox + "\n" + listBox
+	return renderBox(w, "Playlist List", listContent, contentBorder)
 }
 
 func (p LeftPanel) renderPlaylistList(innerW int) string {

@@ -405,8 +405,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
 
-	if !p.input.Focused() && p.activeTab == SideDownloads {
+	if p.activeTab == SideDownloads {
 		localsCount := len(p.getFilteredLocals())
+		if p.dlOffset > 0 && p.dlOffset >= localsCount {
+			p.dlOffset = maxInt(localsCount-1, 0)
+		}
 		if p.dlCursor >= localsCount && localsCount > 0 {
 			p.dlCursor = localsCount - 1
 		}
@@ -477,13 +480,24 @@ func (p LeftPanel) getFilteredLocals() []LocalFile {
 	if q == "" {
 		return p.locals
 	}
+	tokens := strings.Fields(q)
 	var filtered []LocalFile
 	for _, f := range p.locals {
-		if strings.Contains(strings.ToLower(f.Name), q) || strings.Contains(strings.ToLower(f.Artist), q) {
+		if localMatches(f, tokens) {
 			filtered = append(filtered, f)
 		}
 	}
 	return filtered
+}
+
+func localMatches(f LocalFile, tokens []string) bool {
+	hay := strings.ToLower(f.Name + " " + f.Artist)
+	for _, tok := range tokens {
+		if !strings.Contains(hay, tok) {
+			return false
+		}
+	}
+	return true
 }
 
 func saveInputForTab(p *LeftPanel, tab SidebarItem) {
