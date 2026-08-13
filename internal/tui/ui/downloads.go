@@ -147,7 +147,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 			artistW = 0
 		}
 	}
-	header := fmt.Sprintf("  %*s  %-*s  %-*s  %*s", idxW, "#", titleW, "Title", artistW, "Artist", durW, "Time")
+	header := fmt.Sprintf("  %*s  %-*s  %-*s  %*s", idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	for i := p.dlOffset; i < end; i++ {
 		f := locals[i]
