@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" />
+  <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" />
   <img src="https://img.shields.io/badge/React_Native-0.83-61DAFB?logo=react&logoColor=white" />
   <img src="https://img.shields.io/badge/Expo-55-000020?logo=expo&logoColor=white" />
   <img src="https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white" />
@@ -61,14 +61,21 @@ SOM/
 │   │   ├── stream.go    # GET /api/v1/stream
 │   │   ├── lyrics.go    # GET /api/v1/lyrics
 │   │   └── resolve.go   # GET /api/v1/resolve
+│   ├── backend/         # Device auth + rate limiting (used by cmd/server)
+│   ├── cache/           # In-memory TTL cache
+│   ├── domain/          # Shared models & MusicProvider interface
+│   ├── local/           # DirectProvider — in-process backend for the TUI
 │   ├── scraper/         # YouTube data extraction
 │   │   ├── ytdlp.go     # yt-dlp wrapper
 │   │   ├── lrclib.go    # LRCLib lyrics API
 │   │   └── ...          # VTT parser, fallback scrapers
 │   ├── tui/
+│   │   ├── api/               # HTTP client for remote mode (--server)
 │   │   ├── audio/             # System audio capture + FFT for the visualizer
 │   │   ├── player/            # ffmpeg-based decode + oto playback (opus_player.go)
 │   │   ├── bindeps/           # Bundled binary dependency helpers
+│   │   ├── logbuf/            # Thread-safe in-memory ring-buffer logger (crash dump support)
+│   │   ├── cmd/tui/           # Standalone TUI entry point
 │   │   └── ui/                # TUI components (Bubble Tea)
 │   │       ├── app.go           # Main app loop, sidebar, progress bar, key handling
 │   │       ├── browse.go        # Left panel (search/downloads/local)
@@ -101,7 +108,8 @@ SOM/
 │   └── assets/          # App icons, splash screen
 ├── desktop/             # Tauri v2 desktop app (React + Vite + TypeScript)
 ├── docs/
-│   └── DESKTOP.md       # Desktop setup, build, and troubleshooting
+│   ├── index.html       # Inline API documentation
+│   └── openapi.yaml     # OpenAPI spec
 └── go.mod               # Go module definition
 ```
 
@@ -117,7 +125,7 @@ SOM/
 
 ### Prerequisites
 
-- **Go** 1.25+
+- **Go** 1.26+
 - **Node.js** 18+ & **npm**
 - **yt-dlp** installed and available in `$PATH`
 - **Android Studio** (for Android builds) or **Xcode** (for iOS builds)
@@ -143,7 +151,11 @@ The server starts on port `8080` by default. Configure with environment variable
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8080` | Server port |
+| `HOST` | (all interfaces) | Bind host |
 | `YTDLP_PATH` | `yt-dlp` | Path to yt-dlp binary |
+| `SOM_API_KEY` | — | Require an API key for requests |
+| `BANNED_DEVICES` | — | Comma-separated device IDs to ban |
+| `TRUSTED_PROXIES` | — | Comma-separated IP/CIDR allowed to supply `X-Forwarded-For` |
 
 ### 3. Start the mobile app
 
@@ -162,15 +174,9 @@ cd app
 npx expo run:android
 ```
 
-### Desktop App (Stop supported)
+### Desktop App (Deprecated)
 
-See [`docs/DESKTOP.md`](docs/DESKTOP.md) for Linux/Windows desktop setup.
-
-```bash
-npm install
-npm run desktop:dev
-npm run desktop:build:linux
-```
+No longer actively maintained — the mobile app and TUI are the supported clients.
 
 ### TUI (Terminal UI)
 
@@ -193,16 +199,16 @@ go build -o som .
 | `?` | Toggle help popup (full shortcut list) |
 | `Tab` | Cycle through sidebar tabs |
 | `1`-`5` | Jump directly to a tab |
-| `/` | Focus search input |
+| `/` | Focus search input (Playlists tab: create a new playlist) |
 | `:` | Open live audio visualizer |
 | `Enter` | Play selected track |
 | `Space` | Play / pause |
-| `n` / `p` | Next / previous track |
+| `]` / `[` | Next / previous track |
 | `r` | Toggle shuffle (random) |
 | `←` / `→` | Seek -/+ 5s |
+| `+` / `-` | Volume up / down |
 | `a` | Add current track to a playlist |
-| `c` / `n` (Playlists tab) | Create a new playlist |
-| `Delete` | Remove selected playlist |
+| `Delete` | Remove selected playlist / track |
 | `d` | Download selected track |
 | `l` | Choose lyrics language |
 | `q` | Quit (when input not focused) |
@@ -238,6 +244,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 
 | Flag | Description |
 |------|-------------|
+| `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one |
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
 | `--upgrade` | Download and install the latest SOM release from GitHub |
 | `--version` | Print the current version and exit |
@@ -276,7 +283,7 @@ curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.
 - **yt-dlp** — YouTube audio extraction (opus format)
 - **LRCLib** — Synced lyrics database
 - **Bubble Tea** — TUI framework powering the terminal app
-- **oto** — Cross-platform Go audio playback (decodes via `ffmpeg`, no `mpv` dependency)
+- **oto** — Cross-platform Go audio playback (decodes via `ffmpeg`)
 
 ### Frontend
 - **React Native** — Cross-platform mobile framework
