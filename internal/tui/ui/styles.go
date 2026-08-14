@@ -88,12 +88,14 @@ var (
 	ProgressFilledStyle = lipgloss.NewStyle().
 				Foreground(colorAccent)
 
-	ProgressEmptyStyle = lipgloss.NewStyle().
-				Foreground(colorWhite)
-
 	ProgressTimeStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#ffffff")).
 				Bold(true)
+
+	ProgressTimeOnFillStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#ffffff")).
+					Background(colorAccent).
+					Bold(true)
 
 	ProgressDimStyle = lipgloss.NewStyle().
 				Foreground(colorWhite)

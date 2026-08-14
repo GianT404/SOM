@@ -477,24 +477,54 @@ func (a *App) renderProgressBar(w int) string {
 	timeStr := FormatDuration(elapsedSec)
 	timeW := len([]rune(timeStr))
 
-	restW := innerW - timeW
-	if restW < 0 {
-		restW = 0
+	timeStart := (innerW - timeW) / 2
+	if timeStart < 0 {
+		timeStart = 0
+	}
+	leftW := timeStart
+	rightW := innerW - timeStart - timeW
+	if rightW < 0 {
+		rightW = 0
 	}
 
 	fillW := 0
 	if totalSec > 0 {
-		fillW = restW * elapsedSec / totalSec
+		fillW = innerW * elapsedSec / totalSec
 	}
-	if fillW > restW {
-		fillW = restW
+	if fillW > innerW {
+		fillW = innerW
 	}
-	emptyW := restW - fillW
+
+	leftFill := fillW
+	if leftFill > leftW {
+		leftFill = leftW
+	}
+	rightFill := fillW - leftW - timeW
+	if rightFill < 0 {
+		rightFill = 0
+	}
+	if rightFill > rightW {
+		rightFill = rightW
+	}
+
+	labelFill := fillW - leftW
+	if labelFill < 0 {
+		labelFill = 0
+	}
+	if labelFill > timeW {
+		labelFill = timeW
+	}
 
 	var bar strings.Builder
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", fillW)))
-	bar.WriteString(ProgressTimeStyle.Render(timeStr))
-	bar.WriteString(ProgressEmptyStyle.Render(strings.Repeat("░", emptyW)))
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", leftFill)))
+	bar.WriteString(strings.Repeat(" ", leftW-leftFill))
+	if labelFill > 0 {
+		bar.WriteString(ProgressTimeOnFillStyle.Render(string([]rune(timeStr)[:labelFill])))
+	}
+	if labelFill < timeW {
+		bar.WriteString(ProgressTimeStyle.Render(string([]rune(timeStr)[labelFill:])))
+	}
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", rightFill)))
 
 	progress := bar.String()
 	borderColor := lipgloss.Color("#7c7986")
