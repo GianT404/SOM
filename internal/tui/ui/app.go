@@ -44,6 +44,7 @@ type App struct {
 	provider      domain.MusicProvider
 	player        *player.Player
 	nowPlay       *domain.Track
+	songStarted   bool
 	width         int
 	height        int
 	left          LeftPanel
@@ -93,7 +94,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		a.left.animTick++
 		a.right.TickAt()
-		if !a.left.loadingStream && a.player.State() == player.Stopped && a.nowPlay != nil {
+		// resolve stream thất bại trước khi phát thì không tự trỏ qua bài khác.
+		if !a.left.loadingStream && a.songStarted && a.player.State() == player.Stopped && a.nowPlay != nil {
 			playErr := a.player.PlaybackError()
 			a.nowPlay = nil
 			if playErr != nil {
@@ -309,6 +311,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		a.nowPlay = &msg.Track
+		a.songStarted = true
 		a.right.SetTrack(&msg.Track)
 		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
 		if msg.LyricsErr != nil {
@@ -577,6 +580,7 @@ func (a *App) renderProgressBar(w int) string {
 func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.currentIdx = idx
 	a.nowPlay = &t
+	a.songStarted = false
 	a.syncPlaylistState()
 
 	if idx >= 0 && a.sidebarActive == a.activeContext {
@@ -614,6 +618,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
 			return nil
 		}
+		a.songStarted = true
 		a.right.SetTrack(&t)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
