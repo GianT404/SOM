@@ -28,6 +28,11 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	inputContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
 	searchBox := renderBox(w, "Search", inputContent, searchBorder)
 
+	var suggestionBox string
+	if inputFocused && len(p.suggestions) > 0 {
+		suggestionBox = renderBox(w, "Suggestions", p.renderSuggestions(innerW), lipgloss.Color("#7c7986"))
+	}
+
 	var resultContent string
 	if p.errMsg != "" {
 		resultContent = StatusErrStyle.Render("X " + p.errMsg)
@@ -50,7 +55,42 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	}
 	resultsBox := renderBox(w, "", resultContent, contentBorder)
 
+	if suggestionBox != "" {
+		return searchBox + "\n" + suggestionBox + "\n" + resultsBox
+	}
 	return searchBox + "\n" + resultsBox
+}
+
+func (p LeftPanel) renderSuggestions(innerW int) string {
+	const maxShow = 5
+	show := maxShow
+	if len(p.suggestions) < show {
+		show = len(p.suggestions)
+	}
+	titleW := innerW - 2
+	if titleW < 10 {
+		titleW = 10
+	}
+	var b strings.Builder
+	for i := 0; i < show; i++ {
+		mark := " "
+		if i == p.suggestCursor {
+			mark = "»"
+		}
+		text := truncate(strings.TrimSpace(p.suggestions[i]), titleW)
+		line := mark + " " + text
+		pad := innerW - runewidth.StringWidth(line)
+		if pad < 0 {
+			pad = 0
+		}
+		if i == p.suggestCursor {
+			b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
+		} else {
+			b.WriteString(NormalItemStyle.Render(line + strings.Repeat(" ", pad)))
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func (p LeftPanel) renderSearchList(innerW int) string {

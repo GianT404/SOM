@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"som/internal/domain"
+	"som/internal/scraper"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,6 +17,24 @@ func searchCmd(p domain.MusicProvider, q string) tea.Cmd {
 	return func() tea.Msg {
 		tracks, err := p.Search(context.Background(), q)
 		return SearchResultMsg{Tracks: tracks, Err: err}
+	}
+}
+
+const suggestDebounce = 200 * time.Millisecond
+
+// suggestDebounceCmd chờ 200ms trước khi bắn SuggestDebounceMsg
+func suggestDebounceCmd(query string) tea.Cmd {
+	return tea.Tick(suggestDebounce, func(t time.Time) tea.Msg {
+		return SuggestDebounceMsg{Query: query}
+	})
+}
+
+func suggestCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		items, err := scraper.Suggest(ctx, query)
+		return SuggestionsMsg{Query: query, Items: items, Err: err}
 	}
 }
 

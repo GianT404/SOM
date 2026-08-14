@@ -9,6 +9,16 @@ type SearchResultMsg struct {
 	Err    error
 }
 
+type SuggestDebounceMsg struct {
+	Query string
+}
+
+type SuggestionsMsg struct {
+	Query string
+	Items []string
+	Err   error
+}
+
 type PlayStartedMsg struct{ Track domain.Track }
 
 type PlayLocalMsg struct {

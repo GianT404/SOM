@@ -48,6 +48,9 @@ type LeftPanel struct {
 	showDeletePopup   bool
 	deletePopupCursor int
 	deleteMsg         string
+
+	suggestions   []string
+	suggestCursor int
 }
 
 func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
@@ -227,9 +230,17 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		case "enter":
 			if p.input.Focused() {
 				q := strings.TrimSpace(p.input.Value())
+				// Ưu tiên gợi ý đang được chọn nếu có danh sách gợi ý đang mở.
+				if len(p.suggestions) > 0 && p.suggestCursor < len(p.suggestions) {
+					q = strings.TrimSpace(p.suggestions[p.suggestCursor])
+					p.input.SetValue(q)
+					p.input.CursorEnd()
+				}
 				if q == "" || p.loading {
 					return p, nil
 				}
+				p.suggestions = nil
+				p.suggestCursor = 0
 				if p.searchOnEnter {
 					p.loading = true
 					p.errMsg = ""
@@ -268,6 +279,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "backspace", "esc":
+			if len(p.suggestions) > 0 && p.input.Focused() {
+				p.suggestions = nil
+				p.suggestCursor = 0
+				break
+			}
 			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 				p.activePlaylist = nil
 				p.plCursor = 0
@@ -275,6 +291,12 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			}
 
 		case "up":
+			if p.input.Focused() {
+				if len(p.suggestions) > 0 && p.activeTab == SideSearch && p.suggestCursor > 0 {
+					p.suggestCursor--
+				}
+				break
+			}
 			if focused && !p.input.Focused() {
 				if p.activeTab == SideSearch && p.searchCursor > 0 {
 					p.searchCursor--
@@ -296,7 +318,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 
 		case "down":
 			if p.input.Focused() {
-				if p.activeTab == SideSearch || p.activeTab == SideDownloads {
+				if len(p.suggestions) > 0 && p.activeTab == SideSearch && p.suggestCursor < len(p.suggestions)-1 {
+					p.suggestCursor++
+				} else if p.activeTab == SideSearch || p.activeTab == SideDownloads {
 					p.input.Blur()
 				}
 				return p, nil
@@ -387,6 +411,33 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			p.tracks = msg.Tracks
 		}
 
+	case SuggestDebounceMsg:
+		if p.activeTab != SideSearch || !p.input.Focused() {
+			break
+		}
+		cur := strings.TrimSpace(p.input.Value())
+		if cur != "" && cur == msg.Query {
+			cmds = append(cmds, suggestCmd(cur))
+		}
+
+	case SuggestionsMsg:
+		if p.activeTab != SideSearch || !p.input.Focused() {
+			break
+		}
+		cur := strings.TrimSpace(p.input.Value())
+		if cur != msg.Query {
+			break // kết quả đã cũ, bỏ qua
+		}
+		if msg.Err != nil {
+			p.suggestions = nil
+			p.suggestCursor = 0
+			break
+		}
+		p.suggestions = msg.Items
+		if p.suggestCursor >= len(p.suggestions) {
+			p.suggestCursor = 0
+		}
+
 	case DownloadDoneMsg:
 		p.loadingDownload = false
 		if msg.Err == nil {
@@ -402,8 +453,25 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	}
 
 	var inputCmd tea.Cmd
+	oldVal := strings.TrimSpace(p.input.Value())
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
+
+	if p.activeTab == SideSearch && p.input.Focused() && !p.showAddPopup && !p.showDeletePopup {
+		newVal := strings.TrimSpace(p.input.Value())
+		if newVal != oldVal {
+			// User vừa gõ/xoá → debounce rồi mới request gợi ý (200ms).
+			if newVal == "" {
+				p.suggestions = nil
+				p.suggestCursor = 0
+			} else {
+				cmds = append(cmds, suggestDebounceCmd(newVal))
+			}
+		}
+	} else if len(p.suggestions) > 0 && !p.input.Focused() {
+		p.suggestions = nil
+		p.suggestCursor = 0
+	}
 
 	if p.activeTab == SideDownloads {
 		localsCount := len(p.getFilteredLocals())

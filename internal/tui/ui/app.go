@@ -769,6 +769,8 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 		a.left.searchOnEnter = true
 	} else {
 		a.left.searchOnEnter = false
+		a.left.suggestions = nil
+		a.left.suggestCursor = 0
 	}
 
 	var cmds []tea.Cmd
