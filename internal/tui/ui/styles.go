@@ -93,9 +93,9 @@ var (
 				Bold(true)
 
 	ProgressTimeOnFillStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#ffffff")).
-					Background(colorAccent).
-					Bold(true)
+				Foreground(lipgloss.Color("#ffffff")).
+				Background(colorAccent).
+				Bold(true)
 
 	ProgressDimStyle = lipgloss.NewStyle().
 				Foreground(colorWhite)
@@ -153,25 +153,37 @@ func wordWrap(text string, maxW int) []string {
 	var lines []string
 	current := ""
 	for _, w := range words {
-		wr := []rune(w)
-		if len(wr) > maxW {
+		if runewidth.StringWidth(w) > maxW {
 			if current != "" {
 				lines = append(lines, current)
 				current = ""
 			}
-			for len(wr) > maxW {
-				lines = append(lines, string(wr[:maxW]))
-				wr = wr[maxW:]
+			runes := []rune(w)
+			line := ""
+			lineW := 0
+			for _, r := range runes {
+				rw := runewidth.RuneWidth(r)
+				if lineW+rw > maxW && line != "" {
+					lines = append(lines, line)
+					line = ""
+					lineW = 0
+				}
+				line += string(r)
+				lineW += rw
 			}
-			current = string(wr)
+			current = line
 			continue
 		}
-		if current == "" {
-			current = w
-		} else if len([]rune(current))+1+len(wr) <= maxW {
-			current += " " + w
+		probe := w
+		if current != "" {
+			probe = current + " " + w
+		}
+		if runewidth.StringWidth(probe) <= maxW {
+			current = probe
 		} else {
-			lines = append(lines, current)
+			if current != "" {
+				lines = append(lines, current)
+			}
 			current = w
 		}
 	}

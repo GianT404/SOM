@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalColor) string {
@@ -152,20 +153,18 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				if written >= lyrH {
 					break
 				}
-				textW := len([]rune(seg)) + 2
-				padLeft := (innerW - textW) / 2
-				if padLeft < 0 {
-					padLeft = 0
-				}
-				prefix := strings.Repeat(" ", padLeft)
-				var rendered string
-				if i == r.curLine {
-					rendered = LyricHighlightStyle.Render(prefix + "\u25b8 " + seg)
-				} else {
-					rendered = LyricNormalStyle.Render(prefix + "  " + seg)
-				}
-				b.WriteString(rendered + "\n")
-				written++
+textW := runewidth.StringWidth(seg)
+			padLeft := (innerW - textW) / 2
+			if padLeft < 0 {
+				padLeft = 0
+			}
+			prefix := strings.Repeat(" ", padLeft)
+			style := LyricNormalStyle
+			if i == r.curLine {
+				style = LyricHighlightStyle
+			}
+			b.WriteString(style.Render(prefix + seg) + "\n")
+			written++
 			}
 		}
 		for written < lyrH {
