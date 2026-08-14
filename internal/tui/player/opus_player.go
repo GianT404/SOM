@@ -86,6 +86,20 @@ func (p *Player) State() State {
 	return p.state
 }
 
+// Position trả về vị trí phát hiện tại (tính cả trạng thái pause).
+func (p *Player) Position() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch p.state {
+	case Playing:
+		return time.Since(p.startTime)
+	case Paused:
+		return p.pauseOffset
+	default:
+		return 0
+	}
+}
+
 func (p *Player) Play(filePath string) error {
 	return p.playFrom(filePath, 0)
 }

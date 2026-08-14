@@ -21,7 +21,7 @@ import (
 type tickMsg time.Time
 
 func tick() tea.Cmd {
-	return tea.Tick(900*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(250*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
@@ -48,7 +48,6 @@ type App struct {
 	height        int
 	left          LeftPanel
 	right         RightPanel
-	playedAt      time.Time
 	statusMsg     string
 	statusAt      time.Time
 	showHelpPopup bool
@@ -93,7 +92,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		a.left.animTick++
-		a.right.TickAt(a.playedAt)
+		a.right.TickAt()
 		if !a.left.loadingStream && a.player.State() == player.Stopped && a.nowPlay != nil {
 			playErr := a.player.PlaybackError()
 			a.nowPlay = nil
@@ -172,14 +171,14 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			a.player.SeekBy(5)
-			a.right.SeekBy(5 * time.Second)
+			a.right.TickAt()
 
 		case "left":
 			if a.left.input.Focused() {
 				break
 			}
 			a.player.SeekBy(-5)
-			a.right.SeekBy(-5 * time.Second)
+			a.right.TickAt()
 
 		case "]", "}":
 			if a.left.input.Focused() {
@@ -309,14 +308,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 			break
 		}
-		a.playedAt = msg.PlayedAt
 		a.nowPlay = &msg.Track
-		a.right.SetTrack(&msg.Track, a.playedAt)
+		a.right.SetTrack(&msg.Track)
 		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
 		if msg.LyricsErr != nil {
-			a.right.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"}, a.playedAt)
+			a.right.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
 		} else {
-			a.right.SetLyrics(msg.Lyrics, a.playedAt)
+			a.right.SetLyrics(msg.Lyrics)
 		}
 		// start lyrics spinner
 		cmds = append(cmds, a.right.spinner.Tick)
@@ -616,18 +614,17 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
 			return nil
 		}
-		a.playedAt = time.Now()
-		a.right.SetTrack(&t, a.playedAt)
+		a.right.SetTrack(&t)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
 		data, err := os.ReadFile(jsonPath)
 		if err == nil {
 			var lr domain.LyricsResp
 			if json.Unmarshal(data, &lr) == nil {
-				a.right.SetLyrics(lr, a.playedAt)
+				a.right.SetLyrics(lr)
 			}
 		} else {
-			a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"}, a.playedAt)
+			a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 		}
 		return nil
 	}
@@ -645,7 +642,6 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		lr, lyricsErr := getCachedLyrics(a.provider, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
-			PlayedAt:  time.Now(),
 			Lyrics:    lr,
 			LyricsErr: lyricsErr,
 		}

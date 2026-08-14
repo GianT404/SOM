@@ -180,33 +180,3 @@ func wordWrap(text string, maxW int) []string {
 	}
 	return lines
 }
-
-// tui/ui/styles.go
-
-func marqueeText(s string, maxW int, tick int) string {
-	w := runewidth.StringWidth(s)
-	if w <= maxW {
-		return runewidth.FillRight(s, maxW)
-	}
-
-	spaced := s + "   "
-	runes := []rune(spaced)
-	offset := tick % len(runes)
-
-	var b strings.Builder
-	currentW := 0
-
-	for i := 0; currentW < maxW; i++ {
-		idx := (offset + i) % len(runes)
-		r := runes[idx]
-		rw := runewidth.RuneWidth(r)
-
-		if currentW+rw > maxW {
-			break
-		}
-		b.WriteRune(r)
-		currentW += rw
-	}
-
-	return runewidth.FillRight(b.String(), maxW)
-}

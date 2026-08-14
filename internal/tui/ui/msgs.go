@@ -2,7 +2,6 @@ package ui
 
 import (
 	"som/internal/domain"
-	"time"
 )
 
 type SearchResultMsg struct {
@@ -22,7 +21,6 @@ type DownloadDoneMsg struct {
 }
 type StreamStartedMsg struct {
 	Track     domain.Track
-	PlayedAt  time.Time
 	Lyrics    domain.LyricsResp
 	LyricsErr error
 	Err       error

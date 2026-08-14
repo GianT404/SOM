@@ -19,12 +19,9 @@ type RightPanel struct {
 	width   int
 	height  int
 
-	player    *player.Player
-	nowPlay   *domain.Track
-	playedAt  time.Time
-	elapsed   time.Duration
-	pausedAt  time.Time
-	pausedDur time.Duration
+	player  *player.Player
+	nowPlay *domain.Track
+	elapsed time.Duration
 
 	playlistPos   int
 	playlistTotal int
@@ -48,12 +45,9 @@ func NewRightPanel(p *player.Player) RightPanel {
 
 func (r *RightPanel) SetSize(w, h int) { r.width = w; r.height = h }
 
-func (r *RightPanel) SetTrack(t *domain.Track, playedAt time.Time) {
+func (r *RightPanel) SetTrack(t *domain.Track) {
 	r.nowPlay = t
-	r.playedAt = time.Now()
 	r.elapsed = 0
-	r.pausedAt = time.Time{}
-	r.pausedDur = 0
 	r.curLine = 0
 	r.offset = 0
 	r.loaded = false
@@ -62,7 +56,7 @@ func (r *RightPanel) SetTrack(t *domain.Track, playedAt time.Time) {
 	r.langCursor = 0
 }
 
-func (r *RightPanel) SetLyrics(lr domain.LyricsResp, playedAt time.Time) {
+func (r *RightPanel) SetLyrics(lr domain.LyricsResp) {
 	r.lyrics = lr
 	r.loaded = true
 	r.loadingLyrics = false
@@ -77,27 +71,9 @@ func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
 	r.random = random
 }
 
-func (r *RightPanel) SeekBy(d time.Duration) {
-	r.elapsed += d
-	if r.elapsed < 0 {
-		r.elapsed = 0
-	}
-	r.playedAt = r.playedAt.Add(-d)
-}
-
-func (r *RightPanel) TickAt(now time.Time) {
-	state := r.player.State()
-	if state == player.Playing {
-		if !r.pausedAt.IsZero() {
-			r.pausedDur += time.Since(r.pausedAt)
-			r.pausedAt = time.Time{}
-		}
-		r.elapsed = time.Since(r.playedAt) - r.pausedDur
-	} else if state == player.Paused {
-		if r.pausedAt.IsZero() {
-			r.pausedAt = time.Now()
-		}
-	}
+// TickAt đồng bộ vị trí lyrics theo đúng vị trí player
+func (r *RightPanel) TickAt() {
+	r.elapsed = r.player.Position()
 
 	if !r.loaded || len(r.lyrics.Synced) == 0 {
 		return

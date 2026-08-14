@@ -156,7 +156,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 			mark = " "
 		}
 		idx := fmt.Sprintf("%*d", idxW, i+1)
-		title := marqueeText(f.Name, titleW, p.animTick)
+		title := runewidth.FillRight(truncate(f.Name, titleW), titleW)
 		safeArtist := truncate(f.Artist, artistW)
 		artistPlain := runewidth.FillRight(safeArtist, artistW)
 		dur := fmt.Sprintf("%*s", durW, FormatDuration(f.Duration))
