@@ -280,13 +280,15 @@ func NewYtdlpScraper(binPath string) *YtdlpScraper {
 }
 
 type ytdlpSearchItem struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	Thumbnail  string  `json:"thumbnail"`
-	Duration   float64 `json:"duration"`
-	Uploader   string  `json:"uploader"`
-	URL        string  `json:"url"`
-	Thumbnails []struct {
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Type         string  `json:"_type"`
+	ExtractorKey string  `json:"extractor_key"`
+	Thumbnail    string  `json:"thumbnail"`
+	Duration     float64 `json:"duration"`
+	Uploader     string  `json:"uploader"`
+	URL          string  `json:"url"`
+	Thumbnails   []struct {
 		URL string `json:"url"`
 	} `json:"thumbnails"`
 }
@@ -339,6 +341,18 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 			var item ytdlpSearchItem
 			if err := json.Unmarshal(scanner.Bytes(), &item); err != nil {
 				continue // skip malformed lines
+			}
+
+			// Bỏ kênh/playlist, chỉ giữ video (_type "url" với --flat-playlist).
+			if item.Type != "" && item.Type != "url" {
+				continue
+			}
+			if item.ExtractorKey != "" && item.ExtractorKey != "Youtube" {
+				continue
+			}
+			// Channel handle (@...), không phải video id 11 ký tự.
+			if strings.HasPrefix(item.ID, "@") {
+				continue
 			}
 
 			thumb := item.Thumbnail

@@ -74,7 +74,7 @@ func (p LeftPanel) renderSuggestions(innerW int) string {
 	var b strings.Builder
 	for i := 0; i < show; i++ {
 		mark := " "
-		if i == p.suggestCursor {
+		if p.suggestFocus && i == p.suggestCursor {
 			mark = "»"
 		}
 		text := truncate(strings.TrimSpace(p.suggestions[i]), titleW)
@@ -83,7 +83,7 @@ func (p LeftPanel) renderSuggestions(innerW int) string {
 		if pad < 0 {
 			pad = 0
 		}
-		if i == p.suggestCursor {
+		if p.suggestFocus && i == p.suggestCursor {
 			b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
 		} else {
 			b.WriteString(NormalItemStyle.Render(line + strings.Repeat(" ", pad)))
