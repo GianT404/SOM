@@ -66,7 +66,7 @@ type App struct {
 
 func NewApp(provider domain.MusicProvider) *App {
 	p := player.New()
-	return &App{
+	a := &App{
 		provider:      provider,
 		player:        p,
 		left:          NewLeftPanel(provider),
@@ -75,6 +75,9 @@ func NewApp(provider domain.MusicProvider) *App {
 		activeContext: SideDownloads,
 		palette:       NewCommandPalette(),
 	}
+	// focus  border Playlist
+	a.left.input.Blur()
+	return a
 }
 
 func (a *App) Init() tea.Cmd {

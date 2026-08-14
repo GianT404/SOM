@@ -15,8 +15,8 @@ func runInstall() error {
 	case "windows":
 		return installWindows()
 	default:
-		return fmt.Errorf("chưa hỗ trợ --install tự động trên %s — "+
-			"tự copy binary vào 1 thư mục đã có trong $PATH nhé", runtime.GOOS)
+		return fmt.Errorf(" %s — "+
+			"please manually copy the binary to a directory in your $PATH", runtime.GOOS)
 	}
 }
 
@@ -45,23 +45,23 @@ func installUnix() error {
 
 	if err := copyExecutableTo(dest); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("không đủ quyền ghi vào %s — chạy lại với sudo:\n  sudo som --install", destDir)
+			return fmt.Errorf("no permission to write to %s — run again with sudo:\n  sudo som --install", destDir)
 		}
 		return err
 	}
-	fmt.Println("Đã cài vào", dest)
-	fmt.Println("Giờ có thể gõ `som` ở bất kỳ đâu (mở terminal mới nếu chưa thấy tác dụng).")
+	fmt.Println("Installed to", dest)
+	fmt.Println("You can now run `som` from anywhere (open a new terminal if you don't see the effect).")
 	return nil
 }
 
 func installWindows() error {
 	localAppData := os.Getenv("LocalAppData")
 	if localAppData == "" {
-		return fmt.Errorf("không tìm thấy biến môi trường LocalAppData")
+		return fmt.Errorf("no LocalAppData environment variable found")
 	}
 	destDir := filepath.Join(localAppData, "Programs", "som")
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return fmt.Errorf("tạo thư mục cài đặt thất bại: %w", err)
+		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
 	dest := filepath.Join(destDir, "som.exe")
@@ -69,21 +69,21 @@ func installWindows() error {
 		return err
 	}
 
-	fmt.Println("Đã cài vào", dest)
+	fmt.Println("Installed to", dest)
 	fmt.Println()
-	fmt.Println("Để gõ `som` được ở bất kỳ đâu, thêm thư mục sau vào PATH (chỉ cần làm 1 lần):")
+	fmt.Println("To run `som` from anywhere, add the following directory to your PATH (do this only once):")
 	fmt.Println("   ", destDir)
 	fmt.Println()
-	fmt.Println("Cách thêm: gõ \"env\" vào Windows Search → chọn \"Edit environment variables")
-	fmt.Println("for your account\" → mục \"User variables\" → chọn \"Path\" → Edit → New → dán")
-	fmt.Println("đường dẫn ở trên → OK hết các cửa sổ → mở terminal mới để áp dụng.")
+	fmt.Println("How to add to PATH: type \"env\" in Windows Search → select \"Edit environment variables")
+	fmt.Println("for your account\" → select \"User variables\" → select \"Path\" → Edit → New → paste")
+	fmt.Println("the path above → OK all windows → open a new terminal to apply the changes.")
 	return nil
 }
 
 func copyExecutableTo(dest string) error {
 	src, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("không xác định được vị trí binary đang chạy: %w", err)
+		return fmt.Errorf("failed to determine the location of the running binary: %w", err)
 	}
 
 	in, err := os.Open(src)
