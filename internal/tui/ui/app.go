@@ -62,29 +62,56 @@ type App struct {
 	logOffset     int
 	activeContext SidebarItem
 	palette       CommandPalette
+	booting       bool
+	splashFrame   int
 }
 
 func NewApp(provider domain.MusicProvider) *App {
-	p := player.New()
-	a := &App{
+	return &App{
 		provider:      provider,
-		player:        p,
-		left:          NewLeftPanel(provider),
-		right:         NewRightPanel(p),
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
 		palette:       NewCommandPalette(),
+		booting:       true,
 	}
-	// focus  border Playlist
-	a.left.input.Blur()
-	return a
 }
 
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(a.left.Init(), tick(), animTick())
+	return tea.Batch(splashTick(), bootCmd(a.provider))
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if a.booting {
+		switch msg := msg.(type) {
+		case tea.WindowSizeMsg:
+			a.width = msg.Width
+			a.height = msg.Height
+			return a, nil
+
+		case splashTickMsg:
+			a.splashFrame++
+			return a, splashTick()
+
+		case splashDoneMsg:
+			a.player = msg.player
+			a.right = NewRightPanel(msg.player)
+			a.left = msg.left
+			a.left.input.Blur()
+			a.booting = false
+			a.resizePanels()
+			return a, tea.Batch(a.left.Init(), tick(), animTick())
+
+		case tea.KeyMsg:
+			if msg.String() == "ctrl+c" {
+				return a, tea.Quit
+			}
+			return a, nil
+
+		default:
+			return a, nil
+		}
+	}
+
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -131,7 +158,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.Stop()
 			return a, tea.Quit
 
-		case "alt + q":
+		case "alt+q":
 			if !a.left.input.Focused() {
 				a.player.Stop()
 				return a, tea.Quit
@@ -365,8 +392,8 @@ func (a *App) mainContentHeight() int {
 }
 
 func (a *App) View() string {
-	if a.width == 0 {
-		return "Loading..."
+	if a.booting || a.width == 0 {
+		return renderSplash(a.width, a.height, a.splashFrame)
 	}
 
 	contentH := a.mainContentHeight()
