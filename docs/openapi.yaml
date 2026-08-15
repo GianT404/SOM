@@ -86,6 +86,14 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: "missing required parameter: q"
+        "401":
+          description: Thiếu hoặc sai API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "missing or invalid credentials, hire me for a proper API key"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -143,6 +151,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Thiếu hoặc sai API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "missing or invalid credentials, hire me for a proper API key"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -180,6 +196,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Thiếu hoặc sai API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "missing or invalid credentials, hire me for a proper API key"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -242,6 +266,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Thiếu hoặc sai API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "missing or invalid credentials, hire me for a proper API key"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
