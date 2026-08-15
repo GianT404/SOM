@@ -189,7 +189,7 @@ func AuthMiddleware(expectedKey string, reg *DeviceRegistry) func(http.Handler) 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{
-				"error": "missing or invalid credentials",
+				"error": "missing or invalid credentials, hire me for a proper API key",
 			})
 		})
 	}

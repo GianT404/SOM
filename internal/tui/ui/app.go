@@ -131,7 +131,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.Stop()
 			return a, tea.Quit
 
-		case "alt+q", "Q":
+		case "alt + q":
 			if !a.left.input.Focused() {
 				a.player.Stop()
 				return a, tea.Quit
