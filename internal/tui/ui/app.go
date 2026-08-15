@@ -131,7 +131,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.player.Stop()
 			return a, tea.Quit
 
-		case "q", "Q":
+		case "alt+q", "Q":
 			if !a.left.input.Focused() {
 				a.player.Stop()
 				return a, tea.Quit
@@ -407,9 +407,9 @@ func (a *App) View() string {
 	if a.random {
 		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
-	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev +/-:volume ") +
+	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev ") +
 		rStyle.Render("r") +
-		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help q:quit")
+		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help alt + q:quit")
 
 	progressBar := a.renderProgressBar(a.width)
 

@@ -23,7 +23,7 @@ var helpSections = []helpSection{
 			{"1-5", "Jump to Tab"},
 			{"/", "Search"},
 			{":", "Command Palette"},
-			{"q", "Quit"},
+			{"alt + q", "Quit"},
 		},
 	},
 	{
