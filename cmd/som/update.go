@@ -36,7 +36,7 @@ type ghRelease struct {
 
 func runSelfUpdate(current string) error {
 	if current == "dev" {
-		return fmt.Errorf("this binary was built without an embedded version (missing -ldflags), "+
+		return fmt.Errorf("this binary was built without an embedded version (missing -ldflags), " +
 			"cannot compare with the latest GitHub release")
 	}
 
@@ -104,11 +104,16 @@ func findUpdate(assetName string) (*ghRelease, string, error) {
 	if ferr != nil {
 		return nil, "", fmt.Errorf("failed to check for updates (GitHub API and release feed both failed)")
 	}
+	bestTag := ""
 	for _, tag := range tags {
-		u := releaseDownloadURL(tag, assetName)
-		if assetExists(u) {
-			return &ghRelease{TagName: tag}, u, nil
+		if assetExists(releaseDownloadURL(tag, assetName)) {
+			if bestTag == "" || versionCompare(tag, bestTag) > 0 {
+				bestTag = tag
+			}
 		}
+	}
+	if bestTag != "" {
+		return &ghRelease{TagName: bestTag}, releaseDownloadURL(bestTag, assetName), nil
 	}
 	return nil, "", fmt.Errorf("no build %q found in recent releases", assetName)
 }
@@ -144,18 +149,28 @@ func fetchReleases() ([]ghRelease, error) {
 }
 
 func latestReleaseWithAsset(rels []ghRelease, assetName string) *ghRelease {
+	var best *ghRelease
 	for i := range rels {
 		r := &rels[i]
 		if r.Draft || r.Prerelease {
 			continue
 		}
+		hasAsset := false
 		for _, a := range r.Assets {
 			if a.Name == assetName {
-				return r
+				hasAsset = true
+				break
 			}
 		}
+		if !hasAsset {
+			continue
+		}
+		// Chọn bản có version cao nhất
+		if best == nil || versionCompare(r.TagName, best.TagName) > 0 {
+			best = r
+		}
 	}
-	return nil
+	return best
 }
 
 func assetURLOf(r *ghRelease, assetName string) string {
