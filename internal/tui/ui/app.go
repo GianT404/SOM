@@ -64,7 +64,10 @@ type App struct {
 	palette       CommandPalette
 	booting       bool
 	splashFrame   int
+	pendingKeys   []tea.KeyMsg
 }
+
+const maxPendingKeys = 64
 
 func NewApp(provider domain.MusicProvider) *App {
 	return &App{
@@ -86,6 +89,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			a.width = msg.Width
 			a.height = msg.Height
+			// Truyền size xuống palette (visualizer) ngay cả khi đang boot,
+			a.palette.width = msg.Width
+			a.palette.height = msg.Height
 			return a, nil
 
 		case splashTickMsg:
@@ -99,11 +105,24 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.left.input.Blur()
 			a.booting = false
 			a.resizePanels()
-			return a, tea.Batch(a.left.Init(), tick(), animTick())
+
+			// Replay phím bấm trong lúc boot để không bị nuốt.
+			cmds := []tea.Cmd{a.left.Init(), tick(), animTick()}
+			for _, k := range a.pendingKeys {
+				_, c := a.Update(k)
+				if c != nil {
+					cmds = append(cmds, c)
+				}
+			}
+			a.pendingKeys = nil
+			return a, tea.Batch(cmds...)
 
 		case tea.KeyMsg:
 			if msg.String() == "ctrl+c" {
 				return a, tea.Quit
+			}
+			if len(a.pendingKeys) < maxPendingKeys {
+				a.pendingKeys = append(a.pendingKeys, msg)
 			}
 			return a, nil
 
@@ -835,6 +854,8 @@ func (a *App) resizePanels() {
 	contentH := a.mainContentHeight()
 	a.left.SetSize(mainW, contentH)
 	a.right.SetSize(mainW, contentH)
+	a.palette.width = a.width
+	a.palette.height = a.height
 }
 
 func (a *App) setStatus(s string) {
