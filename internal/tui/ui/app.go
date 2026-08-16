@@ -632,9 +632,10 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.songStarted = false
 	a.syncPlaylistState()
 
-	if idx >= 0 && a.sidebarActive == a.activeContext {
+	if idx >= 0 {
 		vis := a.left.visibleRows()
-		if a.sidebarActive == SideSearch {
+		switch a.activeContext {
+		case SideSearch:
 			a.left.searchCursor = idx
 			if a.left.searchCursor < a.left.searchOffset {
 				a.left.searchOffset = a.left.searchCursor
@@ -642,7 +643,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			if a.left.searchCursor >= a.left.searchOffset+vis {
 				a.left.searchOffset = a.left.searchCursor - vis + 1
 			}
-		} else if a.sidebarActive == SideDownloads {
+		case SideDownloads:
 			a.left.dlCursor = idx
 			if a.left.dlCursor < a.left.dlOffset {
 				a.left.dlOffset = a.left.dlCursor
@@ -650,13 +651,15 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			if a.left.dlCursor >= a.left.dlOffset+vis {
 				a.left.dlOffset = a.left.dlCursor - vis + 1
 			}
-		} else if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
-			a.left.plCursor = idx
-			if a.left.plCursor < a.left.plOffset {
-				a.left.plOffset = a.left.plCursor
-			}
-			if a.left.plCursor >= a.left.plOffset+vis {
-				a.left.plOffset = a.left.plCursor - vis + 1
+		case SidePlaylists:
+			if a.left.activePlaylist != nil {
+				a.left.plCursor = idx
+				if a.left.plCursor < a.left.plOffset {
+					a.left.plOffset = a.left.plCursor
+				}
+				if a.left.plCursor >= a.left.plOffset+vis {
+					a.left.plOffset = a.left.plCursor - vis + 1
+				}
 			}
 		}
 	}
