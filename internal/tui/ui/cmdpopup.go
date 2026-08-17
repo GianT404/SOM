@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +13,30 @@ import (
 
 var cmdOptions = []string{
 	"Rename title",
+	"Delete track",
 }
 
 func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
+	if a.delActive {
+		switch k.String() {
+		case "up", "k", "down", "j", "left", "h", "right", "l":
+			a.cmdCursor = 1 - a.cmdCursor
+		case "enter":
+			if a.cmdCursor == 1 {
+				a.applyDeleteTrack()
+				a.delActive = false
+				a.showCmdPopup = false
+			} else {
+				a.delActive = false
+			}
+			return nil
+		case "esc", ":":
+			a.delActive = false
+			return nil
+		}
+		return nil
+	}
+
 	if a.renameActive {
 		switch k.String() {
 		case "enter":
@@ -74,6 +96,13 @@ func (a *App) runCmdOption(idx int) {
 			a.renameInput.SetValue("")
 		}
 		a.renameInput.CursorEnd()
+	case "Delete track":
+		if _, ok := a.renameTarget(); ok {
+			a.delActive = true
+			a.cmdCursor = 0
+		} else {
+			a.setStatus(StatusErrStyle.Render("X No local track selected"))
+		}
 	}
 }
 
@@ -132,6 +161,44 @@ func (a *App) applyRenameTitle(newTitle string) {
 	a.setStatus(StatusOKStyle.Render("> Renamed to " + newTitle))
 }
 
+func (a *App) applyDeleteTrack() {
+	target, ok := a.renameTarget()
+	if !ok {
+		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+		return
+	}
+	path := target.Path
+
+	if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == path {
+		a.player.Stop()
+		a.nowPlay = nil
+		a.songStarted = false
+	}
+
+	os.Remove(path)
+	os.Remove(strings.TrimSuffix(path, ".opus") + ".json")
+
+	for i := range a.left.locals {
+		if a.left.locals[i].Path == path {
+			a.left.locals = append(a.left.locals[:i], a.left.locals[i+1:]...)
+			break
+		}
+	}
+	if a.left.dlCursor >= len(a.left.locals) {
+		a.left.dlCursor = len(a.left.locals) - 1
+	}
+
+	newPlaylist := a.playlist[:0]
+	for _, t := range a.playlist {
+		if t.ID != "local:"+path {
+			newPlaylist = append(newPlaylist, t)
+		}
+	}
+	a.playlist = newPlaylist
+
+	a.setStatus(StatusOKStyle.Render("> Deleted " + target.Name))
+}
+
 func sanitizeLocalName(s string) string {
 	r := strings.NewReplacer("/", "-", "\\", "-", ":", "-", "*", "-", "?", "-", `"`, "-", "<", "-", ">", "-", "|", "-")
 	return strings.TrimSpace(r.Replace(s))
@@ -166,6 +233,29 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 
 func (a *App) renderCmdPopup() string {
 	var b strings.Builder
+	if a.delActive {
+		target, _ := a.renameTarget()
+		name := "(no local track)"
+		if target != nil {
+			name = target.Name
+		}
+		b.WriteString("\n ")
+		b.WriteString(DimItemStyle.Render("Delete \"" + name + "\" permanently?"))
+		b.WriteString("\n\n ")
+
+		cancelStyle := NormalItemStyle
+		confirmStyle := NormalItemStyle
+		if a.cmdCursor == 0 {
+			cancelStyle = SelectedItemStyle
+		} else {
+			confirmStyle = SelectedItemStyle.Foreground(deleteColor)
+		}
+		b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Delete ]")))
+		b.WriteString("\n\n")
+		b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: back)"))
+		return renderBox(60, "Delete Track", b.String(), lipgloss.Color("#E24B4A"))
+	}
+
 	if a.renameActive {
 		b.WriteString("\n  ")
 		b.WriteString(a.renameInput.View())

@@ -79,6 +79,7 @@ type App struct {
 	cmdCursor    int
 	renameActive bool
 	renameInput  textinput.Model
+	delActive    bool
 }
 
 const maxPendingKeys = 64
