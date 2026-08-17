@@ -73,6 +73,7 @@ type App struct {
 	booting       bool
 	splashFrame   int
 	pendingKeys   []tea.KeyMsg
+	searchVisited bool
 }
 
 const maxPendingKeys = 64
@@ -196,11 +197,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.palette.Close()
 			}
 		case "1", "2", "3", "4", "5":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() && a.left.input.Value() != "" {
 				break
 			}
 			targetTab := SidebarItem(msg.String()[0] - '1')
-			cmds = append(cmds, a.switchSidebar(targetTab))
+			return a, a.switchSidebar(targetTab)
 		case ":":
 			if a.left.input.Focused() {
 				break
@@ -830,16 +831,20 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	a.left.activeTab = item
 	loadInputForTab(&a.left, item)
 
+	var cmds []tea.Cmd
+
 	if item == SideSearch {
 		a.left.searchOnEnter = true
+		if !a.searchVisited {
+			a.searchVisited = true
+			cmds = append(cmds, a.left.input.Focus())
+		}
 	} else {
 		a.left.searchOnEnter = false
 		a.left.suggestions = nil
 		a.left.suggestCursor = 0
 		a.left.suggestFocus = false
 	}
-
-	var cmds []tea.Cmd
 
 	if item == SideDownloads && oldTab != SideDownloads {
 		cmds = append(cmds, animTick())
