@@ -15,6 +15,7 @@ import (
 	"som/internal/tui/player"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -73,16 +74,24 @@ type App struct {
 	booting       bool
 	splashFrame   int
 	pendingKeys   []tea.KeyMsg
+
+	showCmdPopup bool
+	cmdCursor    int
+	renameActive bool
+	renameInput  textinput.Model
 }
 
 const maxPendingKeys = 64
 
 func NewApp(provider domain.MusicProvider) *App {
+	ri := textinput.New()
+	ri.CharLimit = 200
 	return &App{
 		provider:      provider,
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
 		palette:       NewCommandPalette(),
+		renameInput:   ri,
 		booting:       true,
 	}
 }
@@ -178,6 +187,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		}
+		if a.showCmdPopup {
+			return a, a.updateCmdPopup(msg)
+		}
 
 		switch msg.String() {
 
@@ -199,7 +211,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			targetTab := SidebarItem(msg.String()[0] - '1')
 			return a, a.switchSidebar(targetTab)
-		case ":":
+		case "\\":
 			if a.left.input.Focused() {
 				break
 			}
@@ -207,6 +219,20 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.palette.Close()
 			} else {
 				cmds = append(cmds, a.palette.Open())
+			}
+
+		case ":":
+			if a.left.input.Focused() {
+				break
+			}
+			if a.showCmdPopup {
+				a.showCmdPopup = false
+				a.renameActive = false
+				a.renameInput.Blur()
+			} else {
+				a.showCmdPopup = true
+				a.cmdCursor = 0
+				a.renameActive = false
 			}
 
 		case "tab":
@@ -493,6 +519,9 @@ func (a *App) View() string {
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.showCmdPopup {
+		popup := a.renderCmdPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.palette.Visible() {
 		popup := a.palette.View()
