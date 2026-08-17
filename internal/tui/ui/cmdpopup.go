@@ -301,7 +301,7 @@ func (a *App) renderCmdPopup() string {
 
 	if a.delActive {
 		target, _ := a.renameTarget()
-		name := "(no local track)"
+		name := "(No local track)"
 		if target != nil {
 			name = target.Name
 		}
