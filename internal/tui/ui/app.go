@@ -40,6 +40,14 @@ func sidebarAnimTick() tea.Cmd {
 	})
 }
 
+type logoTickMsg time.Time
+
+func logoTick() tea.Cmd {
+	return tea.Tick(63*time.Millisecond, func(t time.Time) tea.Msg {
+		return logoTickMsg(t)
+	})
+}
+
 type App struct {
 	provider      domain.MusicProvider
 	player        *player.Player
@@ -107,7 +115,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.resizePanels()
 
 			// Replay phím bấm trong lúc boot để không bị nuốt.
-			cmds := []tea.Cmd{a.left.Init(), tick(), animTick()}
+			cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick()}
 			for _, k := range a.pendingKeys {
 				_, c := a.Update(k)
 				if c != nil {
@@ -324,6 +332,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.left.animTick++
 			cmds = append(cmds, animTick())
 		}
+
+	case logoTickMsg:
+		a.splashFrame++
+		cmds = append(cmds, logoTick())
 	case PlayLocalMsg:
 		locals := a.left.getFilteredLocals()
 		if len(locals) == 0 {
@@ -418,6 +430,7 @@ func (a *App) View() string {
 	contentH := a.mainContentHeight()
 	sideH := contentH
 	mainW := a.width - sidebarWidth
+	frame := a.splashFrame
 	if mainW < 10 {
 		mainW = 10
 	}
@@ -440,7 +453,7 @@ func (a *App) View() string {
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
-		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused)
+		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused, frame)
 	}
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
@@ -491,7 +504,7 @@ func (a *App) View() string {
 	return view
 }
 
-func (a *App) renderLyricsView(w, h int, focused bool) string {
+func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
 	if a.nowPlay == nil {
 		return lipgloss.NewStyle().
 			Width(w).
@@ -500,7 +513,7 @@ func (a *App) renderLyricsView(w, h int, focused bool) string {
 	}
 
 	borderColor := lipgloss.Color("#7c7986")
-	lyricsBox := a.right.renderLyricsBox(focused, borderColor)
+	lyricsBox := a.right.renderLyricsBox(focused, borderColor, frame)
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 

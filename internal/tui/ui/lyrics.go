@@ -7,7 +7,7 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalColor) string {
+func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalColor, frame int) string {
 	if focused {
 		borderColor = lipgloss.Color("#e8593c")
 	}
@@ -20,7 +20,7 @@ func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalC
 		return renderBox(r.width, "Select Language", r.renderLangPopup(innerW), borderColor)
 	}
 
-	content := r.renderLyrics(innerW)
+	content := r.renderLyrics(innerW, frame)
 
 	if content == "" {
 		return renderBox(r.width, "Lyrics", "\n", borderColor)
@@ -95,7 +95,7 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-func (r RightPanel) renderLyrics(innerW int) string {
+func (r RightPanel) renderLyrics(innerW int, frame int) string {
 	lyrH := r.lyricsHeight()
 	var b strings.Builder
 
@@ -153,18 +153,18 @@ func (r RightPanel) renderLyrics(innerW int) string {
 				if written >= lyrH {
 					break
 				}
-textW := runewidth.StringWidth(seg)
-			padLeft := (innerW - textW) / 2
-			if padLeft < 0 {
-				padLeft = 0
-			}
-			prefix := strings.Repeat(" ", padLeft)
-			style := LyricNormalStyle
-			if i == r.curLine {
-				style = LyricHighlightStyle
-			}
-			b.WriteString(style.Render(prefix + seg) + "\n")
-			written++
+				textW := runewidth.StringWidth(seg)
+				padLeft := (innerW - textW) / 2
+				if padLeft < 0 {
+					padLeft = 0
+				}
+				prefix := strings.Repeat(" ", padLeft)
+				style := LyricNormalStyle
+				if i == r.curLine {
+					style = LyricHighlightStyle
+				}
+				b.WriteString(style.Render(prefix+seg) + "\n")
+				written++
 			}
 		}
 		for written < lyrH {
@@ -195,15 +195,31 @@ textW := runewidth.StringWidth(seg)
 		return strings.TrimSuffix(b.String(), "\n")
 	}
 
-	for i := 0; i < lyrH; i++ {
-		if i == lyrH/2 {
-			noLyr := "(no lyrics available)"
-			padLeft := (innerW - len([]rune(noLyr))) / 2
-			if padLeft < 0 {
-				padLeft = 0
-			}
-			b.WriteString(DimItemStyle.Render(strings.Repeat(" ", padLeft) + noLyr))
+	logo := animeFrames[frame%len(animeFrames)]
+	noLyr := DimItemStyle.Render("(no lyrics available)")
+	block := lipgloss.JoinVertical(lipgloss.Center, logo, "", noLyr)
+
+	blockLines := strings.Split(block, "\n")
+	var final []string
+	for _, l := range blockLines {
+		if len(final) >= lyrH {
+			break
 		}
+		final = append(final, l)
+	}
+
+	topPad := (lyrH - len(final)) / 2
+	if topPad < 0 {
+		topPad = 0
+	}
+	for i := 0; i < topPad; i++ {
+		b.WriteString("\n")
+	}
+	centerStyle := lipgloss.NewStyle().Width(innerW).Align(lipgloss.Center)
+	for _, line := range final {
+		b.WriteString(centerStyle.Render(line) + "\n")
+	}
+	for i := topPad + len(final); i < lyrH; i++ {
 		b.WriteString("\n")
 	}
 	return strings.TrimSuffix(b.String(), "\n")
