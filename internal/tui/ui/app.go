@@ -362,10 +362,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.splashFrame++
 		cmds = append(cmds, logoTick())
 	case PlayLocalMsg:
-		locals := a.left.getFilteredLocals()
-		if len(locals) == 0 {
-			locals = a.left.locals
-		}
+		locals := a.left.locals
 		if len(locals) == 0 {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
@@ -380,7 +377,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Artist:   lf.Artist,
 				Duration: lf.Duration,
 			}
-			if lf.Name == msg.Title {
+			if lf.Path == msg.Path || lf.Name == msg.Title {
 				idx = i
 			}
 		}
