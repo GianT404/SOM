@@ -62,28 +62,30 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 }
 
 func (p LeftPanel) renderSuggestions(innerW int) string {
-	const maxShow = 5
-	show := maxShow
-	if len(p.suggestions) < show {
-		show = len(p.suggestions)
+	show := suggestMaxShow
+	if len(p.suggestions)-p.suggestOffset < show {
+		show = len(p.suggestions) - p.suggestOffset
+	}
+	if show < 0 {
+		show = 0
 	}
 	titleW := innerW - 2
 	if titleW < 10 {
 		titleW = 10
 	}
 	var b strings.Builder
-	for i := 0; i < show; i++ {
+	for idx := p.suggestOffset; idx < p.suggestOffset+show; idx++ {
 		mark := " "
-		if p.suggestFocus && i == p.suggestCursor {
+		if p.suggestFocus && idx == p.suggestCursor {
 			mark = "»"
 		}
-		text := truncate(strings.TrimSpace(p.suggestions[i]), titleW)
+		text := truncate(strings.TrimSpace(p.suggestions[idx]), titleW)
 		line := mark + " " + text
 		pad := innerW - runewidth.StringWidth(line)
 		if pad < 0 {
 			pad = 0
 		}
-		if p.suggestFocus && i == p.suggestCursor {
+		if p.suggestFocus && idx == p.suggestCursor {
 			b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
 		} else {
 			b.WriteString(NormalItemStyle.Render(line + strings.Repeat(" ", pad)))

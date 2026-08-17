@@ -51,8 +51,11 @@ type LeftPanel struct {
 
 	suggestions   []string
 	suggestCursor int
+	suggestOffset int
 	suggestFocus  bool
 }
+
+const suggestMaxShow = 5
 
 func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 	ti := textinput.New()
@@ -297,12 +300,14 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			if p.suggestFocus {
 				p.suggestFocus = false
 				p.suggestCursor = 0
+				p.suggestOffset = 0
 				p.input.Focus()
 				break
 			}
 			if len(p.suggestions) > 0 && p.input.Focused() {
 				p.suggestions = nil
 				p.suggestCursor = 0
+				p.suggestOffset = 0
 				break
 			}
 			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
@@ -315,6 +320,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			if p.suggestFocus {
 				if p.suggestCursor > 0 {
 					p.suggestCursor--
+					if p.suggestCursor < p.suggestOffset {
+						p.suggestOffset--
+					}
 				} else {
 					p.suggestFocus = false
 					p.input.Focus()
@@ -347,11 +355,15 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			if p.suggestFocus {
 				if p.suggestCursor < len(p.suggestions)-1 {
 					p.suggestCursor++
+					if p.suggestCursor >= p.suggestOffset+suggestMaxShow {
+						p.suggestOffset++
+					}
 				} else {
 					// Hết danh sách gợi ý → chuyển focus xuống kết quả.
 					p.suggestFocus = false
 					p.suggestions = nil
 					p.suggestCursor = 0
+					p.suggestOffset = 0
 					p.input.Blur()
 				}
 				return p, nil
@@ -471,11 +483,18 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		if msg.Err != nil {
 			p.suggestions = nil
 			p.suggestCursor = 0
+			p.suggestOffset = 0
 			break
 		}
 		p.suggestions = msg.Items
 		if p.suggestCursor >= len(p.suggestions) {
 			p.suggestCursor = 0
+		}
+		if p.suggestOffset > len(p.suggestions)-suggestMaxShow {
+			p.suggestOffset = len(p.suggestions) - suggestMaxShow
+		}
+		if p.suggestOffset < 0 {
+			p.suggestOffset = 0
 		}
 
 	case DownloadDoneMsg:
