@@ -73,7 +73,6 @@ type App struct {
 	booting       bool
 	splashFrame   int
 	pendingKeys   []tea.KeyMsg
-	searchVisited bool
 }
 
 const maxPendingKeys = 64
@@ -195,7 +194,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.palette.Close()
 			}
 		case "1", "2", "3", "4", "5":
-			if a.left.input.Focused() && a.left.input.Value() != "" {
+			if a.left.input.Focused() {
 				break
 			}
 			targetTab := SidebarItem(msg.String()[0] - '1')
@@ -833,10 +832,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 
 	if item == SideSearch {
 		a.left.searchOnEnter = true
-		if !a.searchVisited {
-			a.searchVisited = true
-			cmds = append(cmds, a.left.input.Focus())
-		}
+		cmds = append(cmds, a.left.input.Focus())
 	} else {
 		a.left.searchOnEnter = false
 		a.left.suggestions = nil
