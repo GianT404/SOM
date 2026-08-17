@@ -80,6 +80,7 @@ type App struct {
 	renameActive bool
 	renameInput  textinput.Model
 	delActive    bool
+	infoActive   bool
 }
 
 const maxPendingKeys = 64
