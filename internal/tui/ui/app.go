@@ -138,7 +138,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 
 		case tea.KeyMsg:
-			if msg.String() == "ctrl+c" {
+			if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
 				return a, tea.Quit
 			}
 			if len(a.pendingKeys) < maxPendingKeys {
@@ -183,6 +183,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "alt+q":
+			a.player.Stop()
+			return a, tea.Quit
+		}
+
 		if a.showHelpPopup {
 			switch msg.String() {
 			case "?", "esc", "q":
@@ -195,14 +201,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-
-		case "ctrl+c":
-			a.player.Stop()
-			return a, tea.Quit
-
-		case "alt+q":
-			a.player.Stop()
-			return a, tea.Quit
 
 		case "esc":
 			if a.palette.Visible() {
