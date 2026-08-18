@@ -82,6 +82,7 @@ type App struct {
 	delActive    bool
 	infoActive   bool
 	plMoveActive bool
+	plRmActive   bool
 }
 
 const maxPendingKeys = 64

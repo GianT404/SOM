@@ -20,7 +20,66 @@ var cmdOptions = []string{
 	"Show file info",
 }
 
+func (a *App) cmdOptionList() []string {
+	opts := cmdOptions
+	if _, ok := a.selectedTrackForPlaylist(); ok && len(a.playlistsContainingSelected()) > 0 {
+		opts = append(append([]string{}, cmdOptions...), "Remove from playlist")
+	}
+	return opts
+}
+
+func (a *App) playlistsContainingSelected() []int {
+	track, ok := a.selectedTrackForPlaylist()
+	if !ok {
+		return nil
+	}
+	var idxs []int
+	for i, pl := range a.left.playlists {
+		for _, t := range pl.Tracks {
+			if t.ID == track.ID {
+				idxs = append(idxs, i)
+				break
+			}
+		}
+	}
+	return idxs
+}
+
 func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
+	if a.plRmActive {
+		idxs := a.playlistsContainingSelected()
+		switch k.String() {
+		case "up", "k":
+			if a.cmdCursor > 0 {
+				a.cmdCursor--
+			}
+		case "down", "j":
+			if a.cmdCursor < len(idxs)-1 {
+				a.cmdCursor++
+			}
+		case "enter":
+			if a.cmdCursor < len(idxs) && a.left.plStore != nil {
+				pl := a.left.playlists[idxs[a.cmdCursor]]
+				track, _ := a.selectedTrackForPlaylist()
+				if err := a.left.plStore.RemoveTrack(pl.ID, track.ID); err == nil {
+					for j := range pl.Tracks {
+						if pl.Tracks[j].ID == track.ID {
+							a.left.playlists[idxs[a.cmdCursor]].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
+							break
+						}
+					}
+					a.setStatus(StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""))
+				}
+			}
+			a.plRmActive = false
+			return nil
+		case "esc", ":":
+			a.plRmActive = false
+			return nil
+		}
+		return nil
+	}
+
 	if a.plMoveActive {
 		switch k.String() {
 		case "up", "k":
@@ -106,7 +165,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			a.cmdCursor--
 		}
 	case "down", "j":
-		if a.cmdCursor < len(cmdOptions)-1 {
+		if a.cmdCursor < len(a.cmdOptionList())-1 {
 			a.cmdCursor++
 		}
 	case "enter":
@@ -116,10 +175,11 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 }
 
 func (a *App) runCmdOption(idx int) {
-	if idx < 0 || idx >= len(cmdOptions) {
+	opts := a.cmdOptionList()
+	if idx < 0 || idx >= len(opts) {
 		return
 	}
-	switch cmdOptions[idx] {
+	switch opts[idx] {
 	case "Rename title":
 		a.renameActive = true
 		iw := 60
@@ -157,6 +217,9 @@ func (a *App) runCmdOption(idx int) {
 			a.plMoveActive = true
 			a.cmdCursor = 0
 		}
+	case "Remove from playlist":
+		a.plRmActive = true
+		a.cmdCursor = 0
 	}
 }
 
@@ -311,6 +374,30 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 
 func (a *App) renderCmdPopup() string {
 	var b strings.Builder
+	if a.plRmActive {
+		track, _ := a.selectedTrackForPlaylist()
+		idxs := a.playlistsContainingSelected()
+		b.WriteString("\n ")
+		b.WriteString(NormalItemStyle.Render("Remove \"" + track.Title + "\" from:"))
+		b.WriteString("\n\n ")
+		for i, plIdx := range idxs {
+			marker := "  "
+			if i == a.cmdCursor {
+				marker = "▸ "
+			}
+			line := marker + a.left.playlists[plIdx].Name
+			if i == a.cmdCursor {
+				b.WriteString(SelectedItemStyle.Render(line))
+			} else {
+				b.WriteString(NormalItemStyle.Render(line))
+			}
+			b.WriteString("\n ")
+		}
+		b.WriteString("\n ")
+		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
+		return renderBox(56, "Remove from Playlist", b.String(), lipgloss.Color("#e8593c"))
+	}
+
 	if a.plMoveActive {
 		track, _ := a.selectedTrackForPlaylist()
 		b.WriteString("\n ")
@@ -410,7 +497,7 @@ func (a *App) renderCmdPopup() string {
 	}
 
 	b.WriteString("\n\n")
-	for i, opt := range cmdOptions {
+	for i, opt := range a.cmdOptionList() {
 		marker := "  "
 		if i == a.cmdCursor {
 			marker = "▸ "
