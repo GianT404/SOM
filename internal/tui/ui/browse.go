@@ -42,8 +42,6 @@ type LeftPanel struct {
 	inputDownload string
 	inputPlaylist string
 
-	showAddPopup      bool
-	popupCursor       int
 	animTick          int
 	showDeletePopup   bool
 	deletePopupCursor int
@@ -188,44 +186,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 		p.plInput, plInputCmd = p.plInput.Update(msg)
 		cmds = append(cmds, plInputCmd)
 		return p, tea.Batch(cmds...)
-	}
-
-	if p.showAddPopup {
-		if k, ok := msg.(tea.KeyMsg); ok {
-			switch k.String() {
-			case "up", "k":
-				if p.popupCursor > 0 {
-					p.popupCursor--
-				}
-			case "down", "j":
-				if p.popupCursor < len(p.playlists)-1 {
-					p.popupCursor++
-				}
-			case "enter":
-				var selectedTrack playlist.Track
-				if p.activeTab == SideSearch && p.searchCursor < len(p.tracks) {
-					t := p.tracks[p.searchCursor]
-					selectedTrack = playlist.Track{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: p.isDownloaded(t)}
-				} else if p.activeTab == SideDownloads {
-					locals := p.getFilteredLocals()
-					if p.dlCursor < len(locals) {
-						f := locals[p.dlCursor]
-						selectedTrack = playlist.Track{ID: "local:" + f.Path, Title: f.Name, Artist: f.Artist, Duration: f.Duration, IsLocal: true}
-					}
-				}
-				if selectedTrack.ID != "" && p.plStore != nil {
-					pl := p.playlists[p.popupCursor]
-					if err := p.plStore.AddTrack(pl.ID, selectedTrack); err == nil {
-						p.playlists[p.popupCursor].Tracks = append(p.playlists[p.popupCursor].Tracks, selectedTrack)
-					}
-				}
-				p.showAddPopup = false
-				return p, nil
-			case "esc":
-				p.showAddPopup = false
-				return p, nil
-			}
-		}
 	}
 
 	switch msg := msg.(type) {
@@ -403,16 +363,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				}
 			}
 
-		case "a":
-			if !p.input.Focused() && (p.activeTab == SideSearch || p.activeTab == SideDownloads) {
-				if len(p.playlists) == 0 {
-					p.errMsg = "No playlists available. Press '/' to create one."
-				} else {
-					p.showAddPopup = true
-					p.popupCursor = 0
-				}
-			}
-
 		case "delete":
 			if focused && !p.input.Focused() && p.activeTab == SidePlaylists && p.plStore != nil {
 				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
@@ -516,7 +466,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
 
-	if p.activeTab == SideSearch && p.input.Focused() && !p.showAddPopup && !p.showDeletePopup {
+	if p.activeTab == SideSearch && p.input.Focused() && !p.showDeletePopup {
 		newVal := strings.TrimSpace(p.input.Value())
 		if newVal != oldVal {
 			p.suggestFocus = false

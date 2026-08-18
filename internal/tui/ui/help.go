@@ -41,7 +41,6 @@ var helpSections = []helpSection{
 	{
 		title: "Playlists & Actions",
 		binds: []helpBind{
-			{"a", "Add to Playlist"},
 			{"/", "Create Playlist"},
 			{"delete", "Remove Playlist"},
 			{"d", "Download"},

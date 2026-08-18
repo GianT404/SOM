@@ -130,33 +130,6 @@ func (p LeftPanel) renderPlInputPopup() string {
 	return renderBox(40, "New Playlist", b.String(), lipgloss.Color("#e8593c"))
 }
 
-func (p LeftPanel) renderAddPopup() string {
-	var b strings.Builder
-	b.WriteString("\n\n")
-
-	if len(p.playlists) == 0 {
-		b.WriteString(DimItemStyle.Render(" (No playlists available. Create one first.)"))
-		b.WriteString("\n")
-	} else {
-		for i, pl := range p.playlists {
-			marker := "  "
-			if i == p.popupCursor {
-				marker = "▸ "
-			}
-			line := marker + pl.Name
-			if i == p.popupCursor {
-				b.WriteString(SelectedItemStyle.Render(line))
-			} else {
-				b.WriteString(NormalItemStyle.Render(line))
-			}
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: cancel)"))
-	return renderBox(40, "Add to Playlist", b.String(), lipgloss.Color("#e8593c"))
-}
 func (p LeftPanel) renderDeletePopup() string {
 	var b strings.Builder
 	b.WriteString(p.deleteMsg + "\n\n")

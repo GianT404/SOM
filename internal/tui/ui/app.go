@@ -81,6 +81,7 @@ type App struct {
 	renameInput  textinput.Model
 	delActive    bool
 	infoActive   bool
+	plMoveActive bool
 }
 
 const maxPendingKeys = 64
@@ -512,9 +513,6 @@ func (a *App) View() string {
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.left.showAddPopup {
-		popup := a.left.renderAddPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()

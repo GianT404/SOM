@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"som/internal/playlist"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -14,10 +16,39 @@ import (
 var cmdOptions = []string{
 	"Rename title",
 	"Delete track",
+	"Move to playlist",
 	"Show file info",
 }
 
 func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
+	if a.plMoveActive {
+		switch k.String() {
+		case "up", "k":
+			if a.cmdCursor > 0 {
+				a.cmdCursor--
+			}
+		case "down", "j":
+			if a.cmdCursor < len(a.left.playlists)-1 {
+				a.cmdCursor++
+			}
+		case "enter":
+			track, ok := a.selectedTrackForPlaylist()
+			if ok && a.left.plStore != nil && a.cmdCursor < len(a.left.playlists) {
+				pl := a.left.playlists[a.cmdCursor]
+				if err := a.left.plStore.AddTrack(pl.ID, track); err == nil {
+					a.left.playlists[a.cmdCursor].Tracks = append(a.left.playlists[a.cmdCursor].Tracks, track)
+					a.setStatus(StatusOKStyle.Render("> Added to \"" + pl.Name + "\""))
+				}
+			}
+			a.plMoveActive = false
+			return nil
+		case "esc", ":":
+			a.plMoveActive = false
+			return nil
+		}
+		return nil
+	}
+
 	if a.infoActive {
 		switch k.String() {
 		case "esc", "enter", ":", "q":
@@ -119,6 +150,13 @@ func (a *App) runCmdOption(idx int) {
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		}
+	case "Move to playlist":
+		if len(a.left.playlists) == 0 {
+			a.setStatus(StatusErrStyle.Render("X No playlists available. Press '/' to create one."))
+		} else {
+			a.plMoveActive = true
+			a.cmdCursor = 0
+		}
 	}
 }
 
@@ -215,6 +253,17 @@ func (a *App) applyDeleteTrack() {
 	a.setStatus(StatusOKStyle.Render("> Deleted " + target.Name))
 }
 
+func (a *App) selectedTrackForPlaylist() (playlist.Track, bool) {
+	if a.sidebarActive == SideSearch && a.left.searchCursor < len(a.left.tracks) {
+		t := a.left.tracks[a.left.searchCursor]
+		return playlist.Track{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: a.left.isDownloaded(t)}, true
+	}
+	if lf, ok := a.renameTarget(); ok {
+		return playlist.Track{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, IsLocal: true}, true
+	}
+	return playlist.Track{}, false
+}
+
 func sanitizeLocalName(s string) string {
 	r := strings.NewReplacer("/", "-", "\\", "-", ":", "-", "*", "-", "?", "-", `"`, "-", "<", "-", ">", "-", "|", "-")
 	return strings.TrimSpace(r.Replace(s))
@@ -262,6 +311,29 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 
 func (a *App) renderCmdPopup() string {
 	var b strings.Builder
+	if a.plMoveActive {
+		track, _ := a.selectedTrackForPlaylist()
+		b.WriteString("\n ")
+		b.WriteString(NormalItemStyle.Render("Add \"" + track.Title + "\" to:"))
+		b.WriteString("\n\n ")
+		for i, pl := range a.left.playlists {
+			marker := "  "
+			if i == a.cmdCursor {
+				marker = "▸ "
+			}
+			line := marker + pl.Name
+			if i == a.cmdCursor {
+				b.WriteString(SelectedItemStyle.Render(line))
+			} else {
+				b.WriteString(NormalItemStyle.Render(line))
+			}
+			b.WriteString("\n ")
+		}
+		b.WriteString("\n ")
+		b.WriteString(DimItemStyle.Render(" (enter: select  | esc: back)"))
+		return renderBox(56, "Move to Playlist", b.String(), lipgloss.Color("#e8593c"))
+	}
+
 	if a.infoActive {
 		target, ok := a.renameTarget()
 		if ok {
