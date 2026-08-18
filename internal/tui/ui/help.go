@@ -52,6 +52,8 @@ var helpSections = []helpSection{
 		binds: []helpBind{
 			{"--version", "Show version"},
 			{"--upgrade", "True to it's name."},
+			{"--uninstall", "Remove binary from /usr/local/bin"},
+			{"--check-update", "Check for updates without installing"},
 		},
 	},
 }

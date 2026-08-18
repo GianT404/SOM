@@ -8,6 +8,47 @@ import (
 	"runtime"
 )
 
+func runUninstall() error {
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		return uninstallUnix()
+	case "windows":
+		return uninstallWindows()
+	default:
+		return fmt.Errorf(" %s — "+
+			"please manually delete the binary from your machine", runtime.GOOS)
+	}
+}
+
+func uninstallUnix() error {
+	const dest = "/usr/local/bin/som"
+	if err := os.Remove(dest); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s does not exist — nothing to uninstall", dest)
+		}
+		if os.IsPermission(err) {
+			return fmt.Errorf("no permission to remove %s — run again with sudo:\n  sudo som --uninstall", dest)
+		}
+		return err
+	}
+	fmt.Println("Removed", dest)
+	return nil
+}
+
+func uninstallWindows() error {
+	localAppData := os.Getenv("LocalAppData")
+	if localAppData == "" {
+		return fmt.Errorf("no LocalAppData environment variable found")
+	}
+	destDir := filepath.Join(localAppData, "Programs", "som")
+	if err := os.RemoveAll(destDir); err != nil {
+		return fmt.Errorf("failed to remove %s: %w", destDir, err)
+	}
+	fmt.Println("Removed", destDir)
+	fmt.Println("To finish, remove the directory from your PATH if you added it during install.")
+	return nil
+}
+
 func runInstall() error {
 	switch runtime.GOOS {
 	case "linux", "darwin":

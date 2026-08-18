@@ -28,10 +28,26 @@ func main() {
 	upgrade := flag.Bool("upgrade", false, "download and install the latest SOM release from GitHub")
 	install := flag.Bool("install", false, "copy this binary to /usr/local/bin (or platform equivalent)")
 	showVersion := flag.Bool("version", false, "print the current version and exit")
+	checkUpdate := flag.Bool("check-update", false, "check whether a newer SOM release exists without installing")
+	uninstall := flag.Bool("uninstall", false, "remove the installed som binary from your machine")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println("som", Version)
+		return
+	}
+	if *checkUpdate {
+		if err := runCheckUpdate(Version); err != nil {
+			fmt.Fprintln(os.Stderr, "Check update failed:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *uninstall {
+		if err := runUninstall(); err != nil {
+			fmt.Fprintln(os.Stderr, "Uninstall failed:", err)
+			os.Exit(1)
+		}
 		return
 	}
 	if *install {

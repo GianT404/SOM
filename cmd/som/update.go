@@ -34,6 +34,33 @@ type ghRelease struct {
 	Assets     []ghAsset `json:"assets"`
 }
 
+func runCheckUpdate(current string) error {
+	if current == "dev" {
+		return fmt.Errorf("this binary was built without an embedded version (missing -ldflags), " +
+			"cannot compare with the latest GitHub release")
+	}
+
+	assetName := fmt.Sprintf("som-%s-%s", runtime.GOOS, runtime.GOARCH)
+	if runtime.GOOS == "windows" {
+		assetName += ".exe"
+	}
+
+	target, _, err := findUpdate(assetName)
+	if err != nil {
+		return err
+	}
+
+	if versionCompare(target.TagName, current) <= 0 {
+		fmt.Println("You are on the latest version:", current)
+		return nil
+	}
+
+	fmt.Printf("A new version %s is available — you are on %s.\n", target.TagName, current)
+	printChangelog(current, target.TagName)
+	fmt.Println("Run `som --upgrade` to install it.")
+	return nil
+}
+
 func runSelfUpdate(current string) error {
 	if current == "dev" {
 		return fmt.Errorf("this binary was built without an embedded version (missing -ldflags), " +
