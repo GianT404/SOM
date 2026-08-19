@@ -120,7 +120,7 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 		t := p.tracks[i]
 		mark := "  "
 		if i == p.searchCursor {
-			mark = ""
+			mark = "» "
 		}
 		safeTitle := truncate(t.Title, titleW)
 		titlePlain := runewidth.FillRight(safeTitle, titleW)

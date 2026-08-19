@@ -14,8 +14,8 @@ import (
 	"som/internal/domain"
 	"som/internal/tui/player"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -53,7 +53,7 @@ type App struct {
 	provider      domain.MusicProvider
 	player        *player.Player
 	nowPlay       *domain.Track
-		songStarted   bool
+	songStarted   bool
 	width         int
 	height        int
 	left          LeftPanel
@@ -857,7 +857,16 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 
 	if item == SideSearch {
 		a.left.searchOnEnter = true
-		cmds = append(cmds, a.left.input.Focus())
+		if len(a.left.tracks) > 0 {
+			// Đã có kết quả hiển thị  focus thẳng vào list kết quả
+			a.left.input.Blur()
+			a.left.suggestions = nil
+			a.left.suggestCursor = 0
+			a.left.suggestOffset = 0
+			a.left.suggestFocus = false
+		} else {
+			cmds = append(cmds, a.left.input.Focus())
+		}
 	} else {
 		a.left.searchOnEnter = false
 		a.left.suggestions = nil

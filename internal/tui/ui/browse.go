@@ -411,6 +411,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 			p.tracks = nil
 		} else {
 			p.tracks = msg.Tracks
+			// Kết quả đã hiển thị → blur input để con trỏ rơi vào list kết
+			// quả (border box kết quả cũng được highlight).
+			p.input.Blur()
+			p.suggestions = nil
+			p.suggestFocus = false
+			p.suggestCursor = 0
+			p.suggestOffset = 0
 		}
 
 	case SuggestDebounceMsg:
