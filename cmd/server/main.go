@@ -50,7 +50,7 @@ func main() {
 		ytdlpPath = "yt-dlp"
 	}
 
-	sc := scraper.NewYtdlpScraper(ytdlpPath)
+	sc := scraper.NewYtdlpScraperFastPath(ytdlpPath)
 	resilientSc := scraper.NewResilientScraper(sc)
 
 	// Device registry: per-device token auth cho mobile app.

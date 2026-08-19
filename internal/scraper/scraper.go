@@ -28,8 +28,9 @@ type LyricLine struct {
 
 // StreamInfo holds the direct audio URL and video title for streaming.
 type StreamInfo struct {
-	URL   string // Direct opus audio URL
-	Title string // Video title (for Content-Disposition filename)
+	URL     string // Direct opus audio URL
+	Title   string // Video title (for Content-Disposition filename)
+	Headers map[string]string
 }
 
 // LyricsData maps a subtitle language to its parsed lyrics.

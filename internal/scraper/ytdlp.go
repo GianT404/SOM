@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -22,6 +23,120 @@ import (
 type YtdlpScraper struct {
 	// BinPath is the absolute path to the yt-dlp binary.
 	BinPath string
+	// fastPath dùng lib youtube/v2 resolve URL (nhanh hơn) thay vì spawn
+	// yt-dlp. An toàn cho server vì URL đó không được dùng để phát trực tiếp.
+	fastPath bool
+}
+
+// defaultUA là UA trình duyệt dùng cho fastpath (lib youtube/v2 không trả
+const defaultUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+var (
+	configLoaded    bool
+	clientsList     []string
+	cookiesPath     string
+	extraYtArgs     []string
+	clientChainMu   sync.Mutex
+	preferredClient string
+)
+
+func loadYtConfig() {
+	if configLoaded {
+		return
+	}
+	configLoaded = true
+	extraYtArgs = strings.Fields(os.Getenv("SOM_YTDLP_ARGS"))
+	cookiesPath = strings.TrimSpace(os.Getenv("SOM_YTDLP_COOKIES"))
+	if v := strings.TrimSpace(os.Getenv("SOM_YTDLP_CLIENTS")); v != "" {
+		for _, c := range strings.Split(v, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				clientsList = append(clientsList, c)
+			}
+		}
+	}
+	if len(clientsList) == 0 {
+		clientsList = []string{"web_embedded", "web", "tv_embedded", "android", "mweb", "ios"}
+	}
+}
+
+func nextClient(attempt int) string {
+	loadYtConfig()
+	clientChainMu.Lock()
+	defer clientChainMu.Unlock()
+	cands := make([]string, 0, len(clientsList)+1)
+	if preferredClient != "" {
+		cands = append(cands, preferredClient)
+	}
+	for _, c := range clientsList {
+		if c != preferredClient {
+			cands = append(cands, c)
+		}
+	}
+	if attempt < len(cands) {
+		return cands[attempt]
+	}
+	return ""
+}
+
+// markClientSuccess nhớ client vừa chạy thành công để lần sau thử trước.
+func markClientSuccess(c string) {
+	if c == "" {
+		return
+	}
+	clientChainMu.Lock()
+	defer clientChainMu.Unlock()
+	preferredClient = c
+}
+
+// ytBaseArgs trả args nền tảng cho mọi lệnh yt-dlp: flags ổn định + cookies + extra args từ SOM_YTDLP_ARGS.
+func ytBaseArgs() []string {
+	loadYtConfig()
+	args := []string{"--no-warnings", "--force-ipv4"}
+	if cookiesPath != "" {
+		args = append(args, "--cookies", cookiesPath)
+	}
+	args = append(args, extraYtArgs...)
+	return args
+}
+
+// ytPreferredFlag trả --extractor-args của client đang chạy được (nếu có) để yt-dlp ưu tiên client đó, tránh bị CDN chặn 403.
+func ytPreferredFlag() []string {
+	loadYtConfig()
+	clientChainMu.Lock()
+	defer clientChainMu.Unlock()
+	if preferredClient == "" {
+		return nil
+	}
+	return []string{"--extractor-args", "youtube:player_client=" + preferredClient}
+}
+
+func ytRetryable(errMsg string) bool {
+	return strings.Contains(errMsg, "403") || strings.Contains(errMsg, "Requested format is not available")
+}
+
+const ytOutdatedHint = "yt-dlp có thể đã cũ — chạy `som --update-ytdlp` để cập nhật"
+
+func withYtHint(err error) error {
+	if err == nil {
+		return nil
+	}
+	if ytRetryable(err.Error()) {
+		return fmt.Errorf("%s (%s)", err, ytOutdatedHint)
+	}
+	return err
+}
+
+func UpdateYtdlp(binPath string) error {
+	if binPath == "" {
+		binPath = "yt-dlp"
+	}
+	cmd := exec.Command(binPath, "-U")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("yt-dlp -U: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	fmt.Print(string(out))
+	return nil
 }
 
 var ytdlpCacheDir = resolveYtdlpCacheDir()
@@ -235,33 +350,59 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	// Sắp tạo file mới: trước tiên dọn bớt nếu đã vượt cap.
 	cleanupStaleTempFiles()
 	_ = os.Remove(tempFile)
-	args := []string{
-		"-f", "bestaudio",
-		"-x", "--audio-format", "opus",
-		"--embed-metadata",
-		"-o", tempFile,
-		"--no-warnings",
-		"--no-playlist",
-		"--no-part",
-		"--force-ipv4",
-	}
-	args = append(args, cacheDirArgs()...)
-	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
-	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	cmd.Stdout = nil
+	var lastErr error
+	for attempt := 0; ; attempt++ {
+		client := nextClient(attempt)
+		if client == "" {
+			if lastErr != nil {
+				return "", withYtHint(lastErr)
+			}
+			return "", fmt.Errorf("yt-dlp download: no client worked for %s", videoID)
+		}
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("yt-dlp download: %w: %s", err, stderr.String())
-	}
-	if !isOpusFile(tempFile) {
-		_ = os.Remove(tempFile)
-		return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
-	}
+		args := []string{
+			"-f", "bestaudio",
+			"-x", "--audio-format", "opus",
+			"--embed-metadata",
+			"-o", tempFile,
+			"--no-playlist",
+			"--no-part",
+		}
+		args = append(args, ytBaseArgs()...)
+		args = append(args, "--extractor-args", "youtube:player_client="+client)
+		args = append(args, cacheDirArgs()...)
+		args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+		cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
-	return tempFile, nil
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		cmd.Stdout = nil
+
+		if err := cmd.Run(); err != nil {
+			lastErr = fmt.Errorf("yt-dlp download (%s): %w: %s", client, err, stderr.String())
+			_ = os.Remove(tempFile)
+			if ytRetryable(lastErr.Error()) {
+				continue
+			}
+			return "", lastErr
+		}
+		if !isOpusFile(tempFile) {
+			_ = os.Remove(tempFile)
+			return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
+		}
+		markClientSuccess(client)
+		return tempFile, nil
+	}
+}
+
+// NewYtdlpScraperFastPath giống NewYtdlpScraper nhưng bật cứng fastpath
+// (lib youtube/v2) — dùng cho server, nơi URL resolve không bị CDN chặn vì
+// client phát qua endpoint /stream chứ không fetch URL CDN trực tiếp.
+func NewYtdlpScraperFastPath(binPath string) *YtdlpScraper {
+	y := NewYtdlpScraper(binPath)
+	y.fastPath = true
+	return y
 }
 
 func NewYtdlpScraper(binPath string) *YtdlpScraper {
@@ -305,13 +446,13 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 		query,
 		"--dump-json",
 		"--flat-playlist",
-		"--no-warnings",
 		// Chạy IPv4 ổn định + timeout mỗi socket để không kẹt vô hạn khi
 		// host có IPv6 route lỗi (search không được nhanh cũng phải fail
 		// sớm chứ không kéo dài tới timeout của app).
-		"--force-ipv4",
 		"--socket-timeout", "15",
 	}
+	args = append(args, ytBaseArgs()...)
+	args = append(args, ytPreferredFlag()...)
 	args = append(args, cacheDirArgs()...)
 	cmd := exec.CommandContext(ctx, y.BinPath, args...)
 
@@ -399,36 +540,74 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 	}
 	defer releaseYtdlp()
 
-	if info := fetchStreamInfoLib(ctx, videoID); info != nil {
+	if info := fetchStreamInfoLib(ctx, videoID); info != nil && y.fastPathEnabled() {
 		return info, nil
 	}
 
 	log.Printf("resolve: fastpath miss for %s, falling back to yt-dlp", videoID)
 
-	// Một lần gọi duy nhất lấy cả title lẫn URL trực tiếp (trước đây spawn 2
-	// process song song, nhân đôi thời gian + pid trên VM 1 CPU).
-	args := []string{
-		"--print", "%(title)s\t%(url)s",
-		"-f", "bestaudio",
-		"--no-warnings",
-		"--no-playlist",
-		"--force-ipv4",
+	var lastErr error
+	for attempt := 0; ; attempt++ {
+		client := nextClient(attempt)
+		if client == "" {
+			if lastErr != nil {
+				return nil, withYtHint(lastErr)
+			}
+			return nil, fmt.Errorf("yt-dlp stream info: no client worked for %s", videoID)
+		}
+
+		args := []string{
+			"--print", "%(title)s\t%(url)s\t%(http_headers)s",
+			"-f", "bestaudio",
+			"--no-playlist",
+		}
+		args = append(args, ytBaseArgs()...)
+		args = append(args, "--extractor-args", "youtube:player_client="+client)
+		args = append(args, cacheDirArgs()...)
+		args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
+		cmd := exec.CommandContext(ctx, y.BinPath, args...)
+
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err != nil {
+			lastErr = fmt.Errorf("yt-dlp stream info (%s): %w: %s", client, err, stderr.String())
+			if ytRetryable(lastErr.Error()) {
+				continue
+			}
+			return nil, lastErr
+		}
+
+		info, err := parseStreamInfo(out.String(), videoID)
+		if err != nil {
+			return nil, err
+		}
+		// Không markClientSuccess ở đây: resolve in URL thành công với mọi
+		// client, chỉ download (lấy dữ liệu) mới phân biệt được client nào
+		// thực sự bị CDN chặn.
+		return info, nil
 	}
-	args = append(args, cacheDirArgs()...)
-	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
-	cmd := exec.CommandContext(ctx, y.BinPath, args...)
+}
 
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("yt-dlp stream info: %w: %s", err, stderr.String())
+// fastPathEnabled bật khi NewYtdlpScraperFastPath được dùng (server), hoặc
+// khi set SOM_YTDLP_FASTPATH=1. Lib youtube/v2 nhanh hơn nhưng URL có thể bị
+// 403 IP-binding nếu client fetch trực tiếp — đó là lý do TUI local tắt.
+func (y *YtdlpScraper) fastPathEnabled() bool {
+	if y != nil && y.fastPath {
+		return true
 	}
+	return strings.TrimSpace(os.Getenv("SOM_YTDLP_FASTPATH")) == "1"
+}
 
-	line := strings.TrimSpace(out.String())
-	title, audioURL, found := strings.Cut(line, "\t")
-	if !found || audioURL == "" {
+func parseStreamInfo(raw, videoID string) (*StreamInfo, error) {
+	line := strings.TrimSpace(raw)
+	title, rest, found := strings.Cut(line, "\t")
+	if !found {
+		return nil, fmt.Errorf("yt-dlp returned empty output for %s", videoID)
+	}
+	audioURL, headersRaw, _ := strings.Cut(rest, "\t")
+	if audioURL == "" {
 		return nil, fmt.Errorf("yt-dlp returned empty URL for %s", videoID)
 	}
 
@@ -440,10 +619,27 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		title = videoID // fallback to video ID
 	}
 
+	headers := parsePythonDict(headersRaw)
+	if headers["User-Agent"] == "" {
+		headers["User-Agent"] = defaultUA
+	}
+
 	return &StreamInfo{
-		URL:   audioURL,
-		Title: title,
+		URL:     audioURL,
+		Title:   title,
+		Headers: headers,
 	}, nil
+}
+
+// parsePythonDict bóc map dạng "{'Key': 'value', ...}" mà yt-dlp in ra cho
+// %(http_headers)s thành map[string]string.
+func parsePythonDict(s string) map[string]string {
+	m := make(map[string]string)
+	re := regexp.MustCompile(`'([^']+)'\s*:\s*'([^']*)'`)
+	for _, match := range re.FindAllStringSubmatch(s, -1) {
+		m[match[1]] = match[2]
+	}
+	return m
 }
 
 // fetchStreamInfoLib resolve title + URL audio trực tiếp bằng lib youtube/v2
@@ -477,7 +673,7 @@ func fetchStreamInfoLib(ctx context.Context, videoID string) *StreamInfo {
 		log.Printf("fastpath: %s empty url", videoID)
 		return nil
 	}
-	return &StreamInfo{URL: url, Title: v.Title}
+	return &StreamInfo{URL: url, Title: v.Title, Headers: map[string]string{"User-Agent": defaultUA}}
 }
 
 // bestAudioLibFormat chọn format audio-only tốt nhất (ops: 251 > 250 >
@@ -537,11 +733,11 @@ func (y *YtdlpScraper) VideoTitle(ctx context.Context, videoID string) (string, 
 
 	args := []string{
 		"--print", "%(title)s",
-		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
-		"--force-ipv4",
 	}
+	args = append(args, ytBaseArgs()...)
+	args = append(args, ytPreferredFlag()...)
 	args = append(args, cacheDirArgs()...)
 	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(ctx, y.BinPath, args...)
@@ -572,11 +768,11 @@ func (y *YtdlpScraper) VideoMetadata(ctx context.Context, videoID string) (Music
 
 	args := []string{
 		"--print", "%(track)s|||%(artist)s",
-		"--no-warnings",
 		"--no-playlist",
 		"--skip-download",
-		"--force-ipv4",
 	}
+	args = append(args, ytBaseArgs()...)
+	args = append(args, ytPreferredFlag()...)
 	args = append(args, cacheDirArgs()...)
 	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(metaCtx, y.BinPath, args...)
@@ -648,10 +844,9 @@ func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData
 
 		"--socket-timeout", "20",
 		"-o", outTmpl,
-		"--no-warnings",
-		"--no-playlist",
-		"--force-ipv4",
 	}
+	args = append(args, ytBaseArgs()...)
+	args = append(args, ytPreferredFlag()...)
 	args = append(args, cacheDirArgs()...)
 	args = append(args, "--", "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(ytdlpCtx, y.BinPath, args...)

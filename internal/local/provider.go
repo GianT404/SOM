@@ -120,15 +120,15 @@ func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, d
 	return lr, nil
 }
 
-func (p *DirectProvider) ResolveStream(ctx context.Context, id string) (string, error) {
+func (p *DirectProvider) ResolveStream(ctx context.Context, id string) (*domain.StreamInfo, error) {
 	start := time.Now()
 	info, err := p.Scraper.GetStreamInfo(ctx, id)
 	if err != nil {
 		log.Printf("stream: resolve error for %s after %v: %v", id, time.Since(start), err)
-		return "", err
+		return nil, err
 	}
 	log.Printf("stream: url ready for %s in %v", id, time.Since(start))
-	return info.URL, nil
+	return &domain.StreamInfo{URL: info.URL, Headers: info.Headers}, nil
 }
 
 func (p *DirectProvider) DownloadOPUS(ctx context.Context, id, title, destDir string) (string, error) {

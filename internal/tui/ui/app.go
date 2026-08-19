@@ -53,7 +53,7 @@ type App struct {
 	provider      domain.MusicProvider
 	player        *player.Player
 	nowPlay       *domain.Track
-	songStarted   bool
+		songStarted   bool
 	width         int
 	height        int
 	left          LeftPanel
@@ -723,12 +723,12 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		directURL, err := a.provider.ResolveStream(context.Background(), t.ID)
-		if err != nil || directURL == "" {
+		streamInfo, err := a.provider.ResolveStream(context.Background(), t.ID)
+		if err != nil || streamInfo == nil || streamInfo.URL == "" {
 			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
 		}
 
-		if err := a.player.Play(directURL); err != nil {
+		if err := a.player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
 

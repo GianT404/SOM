@@ -51,6 +51,7 @@ type Player struct {
 	player      *oto.Player
 	decoder     *exec.Cmd
 	currentPath string
+	headers     map[string]string
 	startTime   time.Time
 	pauseOffset time.Duration
 	lastErr     error      // lỗi của lần phát vừa kết thúc; nil = phát hoàn tất bình thường
@@ -101,10 +102,16 @@ func (p *Player) Position() time.Duration {
 }
 
 func (p *Player) Play(filePath string) error {
-	return p.playFrom(filePath, 0)
+	return p.playFrom(filePath, 0, nil)
 }
 
-func (p *Player) playFrom(filePath string, startSec int) error {
+// PlayWithHeaders chơi URL (hoặc file) kèm HTTP headers truyền cho ffmpeg.
+
+func (p *Player) PlayWithHeaders(filePath string, headers map[string]string) error {
+	return p.playFrom(filePath, 0, headers)
+}
+
+func (p *Player) playFrom(filePath string, startSec int, headers map[string]string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -115,6 +122,7 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	}
 
 	p.currentPath = filePath
+	p.headers = headers
 	p.startTime = time.Now().Add(-time.Duration(startSec) * time.Second)
 	p.pauseOffset = 0
 	p.lastErr = nil
@@ -123,6 +131,13 @@ func (p *Player) playFrom(filePath string, startSec int) error {
 	var args []string
 	if strings.HasPrefix(filePath, "http://") {
 		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
+	}
+	if len(headers) > 0 {
+		var hb strings.Builder
+		for k, v := range headers {
+			fmt.Fprintf(&hb, "%s: %s\r\n", k, v)
+		}
+		args = append(args, "-headers", hb.String())
 	}
 	if startSec > 0 {
 		args = append(args, "-ss", fmt.Sprintf("%d", startSec))
@@ -190,11 +205,11 @@ func (p *Player) stopLocked() {
 		}
 		p.state = Stopped
 		p.currentPath = ""
+		p.headers = nil
 	}
 }
 
-// PlaybackError trả về lỗi của lần phát vừa kết thúc nếu ffmpeg thoát do lỗi
-// (stream chết giữa chừng, file hỏng...). Nil nếu phát hoàn tất hoặc user dừng.
+// PlaybackError trả về lỗi của lần phát vừa kết thúc nếu ffmpeg thoát do lỗi(stream chết giữa chừng, file hỏng...). Nil nếu phát hoàn tất hoặc user dừng.
 func (p *Player) PlaybackError() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -238,7 +253,22 @@ func (p *Player) SeekBy(seconds int) {
 	}
 	p.mu.Unlock()
 
-	_ = p.playFrom(path, newSec)
+	_ = p.playFrom(path, newSec, p.currentHeaders())
+}
+
+// currentHeaders giữ headers của lần phát hiện tại để seek lại với đúng header.
+func (p *Player) currentHeaders() map[string]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	h := p.headers
+	if h == nil {
+		return nil
+	}
+	copyH := make(map[string]string, len(h))
+	for k, v := range h {
+		copyH[k] = v
+	}
+	return copyH
 }
 
 func (p *Player) Stderr() string {

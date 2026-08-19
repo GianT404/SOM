@@ -30,8 +30,20 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the current version and exit")
 	checkUpdate := flag.Bool("check-update", false, "check whether a newer SOM release exists without installing")
 	uninstall := flag.Bool("uninstall", false, "remove the installed som binary from your machine")
+	updateYtdlp := flag.Bool("update-ytdlp", false, "update the yt-dlp binary to the latest version")
 	flag.Parse()
 
+	if *updateYtdlp {
+		ytdlpPath := os.Getenv("YTDLP_PATH")
+		if ytdlpPath == "" {
+			ytdlpPath = "yt-dlp"
+		}
+		if err := scraper.UpdateYtdlp(ytdlpPath); err != nil {
+			fmt.Fprintln(os.Stderr, "Update yt-dlp failed:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *showVersion {
 		fmt.Println("som", Version)
 		return

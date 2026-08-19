@@ -67,23 +67,23 @@ func (c *HTTPProvider) Search(ctx context.Context, q string) ([]domain.Track, er
 	return tracks, nil
 }
 
-func (c *HTTPProvider) ResolveStream(ctx context.Context, id string) (string, error) {
+func (c *HTTPProvider) ResolveStream(ctx context.Context, id string) (*domain.StreamInfo, error) {
 	resp, err := c.getShort(ctx, "/api/v1/resolve", url.Values{"id": {id}})
 	if err != nil {
-		return "", fmt.Errorf("resolve request: %w", err)
+		return nil, fmt.Errorf("resolve request: %w", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("resolve: server %s - %s", resp.Status, truncateMsg(body))
+		return nil, fmt.Errorf("resolve: server %s - %s", resp.Status, truncateMsg(body))
 	}
 	var rr struct {
 		URL string `json:"url"`
 	}
 	if err := json.Unmarshal(body, &rr); err != nil {
-		return "", fmt.Errorf("resolve decode: %w", err)
+		return nil, fmt.Errorf("resolve decode: %w", err)
 	}
-	return rr.URL, nil
+	return &domain.StreamInfo{URL: rr.URL}, nil
 }
 
 func (c *HTTPProvider) Lyrics(ctx context.Context, id, title, artist string, duration int) (domain.LyricsResp, error) {
