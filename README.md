@@ -41,7 +41,8 @@
 |  **Audio Visualizer** | Live 2D/3D visualizer driven by real-time system audio capture (TUI) |
 |  **Dynamic Theming** | Album art-based color extraction for immersive UI |
 |  **Audio Settings** | Configurable buffer size and sample rate |
-|  **Self Install/Update** | `som --install` and `som --upgrade` for one-command setup and updates |
+|  **Self Install/Update** | `som --install`, `som --upgrade`, `--check-update`, and `--uninstall` for one-command setup and updates |
+|  **Resilient YouTube Access** | Automatic yt-dlp client fallback against YouTube/CDN 403s, optional cookies & extra args via env vars |
 |  **Desktop App** | Tauri desktop shell for Linux and Windows with the existing Go backend as a sidecar (no longer actively maintained) |
 
 ---
@@ -156,6 +157,11 @@ The server starts on port `8080` by default. Configure with environment variable
 | `SOM_API_KEY` | — | Require an API key for requests |
 | `BANNED_DEVICES` | — | Comma-separated device IDs to ban |
 | `TRUSTED_PROXIES` | — | Comma-separated IP/CIDR allowed to supply `X-Forwarded-For` |
+| `SOM_YTDLP_CLIENTS` | `web_embedded,web,tv_embedded,android,mweb,ios` | Comma-separated yt-dlp player clients to try in order (used by both server and TUI) |
+| `SOM_YTDLP_COOKIES` | — | Path to a Netscape `cookies.txt` from a logged-in browser session (`--cookies`) |
+| `SOM_YTDLP_ARGS` | — | Extra yt-dlp args, appended verbatim to every yt-dlp invocation |
+| `SOM_YTDLP_FASTPATH` | (server on, TUI off) | Set `1` to resolve stream URLs with the in-process `youtube/v2` lib instead of spawning yt-dlp (server enables this automatically) |
+| `YTDLP_CACHE_DIR` | — | Directory for the yt-dlp HTTP cache |
 
 ### 3. Start the mobile app
 
@@ -200,28 +206,30 @@ go build -o som .
 | `Tab` | Cycle through sidebar tabs |
 | `1`-`5` | Jump directly to a tab |
 | `/` | Focus search input (Playlists tab: create a new playlist) |
-| `:` | Open live audio visualizer |
+| `:` | Command popup — Rename title, Delete track, Move to playlist, Show file info |
+| `\` | Open live audio visualizer |
 | `Enter` | Play selected track |
 | `Space` | Play / pause |
 | `]` / `[` | Next / previous track |
 | `r` | Toggle shuffle (random) |
 | `←` / `→` | Seek -/+ 5s |
 | `+` / `-` | Volume up / down |
-| `a` | Add current track to a playlist |
 | `Delete` | Remove selected playlist / track |
 | `d` | Download selected track |
 | `l` | Choose lyrics language |
-| `q` | Quit (when input not focused) |
+| `alt + q` | Quit from anywhere (also during startup) |
 
 **Features:**
 
 - YouTube search and stream via embedded backend (Go server runs in-process, no separate process needed)
 - Download tracks for offline playback in `.opus` format
 - Playlist management — create, add tracks, play, and delete playlists
+- Command popup (`:`) — rename a track's title, delete a track (removes the `.opus` + metadata), move a track to another playlist, show file info (size/duration/bitrate), and remove from the current playlist
 - LRCLib synced lyrics with multi-language selection and auto-fallback to YouTube subtitles
 - Local `.opus` file scanning with `ffprobe` duration detection
-- Live audio visualizer (`:`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
+- Live audio visualizer (`\`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
+- Resilient YouTube streaming via client fallback chain (see *YouTube Stability & Cookies*)
 - Built-in self-installer and self-updater (see below)
 
 **Logging (`5` / Logs tab):**
@@ -247,6 +255,9 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 | `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one |
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
 | `--upgrade` | Download and install the latest SOM release from GitHub |
+| `--check-update` | Check whether a newer SOM release exists without installing |
+| `--uninstall` | Remove the installed `som` binary |
+| `--update-ytdlp` | Update the bundled yt-dlp binary to the latest version |
 | `--version` | Print the current version and exit |
 
 > Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`, so `mpv` is no longer needed). `ffprobe` is also used for local file duration detection.
@@ -263,6 +274,19 @@ curl -fsSL https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.s
 #Windows (PowerShell)
 curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.ps1 | iex
 ```
+
+## YouTube Stability & Cookies
+
+YouTube occasionally 403s (`HTTP Error 403: Forbidden`) for datacenter/VPN IPs — typically when the machine egresses through a CDN multi-IP range that doesn't match the `ip=` bound to the googlevideo token. SOM handles this in three layers:
+
+1. **Client fallback chain** — every yt-dlp call tries the configured player clients in order (`web_embedded → web → tv_embedded → android → mweb → ios`). On a 403 / format error it moves to the next client and **remembers the working one** for the rest of the session. Override with `SOM_YTDLP_CLIENTS=web_embedded,android`.
+2. **Optional cookies** — a Netscape `cookies.txt` exported from a logged-in browser session fixes IP-bound restrictions and age-gated content. Set `SOM_YTDLP_COOKIES=/path/to/cookies.txt` (export it with e.g. the *Get cookies.txt LOCALLY* browser extension; re-export when the session expires).
+3. **Extra args** — `SOM_YTDLP_ARGS="--proxy socks5://localhost:9050"` appends verbatim to every yt-dlp command for advanced setups.
+
+If a 403 still slips through, SOM prints a hint to run `som --update-ytdlp`, which updates the bundled yt-dlp binary.
+
+
+---
 
 ## API Endpoints
 

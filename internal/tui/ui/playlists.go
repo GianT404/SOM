@@ -65,7 +65,7 @@ func (p LeftPanel) renderPlaylistList(innerW int) string {
 
 func (p LeftPanel) renderPlaylistDetail(innerW int) string {
 	if p.activePlaylist == nil || len(p.activePlaylist.Tracks) == 0 {
-		return DimItemStyle.Render("This playlist is empty. Press 'a' in the Search/Downloads tab to add songs.")
+		return DimItemStyle.Render("This playlist is empty. Press ':' on a track to move it here.")
 	}
 
 	var b strings.Builder
