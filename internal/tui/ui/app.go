@@ -124,6 +124,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.right = NewRightPanel(msg.player)
 			a.left = msg.left
 			a.left.input.Blur()
+			a.palette.SetPlayer(msg.player)
 			a.booting = false
 			a.resizePanels()
 

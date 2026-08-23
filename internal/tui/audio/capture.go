@@ -2,10 +2,12 @@ package audio
 
 import "sync"
 
-type platformCapture interface {
-	probe() error
-	run(bands int, out chan<- []float64, stop <-chan struct{}) error
+type PCMSource interface {
+	Subscribe() chan []byte
+	Unsubscribe(chan []byte)
 }
+
+const pcmChannels = 2
 
 type Capture struct {
 	mu    sync.Mutex
@@ -17,43 +19,55 @@ func New() *Capture {
 	return &Capture{}
 }
 
-func (c *Capture) Start(bands int) error {
+func (c *Capture) Start(src PCMSource, bands int) error {
 	c.mu.Lock()
 	if c.stop != nil {
 		c.mu.Unlock()
 		return nil
 	}
-
-	impl := newPlatformCapture()
-	if err := impl.probe(); err != nil {
-		c.mu.Unlock()
-		return err
-	}
-
 	stop := make(chan struct{})
 	c.stop = stop
 	c.bands = nil
 	c.mu.Unlock()
 
-	out := make(chan []float64, 2)
+	sub := src.Subscribe()
 
 	go func() {
-		_ = impl.run(bands, out, stop)
-	}()
+		defer src.Unsubscribe(sub)
 
-	go func() {
+		const frameBytes = pcmChannels * 2
+		var leftover []byte
 		prev := make([]float64, bands)
+
 		for {
 			select {
 			case <-stop:
 				return
-			case snap, ok := <-out:
+			case chunk, ok := <-sub:
 				if !ok {
 					return
 				}
+
+				leftover = append(leftover, chunk...)
+				usable := len(leftover) - (len(leftover) % frameBytes)
+				if usable <= 0 {
+					continue
+				}
+				frame := leftover[:usable]
+				leftover = append([]byte(nil), leftover[usable:]...)
+
+				n := usable / frameBytes
+				samples := make([]float64, n)
+				for i := 0; i < n; i++ {
+					off := i * frameBytes
+					v := int16(uint16(frame[off]) | uint16(frame[off+1])<<8)
+					samples[i] = float64(v) / 32768.0
+				}
+
+				snap := magnitudeBands(samples, bands)
 				for i := range prev {
 					if i < len(snap) {
-						prev[i] = prev[i]*0.55 + snap[i]*0.45
+						prev[i] = prev[i]*0.35 + snap[i]*0.75
 					}
 				}
 				smoothed := make([]float64, len(prev))

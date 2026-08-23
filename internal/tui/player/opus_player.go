@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"sync"
@@ -44,6 +45,95 @@ func (s *syncBuffer) Reset() {
 	s.buf.Reset()
 }
 
+type pcmTap struct {
+	mu   sync.Mutex
+	subs map[chan []byte]struct{}
+}
+
+func newPCMTap() *pcmTap {
+	return &pcmTap{subs: make(map[chan []byte]struct{})}
+}
+
+func (t *pcmTap) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	if len(t.subs) == 0 {
+		t.mu.Unlock()
+		return len(p), nil
+	}
+	subs := make([]chan []byte, 0, len(t.subs))
+	for c := range t.subs {
+		subs = append(subs, c)
+	}
+	t.mu.Unlock()
+
+	cp := make([]byte, len(p))
+	copy(cp, p)
+	for _, c := range subs {
+		select {
+		case c <- cp:
+		default:
+		}
+	}
+	return len(p), nil
+}
+
+func (t *pcmTap) subscribe() chan []byte {
+	c := make(chan []byte, 8)
+	t.mu.Lock()
+	t.subs[c] = struct{}{}
+	t.mu.Unlock()
+	return c
+}
+
+func (t *pcmTap) unsubscribe(c chan []byte) {
+	t.mu.Lock()
+	delete(t.subs, c)
+	t.mu.Unlock()
+	close(c)
+}
+
+// flush xóa dữ liệu PCM cũ trong tất cả subscriber channels,
+// tránh visualizer hiển thị data từ bài trước khi seek/next.
+func (t *pcmTap) flush() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for c := range t.subs {
+		drain := true
+		for drain {
+			select {
+			case <-c:
+			default:
+				drain = false
+			}
+		}
+	}
+}
+
+const pcmFrameBytes = 48000 * 2 * 2 / 30
+
+func relayPCM(src io.Reader, tap *pcmTap) io.Reader {
+	pr, pw := io.Pipe()
+
+	go func() {
+		buf := make([]byte, pcmFrameBytes)
+		for {
+			n, err := io.ReadFull(src, buf)
+			if n > 0 {
+				tap.Write(buf[:n])
+				if _, werr := pw.Write(buf[:n]); werr != nil {
+					return
+				}
+			}
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+	}()
+
+	return pr
+}
+
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -58,6 +148,7 @@ type Player struct {
 	stopped     bool       // đánh dấu user chủ động stop/kill, không tính là lỗi
 	stderrBuf   syncBuffer // stderr thật của ffmpeg, để debug khi decode lỗi
 	volume      float64
+	tap         *pcmTap
 }
 
 func New() *Player {
@@ -69,7 +160,7 @@ func New() *Player {
 	ctx, ready, err := oto.NewContext(op)
 	if err != nil {
 		fmt.Printf("oto init error: %v\n", err)
-		return &Player{state: Stopped}
+		return &Player{state: Stopped, tap: newPCMTap()}
 	}
 
 	<-ready
@@ -78,7 +169,20 @@ func New() *Player {
 		otoCtx: ctx,
 		state:  Stopped,
 		volume: 1.0,
+		tap:    newPCMTap(),
 	}
+}
+
+// Subscribe trả về 1 channel nhận bản sao PCM (s16le, 48kHz, stereo) đang
+// thực sự được phát — dùng cho visualizer đọc FFT trực tiếp từ chính âm
+// thanh SOM đang decode, không cần capture loopback ở tầng hệ điều hành.
+// Luôn phải Unsubscribe khi không dùng nữa để tránh leak channel.
+func (p *Player) Subscribe() chan []byte {
+	return p.tap.subscribe()
+}
+
+func (p *Player) Unsubscribe(c chan []byte) {
+	p.tap.unsubscribe(c)
 }
 
 func (p *Player) State() State {
@@ -115,6 +219,9 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// Flush PCM tap trước khi stop player cũ, tránh visualizer hiển thị
+	// data từ bài trước (stale frames).
+	p.tap.flush()
 	p.stopLocked()
 
 	if p.otoCtx == nil {
@@ -165,7 +272,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 		return fmt.Errorf("ffmpeg start error: %w", err)
 	}
 
-	p.player = p.otoCtx.NewPlayer(pcmOut)
+	p.player = p.otoCtx.NewPlayer(relayPCM(pcmOut, p.tap))
 	p.player.SetVolume(p.volume)
 
 	p.player.Play()
