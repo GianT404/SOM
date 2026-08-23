@@ -458,7 +458,8 @@ func (a *App) View() string {
 		mainW = 10
 	}
 
-	somRow := renderSOMLogo()
+	somLogo := renderSOMLogo()
+	somRow := a.renderSomRow(somLogo)
 
 	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
 
@@ -525,6 +526,33 @@ func (a *App) View() string {
 	}
 
 	return view
+}
+
+// renderSomRow ghép logo SOM với hint lyrics
+func (a *App) renderSomRow(somLogo string) string {
+	if a.sidebarActive != SideLyrics || a.nowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+		return somLogo
+	}
+
+	hint := DimItemStyle.Render("\u2191\u2193:select  enter:seek")
+	lines := strings.Split(somLogo, "\n")
+	if len(lines) == 0 {
+		return somLogo
+	}
+
+	hintLine := 5
+	if hintLine >= len(lines) {
+		return somLogo
+	}
+
+	logoW := lipgloss.Width(lines[hintLine])
+	hintW := lipgloss.Width(hint)
+	gap := a.width - logoW - hintW
+	if gap < 1 {
+		gap = 1
+	}
+	lines[hintLine] = lines[hintLine] + strings.Repeat(" ", gap) + hint
+	return strings.Join(lines, "\n")
 }
 
 func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {

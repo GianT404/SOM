@@ -34,6 +34,8 @@ type RightPanel struct {
 	// picker popup.
 	showLangPopup bool
 	langCursor    int
+	highlightLine int
+	manualSelect  bool
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
@@ -54,6 +56,8 @@ func (r *RightPanel) SetTrack(t *domain.Track) {
 	r.loadingLyrics = true
 	r.showLangPopup = false
 	r.langCursor = 0
+	r.highlightLine = 0
+	r.manualSelect = false
 }
 
 func (r *RightPanel) SetLyrics(lr domain.LyricsResp) {
@@ -89,6 +93,9 @@ func (r *RightPanel) TickAt() {
 
 	if best != r.curLine {
 		r.curLine = best
+		if r.manualSelect && best != r.highlightLine {
+			r.manualSelect = false
+		}
 		lyrH := r.lyricsHeight()
 		target := r.curLine - lyrH/2
 		if target < 0 {
@@ -129,6 +136,43 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 			return r, nil
 		}
 
+		if focused && len(r.lyrics.Synced) > 0 && !r.loadingLyrics {
+			switch msg.String() {
+			case "up":
+				if !r.manualSelect {
+					r.highlightLine = r.curLine
+					r.manualSelect = true
+				}
+				if r.highlightLine > 0 {
+					r.highlightLine--
+				}
+				r.scrollToHighlight()
+				return r, nil
+			case "down":
+				if !r.manualSelect {
+					r.highlightLine = r.curLine
+					r.manualSelect = true
+				}
+				if r.highlightLine < len(r.lyrics.Synced)-1 {
+					r.highlightLine++
+				}
+				r.scrollToHighlight()
+				return r, nil
+			case "enter":
+				if r.manualSelect && r.highlightLine >= 0 && r.highlightLine < len(r.lyrics.Synced) {
+					targetSec := int(r.lyrics.Synced[r.highlightLine].Time)
+					r.elapsed = time.Duration(targetSec) * time.Second
+					r.manualSelect = false
+					return r, seekToCmd(r.player, targetSec)
+				}
+			case "esc":
+				if r.manualSelect {
+					r.manualSelect = false
+					return r, nil
+				}
+			}
+		}
+
 		switch msg.String() {
 		case "l":
 			if focused && len(r.lyrics.AllTracks) > 0 {
@@ -164,4 +208,26 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		}
 	}
 	return r, nil
+}
+
+// scrollToHighlight giữ highlightLine luôn nằm trong viewport.
+func (r *RightPanel) scrollToHighlight() {
+	lyrH := r.lyricsHeight()
+	if r.highlightLine < r.offset {
+		r.offset = r.highlightLine
+	}
+	if r.highlightLine >= r.offset+lyrH {
+		r.offset = r.highlightLine - lyrH + 1
+	}
+	if r.offset < 0 {
+		r.offset = 0
+	}
+}
+
+// seekToCmd trả về tea.Cmd gọi player.SeekTo(seconds).
+func seekToCmd(p *player.Player, seconds int) tea.Cmd {
+	return func() tea.Msg {
+		p.SeekTo(seconds)
+		return nil
+	}
 }

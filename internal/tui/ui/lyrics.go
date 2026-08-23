@@ -160,8 +160,11 @@ func (r RightPanel) renderLyrics(innerW int, frame int) string {
 				}
 				prefix := strings.Repeat(" ", padLeft)
 				style := LyricNormalStyle
-				if i == r.curLine {
+				if i == r.curLine && !r.manualSelect {
 					style = LyricHighlightStyle
+				} else if r.manualSelect && i == r.highlightLine {
+					style = LyricSelectStyle
+					prefix = strings.Repeat(" ", maxInt(0, padLeft-1)) + "\u25b8 "
 				}
 				b.WriteString(style.Render(prefix+seg) + "\n")
 				written++

@@ -256,6 +256,22 @@ func (p *Player) SeekBy(seconds int) {
 	_ = p.playFrom(path, newSec, p.currentHeaders())
 }
 
+// SeekTo nhảy tới giây cụ thể (absolute seek) và tiếp tục phát.
+func (p *Player) SeekTo(seconds int) {
+	p.mu.Lock()
+	path := p.currentPath
+	if path == "" || p.state == Stopped {
+		p.mu.Unlock()
+		return
+	}
+	if seconds < 0 {
+		seconds = 0
+	}
+	p.mu.Unlock()
+
+	_ = p.playFrom(path, seconds, p.currentHeaders())
+}
+
 // currentHeaders giữ headers của lần phát hiện tại để seek lại với đúng header.
 func (p *Player) currentHeaders() map[string]string {
 	p.mu.Lock()

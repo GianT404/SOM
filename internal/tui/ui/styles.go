@@ -69,6 +69,11 @@ var (
 				Foreground(colorAccent).
 				Bold(true)
 
+	LyricSelectStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ffffff")).
+				Background(colorAccent).
+				Bold(true)
+
 	LyricNormalStyle = lipgloss.NewStyle().
 				Foreground(colorSubtle2)
 
