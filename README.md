@@ -79,12 +79,13 @@ SOM/
 │   │   ├── cmd/tui/           # Standalone TUI entry point
 │   │   └── ui/                # TUI components (Bubble Tea)
 │   │       ├── app.go           # Main app loop, sidebar, progress bar, key handling
+│   │       ├── bocchi_frame.go  # (My wifu XD)
 │   │       ├── browse.go        # Left panel (search/downloads/local)
 │   │       ├── nowplaying.go    # Right panel (lyrics, track info)
 │   │       ├── search.go        # Search input view
 │   │       ├── downloads.go     # Local file scanning
 │   │       ├── playlists.go     # Playlist create/add/play/delete UI
-│   │       ├── palette.go       # Live 2D audio visualizer (opened with `:`)
+│   │       ├── palette.go       # Live 2D audio visualizer (opened with `\`)
 │   │       ├── visualizer_3d.go # 3D wireframe visualizer mode
 │   │       ├── help.go          # Keyboard shortcuts popup (`?`)
 │   │       ├── sidebar.go       # Sidebar definition
@@ -180,10 +181,6 @@ cd app
 npx expo run:android
 ```
 
-### Desktop App (Deprecated)
-
-No longer actively maintained — the mobile app and TUI are the supported clients.
-
 ### TUI (Terminal UI)
 
 A standalone terminal music player — stream, download, and listen to music directly from the command line. No desktop environment required.
@@ -260,7 +257,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 | `--update-ytdlp` | Update the bundled yt-dlp binary to the latest version |
 | `--version` | Print the current version and exit |
 
-> Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`, so `mpv` is no longer needed). `ffprobe` is also used for local file duration detection.
+> Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`. `ffprobe` is also used for local file duration detection.
 
 ---
 ## Installation

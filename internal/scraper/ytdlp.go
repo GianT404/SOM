@@ -25,7 +25,22 @@ type YtdlpScraper struct {
 	BinPath string
 	// fastPath dùng lib youtube/v2 resolve URL (nhanh hơn) thay vì spawn
 	// yt-dlp. An toàn cho server vì URL đó không được dùng để phát trực tiếp.
-	fastPath bool
+	fastPath         bool
+	fastpathMisses   map[string]struct{}
+	fastpathMissesMu sync.Mutex
+}
+
+func (y *YtdlpScraper) markFastpathMiss(videoID string) {
+	y.fastpathMissesMu.Lock()
+	y.fastpathMisses[videoID] = struct{}{}
+	y.fastpathMissesMu.Unlock()
+}
+
+func (y *YtdlpScraper) isFastpathMiss(videoID string) bool {
+	y.fastpathMissesMu.Lock()
+	_, ok := y.fastpathMisses[videoID]
+	y.fastpathMissesMu.Unlock()
+	return ok
 }
 
 // defaultUA là UA trình duyệt dùng cho fastpath (lib youtube/v2 không trả
@@ -417,7 +432,7 @@ func NewYtdlpScraper(binPath string) *YtdlpScraper {
 		}
 	}
 
-	return &YtdlpScraper{BinPath: binPath}
+	return &YtdlpScraper{BinPath: binPath, fastpathMisses: make(map[string]struct{})}
 }
 
 type ytdlpSearchItem struct {
@@ -534,17 +549,17 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {
+	if y.fastPathEnabled() && !y.isFastpathMiss(videoID) {
+		if info := fetchStreamInfoLib(ctx, videoID); info != nil {
+			return info, nil
+		}
+		y.markFastpathMiss(videoID)
+	}
 
 	if err := acquireYtdlp(ctx); err != nil {
 		return nil, err
 	}
 	defer releaseYtdlp()
-
-	if info := fetchStreamInfoLib(ctx, videoID); info != nil && y.fastPathEnabled() {
-		return info, nil
-	}
-
-	log.Printf("resolve: fastpath miss for %s, falling back to yt-dlp", videoID)
 
 	var lastErr error
 	for attempt := 0; ; attempt++ {
