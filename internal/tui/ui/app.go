@@ -430,7 +430,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists
 	var leftCmd tea.Cmd
-	a.left, leftCmd = a.left.Update(msg, focusedContent)
+	a.left, leftCmd = a.left.Update(msg, focusedContent, a.nowPlay)
 	cmds = append(cmds, leftCmd)
 
 	var rightCmd tea.Cmd

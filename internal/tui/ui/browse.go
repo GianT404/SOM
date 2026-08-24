@@ -11,17 +11,18 @@ import (
 )
 
 type LeftPanel struct {
-	provider     domain.MusicProvider
-	input        textinput.Model
-	spinner      spinner.Model
-	tracks       []domain.Track
-	locals       []LocalFile
-	searchCursor int
-	searchOffset int
-	dlCursor     int
-	dlOffset     int
-	plCursor     int
-	plOffset     int
+	provider        domain.MusicProvider
+	input           textinput.Model
+	spinner         spinner.Model
+	tracks          []domain.Track
+	locals          []LocalFile
+	searchCursor    int
+	searchOffset    int
+	dlCursor        int
+	dlOffset        int
+	dlPreFilterPath string
+	plCursor        int
+	plOffset        int
 
 	loading         bool
 	searched        bool
@@ -96,7 +97,7 @@ func (p *LeftPanel) SetSize(mainW int, contentH int) {
 
 func (p LeftPanel) Init() tea.Cmd { return textinput.Blink }
 
-func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
+func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (LeftPanel, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if p.showDeletePopup {
@@ -472,9 +473,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	oldVal := strings.TrimSpace(p.input.Value())
 	p.input, inputCmd = p.input.Update(msg)
 	cmds = append(cmds, inputCmd)
+	newVal := strings.TrimSpace(p.input.Value())
 
 	if p.activeTab == SideSearch && p.input.Focused() && !p.showDeletePopup {
-		newVal := strings.TrimSpace(p.input.Value())
 		if newVal != oldVal {
 			p.suggestFocus = false
 			if newVal == "" {
@@ -491,15 +492,58 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 	}
 
 	if p.activeTab == SideDownloads {
-		localsCount := len(p.getFilteredLocals())
-		if p.dlOffset > 0 && p.dlOffset >= localsCount {
-			p.dlOffset = maxInt(localsCount-1, 0)
-		}
-		if p.dlCursor >= localsCount && localsCount > 0 {
-			p.dlCursor = localsCount - 1
-		}
-		if p.dlCursor < 0 {
-			p.dlCursor = 0
+		if p.input.Focused() && newVal != oldVal {
+			switch {
+			case oldVal == "" && newVal != "":
+				// Bắt đầu gõ filter — lưu lại track đang highlight
+				if locals := p.getFilteredLocals(); p.dlCursor >= 0 && p.dlCursor < len(locals) {
+					p.dlPreFilterPath = locals[p.dlCursor].Path
+				}
+				p.dlCursor = 0
+				p.dlOffset = 0
+
+			case newVal == "":
+				restored := false
+				if nowPlay != nil && strings.HasPrefix(nowPlay.ID, "local:") {
+					playingPath := strings.TrimPrefix(nowPlay.ID, "local:")
+					for i, f := range p.locals {
+						if f.Path == playingPath {
+							p.dlCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored && p.dlPreFilterPath != "" {
+					for i, f := range p.locals {
+						if f.Path == p.dlPreFilterPath {
+							p.dlCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored {
+					p.dlCursor = 0
+				}
+				p.scrollDlIntoView()
+				p.dlPreFilterPath = ""
+
+			default:
+				p.dlCursor = 0
+				p.dlOffset = 0
+			}
+		} else {
+			localsCount := len(p.getFilteredLocals())
+			if p.dlOffset > 0 && p.dlOffset >= localsCount {
+				p.dlOffset = maxInt(localsCount-1, 0)
+			}
+			if p.dlCursor >= localsCount && localsCount > 0 {
+				p.dlCursor = localsCount - 1
+			}
+			if p.dlCursor < 0 {
+				p.dlCursor = 0
+			}
 		}
 	}
 	return p, tea.Batch(cmds...)
@@ -527,6 +571,18 @@ func (p LeftPanel) visibleRows() int {
 		return 3
 	}
 	return rows
+}
+
+func (p *LeftPanel) scrollDlIntoView() {
+	vis := p.visibleRows() + 1
+	if p.dlCursor < p.dlOffset {
+		p.dlOffset = p.dlCursor
+	} else if p.dlCursor >= p.dlOffset+vis {
+		p.dlOffset = p.dlCursor - vis + 1
+	}
+	if p.dlOffset < 0 {
+		p.dlOffset = 0
+	}
 }
 
 func (p LeftPanel) isDownloaded(t domain.Track) bool {
