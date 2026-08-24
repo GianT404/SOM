@@ -119,9 +119,9 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 	for i := p.searchOffset; i < end; i++ {
 		t := p.tracks[i]
 		mark := "  "
-		if i == p.searchCursor {
-			mark = "» "
-		}
+		// if i == p.searchCursor {
+		// 	mark = "» "
+		// }
 		safeTitle := truncate(t.Title, titleW)
 		titlePlain := runewidth.FillRight(safeTitle, titleW)
 		durationBlock := FormatDuration(t.Duration)

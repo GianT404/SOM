@@ -240,7 +240,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool) (LeftPanel, tea.Cmd) {
 				locals := p.getFilteredLocals()
 				if len(locals) > 0 && p.dlCursor < len(locals) {
 					f := locals[p.dlCursor]
-					return p, func() tea.Msg { return PlayLocalMsg{Path: f.Path, Title: f.Name} }
+					return p, func() tea.Msg { return PlayLocalMsg{Path: f.Path, Title: f.Name, Filtered: locals} }
 				}
 			} else if p.activeTab == SidePlaylists {
 				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {

@@ -369,10 +369,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
 		}
-		a.playlist = make([]domain.Track, len(locals))
+		// Dùng filtered list nếu có (từ Downloads tab search), ngược lại dùng full list.
+		trackList := msg.Filtered
+		if len(trackList) == 0 {
+			trackList = a.left.locals
+		}
+		a.playlist = make([]domain.Track, len(trackList))
 		a.shuffleHist = nil
 		idx := -1
-		for i, lf := range locals {
+		for i, lf := range trackList {
 			a.playlist[i] = domain.Track{
 				ID:       "local:" + lf.Path,
 				Title:    lf.Name,

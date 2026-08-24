@@ -92,8 +92,6 @@ func (t *pcmTap) unsubscribe(c chan []byte) {
 	close(c)
 }
 
-// flush xóa dữ liệu PCM cũ trong tất cả subscriber channels,
-// tránh visualizer hiển thị data từ bài trước khi seek/next.
 func (t *pcmTap) flush() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -144,9 +142,9 @@ type Player struct {
 	headers     map[string]string
 	startTime   time.Time
 	pauseOffset time.Duration
-	lastErr     error      // lỗi của lần phát vừa kết thúc; nil = phát hoàn tất bình thường
-	stopped     bool       // đánh dấu user chủ động stop/kill, không tính là lỗi
-	stderrBuf   syncBuffer // stderr thật của ffmpeg, để debug khi decode lỗi
+	lastErr     error
+	stopped     bool
+	stderrBuf   syncBuffer
 	volume      float64
 	tap         *pcmTap
 }
