@@ -102,7 +102,7 @@ func magnitudeBands(samples []float64, bands int) []float64 {
 	if framePeak > autoGainPeak {
 		autoGainPeak = framePeak
 	} else {
-		autoGainPeak *= 0.995
+		autoGainPeak *= 0.99
 	}
 
 	if autoGainPeak < 0.001 {

@@ -219,7 +219,9 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 
 	// Flush PCM tap trước khi stop player cũ, tránh visualizer hiển thị
 	// data từ bài trước (stale frames).
-	p.tap.flush()
+	if p.tap != nil {
+		p.tap.flush()
+	}
 	p.stopLocked()
 
 	if p.otoCtx == nil {

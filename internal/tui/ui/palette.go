@@ -126,7 +126,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 				if v >= m.amps[i] {
 					m.amps[i] = v
 				} else {
-					m.amps[i] -= 0.06
+					m.amps[i] -= 0.12
 					if m.amps[i] < v {
 						m.amps[i] = v
 					}
@@ -135,12 +135,12 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 			for i := range m.amps {
 				if m.amps[i] >= m.peaks[i] {
 					m.peaks[i] = m.amps[i]
-					m.peakHold[i] = 15
+					m.peakHold[i] = 8
 				} else {
 					if m.peakHold[i] > 0 {
 						m.peakHold[i]--
 					} else {
-						m.peaks[i] -= 0.025
+						m.peaks[i] -= 0.06
 						if m.peaks[i] < m.amps[i] {
 							m.peaks[i] = m.amps[i]
 						}
@@ -230,7 +230,7 @@ func (m CommandPalette) renderVisualizer() string {
 	}
 
 	bass, bassN := 0.0, 0
-	for i := 0; i < len(m.amps) && i < 4; i++ {
+	for i := 1; i < len(m.amps) && i < 4; i++ {
 		bass += m.amps[i]
 		bassN++
 	}

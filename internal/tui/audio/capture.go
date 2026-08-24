@@ -60,14 +60,16 @@ func (c *Capture) Start(src PCMSource, bands int) error {
 				samples := make([]float64, n)
 				for i := 0; i < n; i++ {
 					off := i * frameBytes
-					v := int16(uint16(frame[off]) | uint16(frame[off+1])<<8)
-					samples[i] = float64(v) / 32768.0
+					// Stereo interleaved: L(int16) R(int16). Average cả 2 channels.
+					l := int16(uint16(frame[off]) | uint16(frame[off+1])<<8)
+					r := int16(uint16(frame[off+2]) | uint16(frame[off+3])<<8)
+					samples[i] = (float64(l) + float64(r)) / 2.0 / 32768.0
 				}
 
 				snap := magnitudeBands(samples, bands)
 				for i := range prev {
 					if i < len(snap) {
-						prev[i] = prev[i]*0.35 + snap[i]*0.75
+						prev[i] = prev[i]*0.40 + snap[i]*0.60
 					}
 				}
 				smoothed := make([]float64, len(prev))
