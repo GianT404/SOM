@@ -7,8 +7,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 	"syscall"
 
 	"som/internal/domain"
@@ -31,6 +33,7 @@ func main() {
 	checkUpdate := flag.Bool("check-update", false, "check whether a newer SOM release exists without installing")
 	uninstall := flag.Bool("uninstall", false, "remove the installed som binary from your machine")
 	updateYtdlp := flag.Bool("update-ytdlp", false, "update the yt-dlp binary to the latest version")
+	showChangelog := flag.Bool("changelog", false, "print the commits of the current version")
 	flag.Parse()
 
 	if *updateYtdlp {
@@ -46,6 +49,10 @@ func main() {
 	}
 	if *showVersion {
 		fmt.Println("som", Version)
+		return
+	}
+	if *showChangelog {
+		runChangelog(Version)
 		return
 	}
 	if *checkUpdate {
@@ -139,4 +146,63 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error TUI: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runChangelog in các commit từ tag trước đến tag hiện tại (version hiện tại).
+func runChangelog(version string) {
+	tag := strings.TrimSpace(version)
+	if tag == "" || tag == "dev" {
+		fmt.Fprintln(os.Stderr, "changelog: no version tag available (dev build)")
+		return
+	}
+
+	// Tìm tag trước đó.
+	prevTag := gitTagPrev(tag)
+
+	// git log <prev>..<current> --oneline
+	var rangeSpec string
+	if prevTag != "" {
+		rangeSpec = prevTag + ".." + tag
+	} else {
+		rangeSpec = tag
+	}
+
+	out, err := exec.Command("git", "log", rangeSpec, "--oneline", "--no-decorate").CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "changelog: git log failed: %v\n", err)
+		return
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		fmt.Printf("changelog: %s — no commits found\n", tag)
+		return
+	}
+
+	fmt.Printf("changelog: %s (%d commits)\n\n", tag, len(lines))
+	for _, line := range lines {
+		fmt.Println("  " + line)
+	}
+}
+
+// gitTagPrev tìm tag đứng trước currentTag theo thứ tự tạo (creatordate).
+func gitTagPrev(currentTag string) string {
+	// Liệt kê tags theo thời gian tạo, tìm tag nằm trước currentTag.
+	out, err := exec.Command("git", "tag", "--sort=-creatordate").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	tags := strings.Split(strings.TrimSpace(string(out)), "\n")
+	found := false
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == currentTag {
+			found = true
+			continue
+		}
+		if found && t != "" {
+			return t
+		}
+	}
+	return ""
 }
