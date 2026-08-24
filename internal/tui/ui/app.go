@@ -369,15 +369,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
 		}
-		// Dùng filtered list nếu có (từ Downloads tab search), ngược lại dùng full list.
-		trackList := msg.Filtered
-		if len(trackList) == 0 {
-			trackList = a.left.locals
-		}
-		a.playlist = make([]domain.Track, len(trackList))
+		a.playlist = make([]domain.Track, len(locals))
 		a.shuffleHist = nil
 		idx := -1
-		for i, lf := range trackList {
+		for i, lf := range locals {
 			a.playlist[i] = domain.Track{
 				ID:       "local:" + lf.Path,
 				Title:    lf.Name,
@@ -388,8 +383,23 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				idx = i
 			}
 		}
+		// Nếu full list không tìm thấy (edge case), fallback tìm trong filtered.
+		if idx < 0 && len(msg.Filtered) > 0 {
+			for _, lf := range msg.Filtered {
+				if lf.Path == msg.Path || lf.Name == msg.Title {
+					// Tìm trong full list bằng path.
+					for j, full := range locals {
+						if full.Path == lf.Path {
+							idx = j
+							break
+						}
+					}
+					break
+				}
+			}
+		}
 		if idx < 0 {
-			idx = len(a.playlist) - 1
+			idx = 0
 		}
 		a.activeContext = SideDownloads
 		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
