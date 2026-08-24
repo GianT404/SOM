@@ -383,26 +383,23 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				idx = i
 			}
 		}
-		// Nếu full list không tìm thấy (edge case), fallback tìm trong filtered.
-		if idx < 0 && len(msg.Filtered) > 0 {
-			for _, lf := range msg.Filtered {
-				if lf.Path == msg.Path || lf.Name == msg.Title {
-					// Tìm trong full list bằng path.
-					for j, full := range locals {
-						if full.Path == lf.Path {
-							idx = j
-							break
-						}
-					}
-					break
-				}
-			}
-		}
 		if idx < 0 {
 			idx = 0
 		}
 		a.activeContext = SideDownloads
 		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
+
+		filtered := a.left.getFilteredLocals()
+		for fi, lf := range filtered {
+			if lf.Path == msg.Path || lf.Name == msg.Title {
+				a.left.dlCursor = fi
+				a.left.dlOffset = 0
+				if fi >= a.left.visibleRows() {
+					a.left.dlOffset = fi - a.left.visibleRows() + 1
+				}
+				break
+			}
+		}
 
 	case StreamStartedMsg:
 		a.left.loadingStream = false

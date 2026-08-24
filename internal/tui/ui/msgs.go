@@ -22,9 +22,8 @@ type SuggestionsMsg struct {
 type PlayStartedMsg struct{ Track domain.Track }
 
 type PlayLocalMsg struct {
-	Path     string
-	Title    string
-	Filtered []LocalFile // danh sách filtered từ Downloads tab (nếu có)
+	Path  string
+	Title string
 }
 type DownloadDoneMsg struct {
 	Path string
