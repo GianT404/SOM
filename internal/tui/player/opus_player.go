@@ -254,6 +254,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
+		"-af", "loudnorm=I=-16:LRA=11:TP=-1.5",
 		"-v", "error",
 		"-",
 	)
