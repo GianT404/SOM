@@ -65,14 +65,16 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 	for i, t := range r.lyrics.AllTracks {
 		label := languageLabel(t.Language)
 		marker := "  "
-		if i == r.lyrics.LanguageIndex() {
-			marker = " \u2713"
-		}
-		line := marker + " " + label
 		if i == r.langCursor {
-			b.WriteString(LyricHighlightStyle.Render("\u25b8 " + line))
+			line := "+ " + marker + " " + label
+			pad := innerW - runewidth.StringWidth(line)
+			if pad < 0 {
+				pad = 0
+			}
+			b.WriteString(LyricSelectStyle.Render(line + strings.Repeat(" ", pad)))
 		} else {
-			b.WriteString(LyricNormalStyle.Render("  " + line))
+			line := "  " + marker + " " + label
+			b.WriteString(LyricNormalStyle.Render(line))
 		}
 		b.WriteString("\n")
 	}

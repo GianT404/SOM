@@ -549,7 +549,7 @@ func (a *App) renderSomRow(somLogo string) string {
 		return somLogo
 	}
 
-	hint := DimItemStyle.Render("\u2191\u2193:select  enter:seek")
+	hint := DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
 	lines := strings.Split(somLogo, "\n")
 	if len(lines) == 0 {
 		return somLogo
