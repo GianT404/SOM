@@ -409,11 +409,7 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(NormalItemStyle.Render("Add \"" + track.Title + "\" to:"))
 		b.WriteString("\n\n ")
 		for i, pl := range a.left.playlists {
-			marker := "  "
-			if i == a.cmdCursor {
-				marker = "▸ "
-			}
-			line := marker + pl.Name
+			line := "  " + pl.Name
 			if i == a.cmdCursor {
 				pad := 51 - runewidth.StringWidth(line)
 				if pad < 0 {
@@ -507,11 +503,7 @@ func (a *App) renderCmdPopup() string {
 
 	b.WriteString("\n\n")
 	for i, opt := range a.cmdOptionList() {
-		marker := "  "
-		if i == a.cmdMenuCursor {
-			marker = "▸ "
-		}
-		line := marker + opt
+		line := "  " + opt
 		if i == a.cmdMenuCursor {
 			pad := 36 - runewidth.StringWidth(line)
 			if pad < 0 {
