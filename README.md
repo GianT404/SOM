@@ -23,7 +23,7 @@
 
 <p align="center">
   <video controls width="100%">
-    <source src="./assets/demo.mp4" type="video/mp4">
+    <source src="./assets/demo_tui.mp4" type="video/mp4">
   </video>
 </p>
 
