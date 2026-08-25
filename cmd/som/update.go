@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -103,11 +104,21 @@ func runSelfUpdate(current string) error {
 		return fmt.Errorf("failed to download new version: GitHub returned %d", dlResp.StatusCode)
 	}
 
-	if err := selfupdate.Apply(dlResp.Body, selfupdate.Options{}); err != nil {
+	var reader io.Reader = dlResp.Body
+	total := dlResp.ContentLength
+	if total > 0 {
+		pr := &progressReader{total: total}
+		reader = pr.Wrap(dlResp.Body)
+	}
+
+	if err := selfupdate.Apply(reader, selfupdate.Options{}); err != nil {
 		if rerr := selfupdate.RollbackError(err); rerr != nil {
 			return fmt.Errorf("update failed AND rollback also failed (reinstall manually): %w", rerr)
 		}
 		return fmt.Errorf("update failed, rolled back to the previous version: %w", err)
+	}
+	if total > 0 {
+		fmt.Printf("\r[%-40s] 100%%  \n", strings.Repeat("#", 40))
 	}
 
 	fmt.Println("Successfully updated to", target.TagName, "— run `som` again to use the new version.")
@@ -359,4 +370,38 @@ func fetchCompareCommits(base, head string) ([]ghCompareCommit, error) {
 		return nil, err
 	}
 	return cmp.Commits, nil
+}
+
+type progressReader struct {
+	total   int64
+	current int64
+}
+
+func (pr *progressReader) Wrap(r io.Reader) io.Reader {
+	return &progressReading{pr: pr, r: r}
+}
+
+type progressReading struct {
+	pr *progressReader
+	r  io.Reader
+}
+
+func (p *progressReading) Read(buf []byte) (int, error) {
+	n, err := p.r.Read(buf)
+	p.pr.current += int64(n)
+	p.pr.print()
+	return n, err
+}
+
+func (pr *progressReader) print() {
+	if pr.total <= 0 {
+		return
+	}
+	pct := int(float64(pr.current) / float64(pr.total) * 100)
+	if pct > 100 {
+		pct = 100
+	}
+	filled := pct * 40 / 100
+	bar := strings.Repeat("#", filled) + strings.Repeat(" ", 40-filled)
+	fmt.Printf("\r[%s] %3d%%", bar, pct)
 }
