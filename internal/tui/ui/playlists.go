@@ -40,7 +40,7 @@ func (p LeftPanel) renderPlaylistList(innerW int) string {
 		pl := p.playlists[i]
 		mark := "  "
 		if i == p.plCursor {
-			mark = ""
+			mark = " "
 		}
 
 		name := truncate(pl.Name, innerW-10)
