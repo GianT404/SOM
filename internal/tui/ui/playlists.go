@@ -21,12 +21,12 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 		listContent = p.renderPlaylistList(innerW)
 	}
 
-	return renderBox(w, "Playlist List", listContent, contentBorder)
+	return renderBox(w, "Playlist List", "\n"+listContent, contentBorder)
 }
 
 func (p LeftPanel) renderPlaylistList(innerW int) string {
 	if len(p.playlists) == 0 {
-		return DimItemStyle.Render(" No playlists available. Press '/' to create a new playlist.") + "\n"
+		return DimItemStyle.Render("\n"+" No playlists available. Press '/' to create a new playlist.") + "\n"
 	}
 
 	var b strings.Builder
