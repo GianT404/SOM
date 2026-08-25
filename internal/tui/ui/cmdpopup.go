@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"som/internal/domain"
 	"som/internal/playlist"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,6 +16,7 @@ import (
 )
 
 var cmdOptions = []string{
+	"Add to queue",
 	"Rename title",
 	"Delete track",
 	"Move to playlist",
@@ -181,6 +183,20 @@ func (a *App) runCmdOption(idx int) {
 		return
 	}
 	switch opts[idx] {
+	case "Add to queue":
+		track, ok := a.selectedTrackForPlaylist()
+		if ok {
+			a.trackQueue = append(a.trackQueue, domain.Track{
+				ID:       track.ID,
+				Title:    track.Title,
+				Artist:   track.Artist,
+				Duration: track.Duration,
+			})
+			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Queued: %s", track.Title)))
+		} else {
+			a.setStatus(StatusErrStyle.Render("X No track selected"))
+		}
+		a.showCmdPopup = false
 	case "Rename title":
 		a.renameActive = true
 		iw := 60

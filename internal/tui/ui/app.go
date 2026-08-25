@@ -84,6 +84,7 @@ type App struct {
 	infoActive    bool
 	plMoveActive  bool
 	plRmActive    bool
+	trackQueue    []domain.Track
 }
 
 const maxPendingKeys = 64
@@ -171,8 +172,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			playErr := a.player.PlaybackError()
 			a.nowPlay = nil
 			if playErr != nil {
-				// Stream/file lỗi giữa chừng: dừng, không tự nhảy bài tiếp.
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
+			} else if len(a.trackQueue) > 0 {
+				t := a.trackQueue[0]
+				a.trackQueue = a.trackQueue[1:]
+				if a.left.qCursor >= len(a.trackQueue) {
+					a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+				}
+				a.highlightTrackInSidebar(t)
+				cmds = append(cmds, a.playTrackAt(-1, t))
+				a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 			} else {
 				cmds = append(cmds, a.playNext())
 			}
@@ -185,6 +194,26 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
+	case PlayQueueMsg:
+		if msg.Index >= 0 && msg.Index < len(a.trackQueue) {
+			t := a.trackQueue[msg.Index]
+			a.trackQueue = append(a.trackQueue[:msg.Index], a.trackQueue[msg.Index+1:]...)
+			if a.left.qCursor >= len(a.trackQueue) {
+				a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+			}
+			a.highlightTrackInSidebar(t)
+			cmds = append(cmds, a.playTrackAt(-1, t))
+			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
+		}
+	case RemoveFromQueueMsg:
+		if msg.Index >= 0 && msg.Index < len(a.trackQueue) {
+			removed := a.trackQueue[msg.Index]
+			a.trackQueue = append(a.trackQueue[:msg.Index], a.trackQueue[msg.Index+1:]...)
+			if a.left.qCursor >= len(a.trackQueue) {
+				a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+			}
+			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
+		}
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "alt+q":
@@ -430,7 +459,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	}
 
-	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists
+	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists
 	var leftCmd tea.Cmd
 	a.left, leftCmd = a.left.Update(msg, focusedContent, a.nowPlay)
 	cmds = append(cmds, leftCmd)
@@ -487,6 +516,8 @@ func (a *App) View() string {
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
 		mainView = a.left.ViewDownloadsContent(mainW, contentH)
+	case SideQueue:
+		mainView = a.left.ViewQueueContent(mainW, contentH, a.trackQueue)
 	case SidePlaylists:
 		mainView = a.left.ViewPlaylistsContent(mainW, contentH)
 	case SideLogs:
@@ -784,7 +815,50 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	}
 }
 
+func (a *App) highlightTrackInSidebar(t domain.Track) {
+	if strings.HasPrefix(t.ID, "local:") {
+		path := strings.TrimPrefix(t.ID, "local:")
+		a.activeContext = SideDownloads
+		a.sidebarActive = SideDownloads
+		a.left.activeTab = SideDownloads
+		for i, lf := range a.left.locals {
+			if lf.Path == path {
+				a.left.dlCursor = i
+				a.left.dlOffset = 0
+				if i >= a.left.visibleRows() {
+					a.left.dlOffset = i - a.left.visibleRows() + 1
+				}
+				break
+			}
+		}
+	} else {
+		a.activeContext = SideSearch
+		a.sidebarActive = SideSearch
+		a.left.activeTab = SideSearch
+		for i, tr := range a.left.tracks {
+			if tr.ID == t.ID {
+				a.left.searchCursor = i
+				a.left.searchOffset = 0
+				if i >= a.left.visibleRows() {
+					a.left.searchOffset = i - a.left.visibleRows() + 1
+				}
+				break
+			}
+		}
+	}
+}
+
 func (a *App) playNext() tea.Cmd {
+	if len(a.trackQueue) > 0 {
+		t := a.trackQueue[0]
+		a.trackQueue = a.trackQueue[1:]
+		if a.left.qCursor >= len(a.trackQueue) {
+			a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+		}
+		a.highlightTrackInSidebar(t)
+		a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
+		return a.playTrackAt(-1, t)
+	}
 	if len(a.playlist) == 0 {
 		return nil
 	}

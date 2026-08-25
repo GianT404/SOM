@@ -23,6 +23,8 @@ type LeftPanel struct {
 	dlPreFilterPath string
 	plCursor        int
 	plOffset        int
+	qCursor         int
+	qOffset         int
 
 	loading         bool
 	searched        bool
@@ -243,6 +245,8 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					f := locals[p.dlCursor]
 					return p, func() tea.Msg { return PlayLocalMsg{Path: f.Path, Title: f.Name} }
 				}
+			} else if p.activeTab == SideQueue {
+				return p, func() tea.Msg { return PlayQueueMsg{Index: p.qCursor} }
 			} else if p.activeTab == SidePlaylists {
 				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
 					plTracks := make([]domain.Track, len(p.activePlaylist.Tracks))
@@ -304,6 +308,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					if p.dlCursor < p.dlOffset {
 						p.dlOffset = p.dlCursor
 					}
+				} else if p.activeTab == SideQueue && p.qCursor > 0 {
+					p.qCursor--
+					if p.qCursor < p.qOffset {
+						p.qOffset = p.qCursor
+					}
 				} else if p.activeTab == SidePlaylists && p.plCursor > 0 {
 					p.plCursor--
 					if p.plCursor < p.plOffset {
@@ -354,7 +363,14 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 							p.dlOffset++
 						}
 					}
-				} else if p.activeTab == SidePlaylists {
+				} else if p.activeTab == SideQueue {
+					if p.qCursor < items-1 {
+						p.qCursor++
+						if p.qCursor >= p.qOffset+p.visibleRows()+1 {
+							p.qOffset++
+						}
+					}
+			} else if p.activeTab == SidePlaylists {
 					if p.plCursor < items-1 {
 						p.plCursor++
 						if p.plCursor >= p.plOffset+p.visibleRows() {
@@ -375,6 +391,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					p.showDeletePopup = true
 					p.deletePopupCursor = 0
 				}
+			}
+			if focused && !p.input.Focused() && p.activeTab == SideQueue {
+				return p, func() tea.Msg { return RemoveFromQueueMsg{Index: p.qCursor} }
 			}
 
 		case "d":

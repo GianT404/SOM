@@ -58,3 +58,11 @@ type PlayPlaylistMsg struct {
 	Tracks []domain.Track
 	Index  int
 }
+
+type PlayQueueMsg struct {
+	Index int
+}
+
+type RemoveFromQueueMsg struct {
+	Index int
+}

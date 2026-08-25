@@ -13,6 +13,7 @@ type SidebarItem int
 const (
 	SideSearch SidebarItem = iota
 	SideDownloads
+	SideQueue
 	SidePlaylists
 	SideLyrics
 	SideLogs
@@ -37,6 +38,8 @@ func (s SidebarItem) String() string {
 		return "Search"
 	case SideDownloads:
 		return "Downloads"
+	case SideQueue:
+		return "Queue"
 	case SideLyrics:
 		return "Lyrics"
 	case SideLogs:
@@ -62,7 +65,7 @@ var (
 func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string {
 	var b strings.Builder
 
-	items := []SidebarItem{SideSearch, SideDownloads, SidePlaylists, SideLyrics, SideLogs}
+	items := []SidebarItem{SideSearch, SideDownloads, SideQueue, SidePlaylists, SideLyrics, SideLogs}
 	for i, item := range items {
 		if i > 0 {
 			b.WriteString("\n")
