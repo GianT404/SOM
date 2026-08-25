@@ -22,7 +22,9 @@
 </p>
 
 <p align="center">
-  <img src="./assets/lyrics-tui.png" alt="SOM Logo" width="100%" />
+  <video controls width="100%">
+    <source src="./assets/demo.mp4" type="video/mp4">
+  </video>
 </p>
 
 ---
