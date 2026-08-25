@@ -19,13 +19,10 @@
 
 <p align="center">
   <img src="./assets/thumbnail.png" alt="SOM Logo" width="100%" />
+
+  https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
 </p>
 
-<p align="center">
-  <video controls width="100%">
-    <source src="./assets/demo_tui.mp4" type="video/mp4">
-  </video>
-</p>
 
 ---
 
