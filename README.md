@@ -20,7 +20,8 @@
 <p align="center">
   <img src="./assets/thumbnail.png" alt="SOM Logo" width="100%" />
 </p>
-  https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
+
+https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
 
 ---
 
