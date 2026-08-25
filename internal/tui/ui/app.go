@@ -75,14 +75,15 @@ type App struct {
 	splashFrame   int
 	pendingKeys   []tea.KeyMsg
 
-	showCmdPopup bool
-	cmdCursor    int
-	renameActive bool
-	renameInput  textinput.Model
-	delActive    bool
-	infoActive   bool
-	plMoveActive bool
-	plRmActive   bool
+	showCmdPopup  bool
+	cmdCursor     int
+	cmdMenuCursor int
+	renameActive  bool
+	renameInput   textinput.Model
+	delActive     bool
+	infoActive    bool
+	plMoveActive  bool
+	plRmActive    bool
 }
 
 const maxPendingKeys = 64
@@ -235,6 +236,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				a.showCmdPopup = true
 				a.cmdCursor = 0
+				a.cmdMenuCursor = 0
 				a.renameActive = false
 			}
 

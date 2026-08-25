@@ -161,15 +161,15 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 	case "esc", ":":
 		a.showCmdPopup = false
 	case "up", "k":
-		if a.cmdCursor > 0 {
-			a.cmdCursor--
+		if a.cmdMenuCursor > 0 {
+			a.cmdMenuCursor--
 		}
 	case "down", "j":
-		if a.cmdCursor < len(a.cmdOptionList())-1 {
-			a.cmdCursor++
+		if a.cmdMenuCursor < len(a.cmdOptionList())-1 {
+			a.cmdMenuCursor++
 		}
 	case "enter":
-		a.runCmdOption(a.cmdCursor)
+		a.runCmdOption(a.cmdMenuCursor)
 	}
 	return nil
 }
@@ -499,11 +499,11 @@ func (a *App) renderCmdPopup() string {
 	b.WriteString("\n\n")
 	for i, opt := range a.cmdOptionList() {
 		marker := "  "
-		if i == a.cmdCursor {
+		if i == a.cmdMenuCursor {
 			marker = "▸ "
 		}
 		line := marker + opt
-		if i == a.cmdCursor {
+		if i == a.cmdMenuCursor {
 			b.WriteString(SelectedItemStyle.Render(line))
 		} else {
 			b.WriteString(NormalItemStyle.Render(line))
