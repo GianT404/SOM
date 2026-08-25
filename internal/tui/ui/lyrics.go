@@ -65,8 +65,11 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 	for i, t := range r.lyrics.AllTracks {
 		label := languageLabel(t.Language)
 		marker := "  "
+		if i == r.lyrics.LanguageIndex() {
+			marker = "+"
+		}
 		if i == r.langCursor {
-			line := "+ " + marker + " " + label
+			line := marker + " " + label
 			pad := innerW - runewidth.StringWidth(line)
 			if pad < 0 {
 				pad = 0
@@ -165,8 +168,12 @@ func (r RightPanel) renderLyrics(innerW int, frame int) string {
 				if i == r.curLine && !r.manualSelect {
 					style = LyricHighlightStyle
 				} else if r.manualSelect && i == r.highlightLine {
-					style = LyricSelectStyle
-					prefix = strings.Repeat(" ", maxInt(0, padLeft-1)) + "\u25b8 "
+					highlightStyle := LyricSelectStyle.Copy().
+						Width(innerW).
+						Align(lipgloss.Center)
+					b.WriteString(highlightStyle.Render(seg) + "\n")
+					written++
+					continue
 				}
 				b.WriteString(style.Render(prefix+seg) + "\n")
 				written++
