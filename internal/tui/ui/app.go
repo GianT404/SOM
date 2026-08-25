@@ -238,7 +238,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.palette.Visible() {
 				a.palette.Close()
 			}
-		case "1", "2", "3", "4", "5":
+		case "1", "2", "3", "4", "5", "6":
 			if a.left.input.Focused() {
 				break
 			}
