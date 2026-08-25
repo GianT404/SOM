@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 var cmdOptions = []string{
@@ -387,7 +388,11 @@ func (a *App) renderCmdPopup() string {
 			}
 			line := marker + a.left.playlists[plIdx].Name
 			if i == a.cmdCursor {
-				b.WriteString(SelectedItemStyle.Render(line))
+				pad := 51 - runewidth.StringWidth(line)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
 			} else {
 				b.WriteString(NormalItemStyle.Render(line))
 			}
@@ -410,7 +415,11 @@ func (a *App) renderCmdPopup() string {
 			}
 			line := marker + pl.Name
 			if i == a.cmdCursor {
-				b.WriteString(SelectedItemStyle.Render(line))
+				pad := 51 - runewidth.StringWidth(line)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
 			} else {
 				b.WriteString(NormalItemStyle.Render(line))
 			}
@@ -504,7 +513,11 @@ func (a *App) renderCmdPopup() string {
 		}
 		line := marker + opt
 		if i == a.cmdMenuCursor {
-			b.WriteString(SelectedItemStyle.Render(line))
+			pad := 36 - runewidth.StringWidth(line)
+			if pad < 0 {
+				pad = 0
+			}
+			b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
 		} else {
 			b.WriteString(NormalItemStyle.Render(line))
 		}
