@@ -21,7 +21,7 @@ const (
 	sideCount
 )
 
-const sidebarWidth = 22
+const sidebarWidth = 18
 
 const sidebarGhostDuration = 120 * time.Millisecond
 
