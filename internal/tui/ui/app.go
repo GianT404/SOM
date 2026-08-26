@@ -574,6 +574,15 @@ func (a *App) View() tea.View {
 	v := tea.NewView(view)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+
+	if a.left.input.Focused() {
+		if c := a.left.input.Cursor(); c != nil {
+			c.Position.X += sidebarWidth + 2 + 1
+			c.Position.Y = 8
+			v.Cursor = c
+		}
+	}
+
 	return v
 }
 
