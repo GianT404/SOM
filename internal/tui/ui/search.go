@@ -76,9 +76,6 @@ func (p LeftPanel) renderSuggestions(innerW int) string {
 	var b strings.Builder
 	for idx := p.suggestOffset; idx < p.suggestOffset+show; idx++ {
 		mark := " "
-		if p.suggestFocus && idx == p.suggestCursor {
-			mark = "»"
-		}
 		text := truncate(strings.TrimSpace(p.suggestions[idx]), titleW)
 		line := mark + " " + text
 		pad := innerW - runewidth.StringWidth(line)
@@ -119,9 +116,6 @@ func (p LeftPanel) renderSearchList(innerW int) string {
 	for i := p.searchOffset; i < end; i++ {
 		t := p.tracks[i]
 		mark := "  "
-		// if i == p.searchCursor {
-		// 	mark = "» "
-		// }
 		safeTitle := truncate(t.Title, titleW)
 		titlePlain := runewidth.FillRight(safeTitle, titleW)
 		durationBlock := FormatDuration(t.Duration)
