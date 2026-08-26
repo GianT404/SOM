@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"som/internal/domain"
 	"som/internal/scraper"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,7 +56,7 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 				lr.Title = t.Title
 				lr.VideoID = t.ID
 			}
-			jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
+			jsonPath := localFileSidecar(path)
 			data, _ := json.MarshalIndent(lr, "", "  ")
 			_ = os.WriteFile(jsonPath, data, 0644)
 		}

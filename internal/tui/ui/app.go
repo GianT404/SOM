@@ -783,7 +783,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.songStarted = true
 		a.right.SetTrack(&t)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
-		jsonPath := strings.TrimSuffix(path, ".opus") + ".json"
+		jsonPath := localFileSidecar(path)
 		data, err := os.ReadFile(jsonPath)
 		if err == nil {
 			var lr domain.LyricsResp

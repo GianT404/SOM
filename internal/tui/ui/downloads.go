@@ -35,12 +35,13 @@ func (p *LeftPanel) scanLocalFiles() {
 	p.errMsg = ""
 
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".opus") {
+		if !e.IsDir() && isSupportedAudio(e.Name()) {
 			localPath := filepath.Join(dir, e.Name())
-			name := strings.TrimSuffix(e.Name(), ".opus")
+			ext := filepath.Ext(e.Name())
+			name := strings.TrimSuffix(e.Name(), ext)
 			artist := ""
 			videoID := ""
-			jsonPath := strings.TrimSuffix(localPath, ".opus") + ".json"
+			jsonPath := strings.TrimSuffix(localPath, ext) + ".json"
 			if data, err := os.ReadFile(jsonPath); err == nil {
 				var meta struct {
 					Artist  string `json:"artist"`
@@ -170,4 +171,16 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 
 	return b.String()
+}
+
+func isSupportedAudio(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".opus") ||
+		strings.HasSuffix(lower, ".mp3") ||
+		strings.HasSuffix(lower, ".mp4")
+}
+
+func localFileSidecar(path string) string {
+	ext := filepath.Ext(path)
+	return strings.TrimSuffix(path, ext) + ".json"
 }

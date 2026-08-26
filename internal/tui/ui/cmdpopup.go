@@ -256,7 +256,7 @@ func (a *App) applyRenameTitle(newTitle string) {
 	if newBase == "" {
 		newBase = target.VideoID
 	}
-	newPath := filepath.Join(filepath.Dir(oldPath), newBase+".opus")
+	newPath := filepath.Join(filepath.Dir(oldPath), newBase+filepath.Ext(oldPath))
 	if newPath != oldPath {
 		if err := os.Rename(oldPath, newPath); err != nil {
 			a.setStatus(StatusErrStyle.Render("X Rename file failed: " + err.Error()))
@@ -264,8 +264,8 @@ func (a *App) applyRenameTitle(newTitle string) {
 		}
 	}
 
-	oldJson := strings.TrimSuffix(oldPath, ".opus") + ".json"
-	newJson := strings.TrimSuffix(newPath, ".opus") + ".json"
+	oldJson := localFileSidecar(oldPath)
+	newJson := localFileSidecar(newPath)
 	if data, err := os.ReadFile(oldJson); err == nil {
 		var meta map[string]any
 		if json.Unmarshal(data, &meta) == nil {
@@ -310,7 +310,7 @@ func (a *App) applyDeleteTrack() {
 	}
 
 	os.Remove(path)
-	os.Remove(strings.TrimSuffix(path, ".opus") + ".json")
+	os.Remove(localFileSidecar(path))
 
 	for i := range a.left.locals {
 		if a.left.locals[i].Path == path {
