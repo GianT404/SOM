@@ -183,6 +183,16 @@ func (p *Player) Unsubscribe(c chan []byte) {
 	p.tap.unsubscribe(c)
 }
 
+// BufferedBytes trả về số byte PCM đang nằm trong buffer của oto nhưng CHƯA thực sự phát ra loa — dùng để tính đúng độ trễ audio thật của máyđang chạy
+func (p *Player) BufferedBytes() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.player == nil {
+		return 0
+	}
+	return p.player.BufferedSize()
+}
+
 func (p *Player) State() State {
 	p.mu.Lock()
 	defer p.mu.Unlock()

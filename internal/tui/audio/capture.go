@@ -1,13 +1,28 @@
 package audio
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
+// PCMSource là nguồn cấp PCM cho Capture — khớp với player.Player.
 type PCMSource interface {
 	Subscribe() chan []byte
 	Unsubscribe(chan []byte)
+	BufferedBytes() int
 }
 
-const pcmChannels = 2
+const (
+	pcmChannels       = 2
+	pcmBytesPerSample = 2 // s16le
+	pcmSampleRate     = 48000
+	pcmBytesPerSecond = pcmSampleRate * pcmChannels * pcmBytesPerSample
+)
+
+type bandsSnapshot struct {
+	readyAt time.Time
+	bands   []float64
+}
 
 type Capture struct {
 	mu    sync.Mutex
@@ -35,9 +50,20 @@ func (c *Capture) Start(src PCMSource, bands int) error {
 	go func() {
 		defer src.Unsubscribe(sub)
 
-		const frameBytes = pcmChannels * 2
+		const frameBytes = pcmChannels * pcmBytesPerSample
 		var leftover []byte
 		prev := make([]float64, bands)
+		var queue []bandsSnapshot
+
+		publishReady := func() {
+			now := time.Now()
+			for len(queue) > 0 && !now.Before(queue[0].readyAt) {
+				c.mu.Lock()
+				c.bands = queue[0].bands
+				c.mu.Unlock()
+				queue = queue[1:]
+			}
+		}
 
 		for {
 			select {
@@ -51,6 +77,7 @@ func (c *Capture) Start(src PCMSource, bands int) error {
 				leftover = append(leftover, chunk...)
 				usable := len(leftover) - (len(leftover) % frameBytes)
 				if usable <= 0 {
+					publishReady()
 					continue
 				}
 				frame := leftover[:usable]
@@ -75,9 +102,12 @@ func (c *Capture) Start(src PCMSource, bands int) error {
 				smoothed := make([]float64, len(prev))
 				copy(smoothed, prev)
 
-				c.mu.Lock()
-				c.bands = smoothed
-				c.mu.Unlock()
+				// Delay = đúng bằng thời lượng audio đang xếp hàng chờ trong buffer
+				delaySec := float64(src.BufferedBytes()) / float64(pcmBytesPerSecond)
+				readyAt := time.Now().Add(time.Duration(delaySec * float64(time.Second)))
+
+				queue = append(queue, bandsSnapshot{readyAt: readyAt, bands: smoothed})
+				publishReady()
 			}
 		}
 	}()
