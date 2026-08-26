@@ -491,7 +491,9 @@ func (a *App) mainContentHeight() int {
 
 func (a *App) View() tea.View {
 	if a.booting || a.width == 0 {
-		return tea.NewView(renderSplash(a.width, a.height, a.splashFrame))
+		v := tea.NewView(renderSplash(a.width, a.height, a.splashFrame))
+		v.AltScreen = true
+		return v
 	}
 
 	contentH := a.mainContentHeight()
