@@ -19,7 +19,7 @@ import (
 	"som/internal/tui/api"
 	"som/internal/tui/ui"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
@@ -115,11 +115,7 @@ func main() {
 		}
 	}()
 
-	p := tea.NewProgram(
-		app,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(app)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

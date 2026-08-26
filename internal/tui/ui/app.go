@@ -14,9 +14,9 @@ import (
 	"som/internal/domain"
 	"som/internal/tui/player"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type tickMsg time.Time
@@ -73,7 +73,7 @@ type App struct {
 	palette       CommandPalette
 	booting       bool
 	splashFrame   int
-	pendingKeys   []tea.KeyMsg
+	pendingKeys   []tea.KeyPressMsg
 
 	showCmdPopup  bool
 	cmdCursor     int
@@ -141,7 +141,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.pendingKeys = nil
 			return a, tea.Batch(cmds...)
 
-		case tea.KeyMsg:
+		case tea.KeyPressMsg:
 			if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
 				return a, tea.Quit
 			}
@@ -214,7 +214,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "alt+q":
 			a.player.Stop()
@@ -277,7 +277,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, a.switchSidebar(next))
 			}
 
-		case " ":
+		case "space":
 			if a.left.input.Focused() {
 				break
 			}
@@ -489,9 +489,9 @@ func (a *App) mainContentHeight() int {
 	return contentH
 }
 
-func (a *App) View() string {
+func (a *App) View() tea.View {
 	if a.booting || a.width == 0 {
-		return renderSplash(a.width, a.height, a.splashFrame)
+		return tea.NewView(renderSplash(a.width, a.height, a.splashFrame))
 	}
 
 	contentH := a.mainContentHeight()
@@ -571,7 +571,10 @@ func (a *App) View() string {
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	}
 
-	return view
+	v := tea.NewView(view)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 // renderSomRow ghép logo SOM với hint lyrics

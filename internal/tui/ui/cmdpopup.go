@@ -10,8 +10,8 @@ import (
 	"som/internal/domain"
 	"som/internal/playlist"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -206,7 +206,7 @@ func (a *App) runCmdOption(idx int) {
 		if iw < 20 {
 			iw = 20
 		}
-		a.renameInput.Width = iw
+		a.renameInput.SetWidth(iw)
 		a.renameInput.Focus()
 		if target, ok := a.renameTarget(); ok {
 			a.renameInput.SetValue(target.Name)
@@ -507,7 +507,7 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(a.renameInput.View())
 		b.WriteString("\n\n")
 		b.WriteString(DimItemStyle.Render(" (enter: rename  | esc: back)"))
-		w := a.renameInput.Width + 8
+		w := a.renameInput.Width() + 8
 		if w < 48 {
 			w = 48
 		}

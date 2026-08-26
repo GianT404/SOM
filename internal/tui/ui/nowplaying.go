@@ -7,8 +7,8 @@ import (
 	"som/internal/domain"
 	"som/internal/tui/player"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 )
 
 type RightPanel struct {
@@ -114,7 +114,7 @@ func (r *RightPanel) TickAt() {
 
 func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if focused && r.showLangPopup {
 			switch msg.String() {
 			case "up", "k":

@@ -1,12 +1,14 @@
 package ui
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"image/color"
+
+	"charm.land/lipgloss/v2"
 
 	"strings"
 )
 
-func renderBox(w int, title string, content string, borderColor lipgloss.TerminalColor) string {
+func renderBox(w int, title string, content string, borderColor color.Color) string {
 
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 

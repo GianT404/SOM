@@ -11,7 +11,7 @@ import (
 	"som/internal/tui/api"
 	"som/internal/tui/ui"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func main() {
@@ -33,11 +33,7 @@ func main() {
 	}
 
 	app := ui.NewApp(provider)
-	p := tea.NewProgram(
-		app,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(app)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)

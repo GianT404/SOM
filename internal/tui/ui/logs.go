@@ -6,7 +6,7 @@ import (
 
 	"som/internal/tui/logbuf"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var LogBuf = logbuf.New(logbuf.DefaultCapacity)

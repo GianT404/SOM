@@ -5,9 +5,9 @@ import (
 	"som/internal/playlist"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 type LeftPanel struct {
@@ -61,7 +61,6 @@ const suggestMaxShow = 5
 func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 	ti := textinput.New()
 	ti.CharLimit = 120
-	ti.PromptStyle = InputPromptStyle
 	ti.Focus()
 
 	sp := spinner.New()
@@ -94,7 +93,7 @@ func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 func (p *LeftPanel) SetSize(mainW int, contentH int) {
 	p.width = mainW
 	p.height = contentH
-	p.input.Width = maxInt(mainW-6, 10)
+	p.input.SetWidth(maxInt(mainW-6, 10))
 }
 
 func (p LeftPanel) Init() tea.Cmd { return textinput.Blink }
@@ -192,7 +191,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter":
 			if p.input.Focused() && p.suggestFocus && len(p.suggestions) > 0 {
@@ -266,7 +265,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				p.suggestFocus = false
 				p.suggestCursor = 0
 				p.suggestOffset = 0
-				p.input.Focus()
+				cmds = append(cmds, p.input.Focus())
 				break
 			}
 			if len(p.suggestions) > 0 && p.input.Focused() {
@@ -290,7 +289,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					}
 				} else {
 					p.suggestFocus = false
-					p.input.Focus()
+					cmds = append(cmds, p.input.Focus())
 				}
 				break
 			}
@@ -412,11 +411,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			if p.activeTab == SidePlaylists {
 				if !p.input.Focused() && p.activePlaylist == nil {
 					p.showPlInput = true
-					p.plInput.Focus()
 					p.plInput.SetValue("")
+					return p, p.plInput.Focus()
 				}
 			} else if !p.input.Focused() {
-				p.input.Focus()
+				return p, p.input.Focus()
 			}
 			return p, nil
 		}

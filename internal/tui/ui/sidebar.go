@@ -1,11 +1,12 @@
 package ui
 
 import (
+	"image/color"
 	"math"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 type SidebarItem int
@@ -160,13 +161,13 @@ func ghostStyle(gi float64) lipgloss.Style {
 }
 
 func renderSOMLogo() string {
-	purples := []lipgloss.Color{
-		"#FFE8DF",
-		"#FFB9A7",
-		"#E8593C",
-		"#C84328",
-		"#9D311A",
-		"#6B1F0E",
+	purples := []color.Color{
+		lipgloss.Color("#FFE8DF"),
+		lipgloss.Color("#FFB9A7"),
+		lipgloss.Color("#E8593C"),
+		lipgloss.Color("#C84328"),
+		lipgloss.Color("#9D311A"),
+		lipgloss.Color("#6B1F0E"),
 	}
 	art := []string{
 		"     ███████╗   ██████╗   ███╗   ███╗",

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/color"
 	"io"
 	"log"
 	"log/slog"
@@ -16,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -73,13 +74,13 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		purples := []lipgloss.Color{
-			"#FFE8DF",
-			"#FFB9A7",
-			"#E8593C",
-			"#C84328",
-			"#9D311A",
-			"#6B1F0E",
+		purples := []color.Color{
+			lipgloss.Color("#FFE8DF"),
+			lipgloss.Color("#FFB9A7"),
+			lipgloss.Color("#E8593C"),
+			lipgloss.Color("#C84328"),
+			lipgloss.Color("#9D311A"),
+			lipgloss.Color("#6B1F0E"),
 		}
 		art := []string{
 			"     ███████╗   ██████╗   ███╗   ███╗",

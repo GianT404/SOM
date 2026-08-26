@@ -9,7 +9,7 @@ import (
 	"som/internal/scraper"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func searchCmd(p domain.MusicProvider, q string) tea.Cmd {

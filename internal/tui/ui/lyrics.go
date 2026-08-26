@@ -1,13 +1,14 @@
 package ui
 
 import (
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 )
 
-func (r RightPanel) renderLyricsBox(focused bool, borderColor lipgloss.TerminalColor, frame int) string {
+func (r RightPanel) renderLyricsBox(focused bool, borderColor color.Color, frame int) string {
 	if focused {
 		borderColor = lipgloss.Color("#e8593c")
 	}
