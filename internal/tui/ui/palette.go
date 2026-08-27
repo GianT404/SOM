@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"som/internal/tui/audio"
-	"som/internal/tui/player"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -49,7 +48,6 @@ type CommandPalette struct {
 	is3D      bool
 	capture   *audio.Capture
 	captureOK bool
-	player    *player.Player
 	amps      []float64
 	phase     float64
 	width     int
@@ -65,10 +63,6 @@ func NewCommandPalette() CommandPalette {
 	}
 }
 
-func (m *CommandPalette) SetPlayer(p *player.Player) {
-	m.player = p
-}
-
 func (m *CommandPalette) Open() tea.Cmd {
 	m.visible = true
 	m.amps = make([]float64, paletteVisBands)
@@ -76,10 +70,7 @@ func (m *CommandPalette) Open() tea.Cmd {
 	m.peakHold = make([]int, paletteVisBands)
 	m.phase = 0
 
-	if m.player == nil {
-		m.captureOK = false
-		log.Printf("visualizer: player chưa sẵn sàng")
-	} else if err := m.capture.Start(m.player, paletteVisBands); err == nil {
+	if err := m.capture.Start(paletteVisBands); err == nil {
 		m.captureOK = true
 	} else {
 		m.captureOK = false
