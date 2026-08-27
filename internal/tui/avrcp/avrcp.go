@@ -251,7 +251,12 @@ func (s *Server) UpdatePlaybackStatus(status string) {
 }
 
 func (s *Server) UpdatePosition(positionUs int64) {
-	s.SetProperty(dbusPlayerIface, "Position", dbus.MakeVariant(positionUs))
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.props[dbusPlayerIface] == nil {
+		s.props[dbusPlayerIface] = make(map[string]dbus.Variant)
+	}
+	s.props[dbusPlayerIface]["Position"] = dbus.MakeVariant(positionUs)
 }
 
 func (s *Server) UpdateMetadata(trackID, title, artist, album, artURL string, durationUs int64) {

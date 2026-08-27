@@ -301,6 +301,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			a.player.TogglePause()
+			if a.avrcp != nil {
+				if a.player.State() == player.Playing {
+					a.avrcp.UpdatePlaybackStatus("Playing")
+				} else if a.player.State() == player.Paused {
+					a.avrcp.UpdatePlaybackStatus("Paused")
+				}
+			}
 
 		case "right":
 			if a.left.input.Focused() {
@@ -496,15 +503,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.playPrev())
 		case "play", "playpause":
 			switch a.player.State() {
-			case player.Playing:
-				a.player.TogglePause()
-				if a.avrcp != nil {
-					a.avrcp.UpdatePlaybackStatus("Paused")
-				}
 			case player.Paused:
 				a.player.TogglePause()
 				if a.avrcp != nil {
 					a.avrcp.UpdatePlaybackStatus("Playing")
+				}
+			case player.Playing:
+				a.player.TogglePause()
+				if a.avrcp != nil {
+					a.avrcp.UpdatePlaybackStatus("Paused")
 				}
 			case player.Stopped:
 				if a.nowPlay != nil {
@@ -516,6 +523,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.player.TogglePause()
 				if a.avrcp != nil {
 					a.avrcp.UpdatePlaybackStatus("Paused")
+				}
+			} else if a.player.State() == player.Paused {
+				a.player.TogglePause()
+				if a.avrcp != nil {
+					a.avrcp.UpdatePlaybackStatus("Playing")
 				}
 			}
 		case "stop":
@@ -876,9 +888,13 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.playerGen = a.player.Generation()
 		a.songStarted = true
 		a.right.SetTrack(&t)
-		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		jsonPath := localFileSidecar(path)
 		data, err := os.ReadFile(jsonPath)
+		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+		if a.avrcp != nil {
+			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", "", int64(t.Duration)*1_000_000)
+			a.avrcp.UpdatePlaybackStatus("Playing")
+		}
 		if err == nil {
 			var lr domain.LyricsResp
 			if json.Unmarshal(data, &lr) == nil {
@@ -891,6 +907,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	}
 
 	gen := a.player.Generation()
+	a.playerGen = gen
 	return func() tea.Msg {
 		streamInfo, err := a.provider.ResolveStream(context.Background(), t.ID)
 		if err != nil || streamInfo == nil || streamInfo.URL == "" {
