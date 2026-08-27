@@ -3,10 +3,13 @@ package ui
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"som/internal/domain"
 	"som/internal/scraper"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -49,17 +52,39 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 	return func() tea.Msg {
 		path, err := p.DownloadOPUS(context.Background(), t.ID, t.Title, destDir)
 		if err == nil {
+			if t.Thumbnail != "" {
+				safe := t.Title
+				for _, ch := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"} {
+					safe = strings.ReplaceAll(safe, ch, "-")
+				}
+				safe = strings.TrimSpace(safe)
+				if safe == "" {
+					safe = t.ID
+				}
+				imgPath := filepath.Join(destDir, safe+".jpg")
+				if resp, errImg := http.Get(t.Thumbnail); errImg == nil {
+					defer resp.Body.Close()
+					if f, errF := os.Create(imgPath); errF == nil {
+						_, _ = io.Copy(f, resp.Body)
+						f.Close()
+					}
+				}
+			}
+
 			lr, errLyr := getCachedLyrics(p, t.ID, t.Title, t.Artist, t.Duration)
 			if errLyr != nil {
 				lr = domain.LyricsResp{}
-				lr.Artist = t.Artist
-				lr.Title = t.Title
-				lr.VideoID = t.ID
-				lr.Thumbnail = t.Thumbnail
 			}
+			lr.Artist = t.Artist
+			lr.Title = t.Title
+			lr.VideoID = t.ID
+			lr.Thumbnail = t.Thumbnail
+
 			jsonPath := localFileSidecar(path)
 			data, _ := json.MarshalIndent(lr, "", "  ")
 			_ = os.WriteFile(jsonPath, data, 0644)
+
+			return DownloadDoneMsg{Path: path, Err: err}
 		}
 		return DownloadDoneMsg{Path: path, Err: err}
 	}
