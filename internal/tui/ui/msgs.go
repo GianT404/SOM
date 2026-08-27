@@ -34,6 +34,7 @@ type StreamStartedMsg struct {
 	Lyrics    domain.LyricsResp
 	LyricsErr error
 	Err       error
+	Gen       uint64
 }
 type LocalFilesMsg struct {
 	Files []LocalFile

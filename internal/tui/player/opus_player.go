@@ -58,6 +58,7 @@ type Player struct {
 	stopped     bool
 	stderrBuf   syncBuffer
 	volume      float64
+	generation  uint64
 }
 
 func New() *Player {
@@ -127,6 +128,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 	p.pauseOffset = 0
 	p.lastErr = nil
 	p.stopped = false
+	p.generation++
 
 	var args []string
 	if strings.HasPrefix(filePath, "http://") {
@@ -172,10 +174,10 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 	p.player.Play()
 	p.state = Playing
 
-	go func(cmd *exec.Cmd) {
+	go func(cmd *exec.Cmd, gen uint64) {
 		err := cmd.Wait()
 		p.mu.Lock()
-		if p.decoder == cmd {
+		if p.decoder == cmd && p.generation == gen {
 			// Chỉ tính là lỗi khi không phải user chủ động dừng (stop/seek/next).
 			if err != nil && !p.stopped {
 				p.lastErr = err
@@ -184,7 +186,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 			p.stopped = false
 		}
 		p.mu.Unlock()
-	}(p.decoder)
+	}(p.decoder, p.generation)
 
 	return nil
 }
@@ -313,4 +315,13 @@ func (p *Player) Volume() float64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.volume
+}
+
+// Generation returns the current playback generation counter.
+// It increments each time playFrom() is called; goroutines from
+// older generations must be discarded to avoid race conditions.
+func (p *Player) Generation() uint64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.generation
 }

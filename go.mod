@@ -9,6 +9,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/gen2brain/malgo v0.11.26
 	github.com/go-chi/chi/v5 v5.2.5
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/kkdai/youtube/v2 v2.10.6
 	github.com/mattn/go-runewidth v0.0.27
 	github.com/minio/selfupdate v0.6.0

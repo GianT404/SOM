@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"som/internal/domain"
+	"som/internal/tui/avrcp"
 	"som/internal/tui/player"
 
 	"charm.land/bubbles/v2/textinput"
@@ -85,6 +86,8 @@ type App struct {
 	plMoveActive  bool
 	plRmActive    bool
 	trackQueue    []domain.Track
+	avrcp         *avrcp.Server
+	playerGen     uint64
 }
 
 const maxPendingKeys = 64
@@ -129,8 +132,14 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.booting = false
 			a.resizePanels()
 
+			// Start AVRCP (Bluetooth media control).
+			a.avrcp = avrcp.New()
+
 			// Replay phím bấm trong lúc boot để không bị nuốt.
 			cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick()}
+			if a.avrcp != nil {
+				cmds = append(cmds, a.avrcp.WatchCommands())
+			}
 			for _, k := range a.pendingKeys {
 				_, c := a.Update(k)
 				if c != nil {
@@ -170,6 +179,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !a.left.loadingStream && a.songStarted && a.player.State() == player.Stopped && a.nowPlay != nil {
 			playErr := a.player.PlaybackError()
 			a.nowPlay = nil
+			if a.avrcp != nil {
+				a.avrcp.UpdatePlaybackStatus("Stopped")
+			}
 			if playErr != nil {
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
 			} else if len(a.trackQueue) > 0 {
@@ -184,6 +196,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				cmds = append(cmds, a.playNext())
 			}
+		}
+
+		// Update AVRCP position for Bluetooth devices.
+		if a.avrcp != nil && a.nowPlay != nil {
+			a.avrcp.UpdatePosition(a.player.Position().Microseconds())
 		}
 
 		cmds = append(cmds, tick())
@@ -217,6 +234,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "alt+q":
 			a.player.Stop()
+			if a.avrcp != nil {
+				a.avrcp.Close()
+			}
 			return a, tea.Quit
 		}
 
@@ -432,11 +452,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case StreamStartedMsg:
-		a.left.loadingStream = false
 		if msg.Err != nil {
+			a.left.loadingStream = false
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 			break
 		}
+		// Ignore stale goroutine: a newer playTrackAt has been called since.
+		if msg.Gen != a.playerGen {
+			break
+		}
+		a.left.loadingStream = false
 		a.nowPlay = &msg.Track
 		a.songStarted = true
 		a.right.SetTrack(&msg.Track)
@@ -449,11 +474,61 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// start lyrics spinner
 		cmds = append(cmds, a.right.spinner.Tick)
 
+		// Update AVRCP metadata for Bluetooth devices.
+		if a.avrcp != nil {
+			a.avrcp.UpdateMetadata(msg.Track.ID, msg.Track.Title, msg.Track.Artist, "", msg.Track.Thumbnail, int64(msg.Track.Duration)*1_000_000)
+			a.avrcp.UpdatePlaybackStatus("Playing")
+		}
+
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))
 		} else {
 			a.setStatus(StatusOKStyle.Render("Saved " + msg.Path))
+		}
+
+	case avrcp.AVRCPCmdMsg:
+		switch msg.Cmd {
+		case "next":
+			a.player.Stop()
+			cmds = append(cmds, a.playNext())
+		case "previous":
+			cmds = append(cmds, a.playPrev())
+		case "play", "playpause":
+			switch a.player.State() {
+			case player.Paused:
+				a.player.TogglePause()
+				if a.avrcp != nil {
+					a.avrcp.UpdatePlaybackStatus("Playing")
+				}
+			case player.Stopped:
+				if a.nowPlay != nil {
+					cmds = append(cmds, a.playTrackAt(a.currentIdx, *a.nowPlay))
+				}
+			}
+		case "pause":
+			if a.player.State() == player.Playing {
+				a.player.TogglePause()
+				if a.avrcp != nil {
+					a.avrcp.UpdatePlaybackStatus("Paused")
+				}
+			}
+		case "stop":
+			a.player.Stop()
+			if a.avrcp != nil {
+				a.avrcp.UpdatePlaybackStatus("Stopped")
+			}
+		default:
+			// Seek: "seek:<offset_us>"
+			if len(msg.Cmd) > 5 && msg.Cmd[:5] == "seek:" {
+				var offsetUs int64
+				fmt.Sscanf(msg.Cmd[5:], "%d", &offsetUs)
+				a.player.SeekBy(int(offsetUs / 1_000_000))
+			}
+		}
+		// Re-arm the watcher.
+		if a.avrcp != nil {
+			cmds = append(cmds, a.avrcp.WatchCommands())
 		}
 
 	}
@@ -793,6 +868,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
 			return nil
 		}
+		a.playerGen = a.player.Generation()
 		a.songStarted = true
 		a.right.SetTrack(&t)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
@@ -809,6 +885,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		return nil
 	}
 
+	gen := a.player.Generation()
 	return func() tea.Msg {
 		streamInfo, err := a.provider.ResolveStream(context.Background(), t.ID)
 		if err != nil || streamInfo == nil || streamInfo.URL == "" {
@@ -824,6 +901,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			Track:     t,
 			Lyrics:    lr,
 			LyricsErr: lyricsErr,
+			Gen:       gen,
 		}
 	}
 }
