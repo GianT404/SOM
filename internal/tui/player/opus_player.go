@@ -174,8 +174,23 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 	p.player.Play()
 	p.state = Playing
 
-	go func(cmd *exec.Cmd, gen uint64) {
+	go func(cmd *exec.Cmd, gen uint64, optr *oto.Player) {
 		err := cmd.Wait()
+
+		if optr != nil {
+			for optr.IsPlaying() {
+				time.Sleep(50 * time.Millisecond)
+
+				p.mu.Lock()
+				isStopped := p.stopped
+				p.mu.Unlock()
+
+				if isStopped {
+					break // Bỏ qua buffer và thoát ngay nếu user chủ động ngắt/chuyển bài
+				}
+			}
+		}
+
 		p.mu.Lock()
 		defer p.mu.Unlock()
 
@@ -190,7 +205,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 				p.stopped = false
 			}
 		}
-	}(p.decoder, p.generation)
+	}(p.decoder, p.generation, p.player)
 
 	return nil
 }
