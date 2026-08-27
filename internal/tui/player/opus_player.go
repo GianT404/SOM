@@ -177,15 +177,19 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 	go func(cmd *exec.Cmd, gen uint64) {
 		err := cmd.Wait()
 		p.mu.Lock()
+		defer p.mu.Unlock()
+
 		if p.decoder == cmd && p.generation == gen {
-			// Chỉ tính là lỗi khi không phải user chủ động dừng (stop/seek/next).
 			if err != nil && !p.stopped {
 				p.lastErr = err
+				p.state = Stopped
+				p.stopped = false
+			} else if err == nil && !p.stopped {
+				p.lastErr = nil
+				p.state = Stopped
+				p.stopped = false
 			}
-			p.state = Stopped
-			p.stopped = false
 		}
-		p.mu.Unlock()
 	}(p.decoder, p.generation)
 
 	return nil

@@ -88,6 +88,7 @@ type App struct {
 	trackQueue    []domain.Track
 	avrcp         *avrcp.Server
 	playerGen     uint64
+	resolveCancel context.CancelFunc
 }
 
 const maxPendingKeys = 64
@@ -905,13 +906,21 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		}
 		return nil
 	}
-
+	if a.resolveCancel != nil {
+		a.resolveCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.resolveCancel = cancel
 	gen := a.player.Generation()
 	a.playerGen = gen
 	return func() tea.Msg {
-		streamInfo, err := a.provider.ResolveStream(context.Background(), t.ID)
+		streamInfo, err := a.provider.ResolveStream(ctx, t.ID)
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		if err != nil || streamInfo == nil || streamInfo.URL == "" {
-			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
+			return StreamStartedMsg{Err: fmt.Errorf("l y link CDN: %v", err)}
 		}
 
 		if err := a.player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
