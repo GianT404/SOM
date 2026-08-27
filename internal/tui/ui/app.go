@@ -432,10 +432,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		idx := -1
 		for i, lf := range locals {
 			a.playlist[i] = domain.Track{
-				ID:       "local:" + lf.Path,
-				Title:    lf.Name,
-				Artist:   lf.Artist,
-				Duration: lf.Duration,
+				ID:        "local:" + lf.Path,
+				Title:     lf.Name,
+				Artist:    lf.Artist,
+				Duration:  lf.Duration,
+				Thumbnail: lf.Thumbnail,
 			}
 			if lf.Path == msg.Path || lf.Name == msg.Title {
 				idx = i
@@ -893,7 +894,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		data, err := os.ReadFile(jsonPath)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		if a.avrcp != nil {
-			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", "", int64(t.Duration)*1_000_000)
+			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
 		if err == nil {

@@ -32,6 +32,7 @@ type LyricsResp struct {
 	Title     string        `json:"title,omitempty"`
 	VideoID   string        `json:"video_id,omitempty"`
 	Language  string        `json:"language,omitempty"`
+	Thumbnail string        `json:"thumbnail,omitempty"`
 	AllTracks []LyricsTrack `json:"all_tracks,omitempty"`
 }
 

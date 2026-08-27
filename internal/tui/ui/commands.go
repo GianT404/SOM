@@ -55,6 +55,7 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 				lr.Artist = t.Artist
 				lr.Title = t.Title
 				lr.VideoID = t.ID
+				lr.Thumbnail = t.Thumbnail
 			}
 			jsonPath := localFileSidecar(path)
 			data, _ := json.MarshalIndent(lr, "", "  ")

@@ -41,11 +41,12 @@ type LocalFilesMsg struct {
 }
 
 type LocalFile struct {
-	Name     string
-	Path     string
-	Artist   string
-	Duration int
-	VideoID  string
+	Name      string
+	Path      string
+	Artist    string
+	Duration  int
+	VideoID   string
+	Thumbnail string
 }
 
 type Pane int

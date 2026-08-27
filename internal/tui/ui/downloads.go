@@ -38,30 +38,43 @@ func (p *LeftPanel) scanLocalFiles() {
 		if !e.IsDir() && isSupportedAudio(e.Name()) {
 			localPath := filepath.Join(dir, e.Name())
 			ext := filepath.Ext(e.Name())
+			baseName := strings.TrimSuffix(localPath, ext)
 			name := strings.TrimSuffix(e.Name(), ext)
 			artist := ""
 			videoID := ""
+			thumbnail := ""
+
 			jsonPath := strings.TrimSuffix(localPath, ext) + ".json"
 			if data, err := os.ReadFile(jsonPath); err == nil {
 				var meta struct {
-					Artist  string `json:"artist"`
-					Title   string `json:"title"`
-					VideoID string `json:"video_id"`
+					Artist    string `json:"artist"`
+					Title     string `json:"title"`
+					VideoID   string `json:"video_id"`
+					Thumbnail string `json:"thumbnail"`
 				}
 				if json.Unmarshal(data, &meta) == nil {
 					artist = meta.Artist
 					videoID = meta.VideoID
+					thumbnail = meta.Thumbnail
 					if meta.Title != "" {
 						name = meta.Title
 					}
 				}
 			}
+			if thumbnail == "" {
+				imgPath := baseName + ".jpg"
+				if _, errStat := os.Stat(imgPath); errStat == nil {
+					absPath, _ := filepath.Abs(imgPath)
+					thumbnail = "file://" + absPath
+				}
+			}
 			p.locals = append(p.locals, LocalFile{
-				Name:     name,
-				Path:     localPath,
-				Artist:   artist,
-				Duration: getFileDuration(localPath),
-				VideoID:  videoID,
+				Name:      name,
+				Path:      localPath,
+				Artist:    artist,
+				Duration:  getFileDuration(localPath),
+				VideoID:   videoID,
+				Thumbnail: thumbnail,
 			})
 		}
 	}
