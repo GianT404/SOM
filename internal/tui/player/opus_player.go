@@ -229,7 +229,7 @@ func (p *Player) TogglePause() {
 	if p.state == Playing {
 		p.player.Pause()
 		p.state = Paused
-		p.pauseOffset += time.Since(p.startTime)
+		p.pauseOffset = time.Since(p.startTime)
 	} else if p.state == Paused {
 		p.player.Play()
 		p.state = Playing

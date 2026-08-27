@@ -496,6 +496,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.playPrev())
 		case "play", "playpause":
 			switch a.player.State() {
+			case player.Playing:
+				a.player.TogglePause()
+				if a.avrcp != nil {
+					a.avrcp.UpdatePlaybackStatus("Paused")
+				}
 			case player.Paused:
 				a.player.TogglePause()
 				if a.avrcp != nil {
