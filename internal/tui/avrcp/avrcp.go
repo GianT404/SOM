@@ -5,26 +5,20 @@ import (
 	"log"
 	"sync"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
-	tea "charm.land/bubbletea/v2"
 )
 
 // Server implements an MPRIS2 media player over D-Bus.
-// BlueZ bridges MPRIS2 to AVRCP automatically, making SOM
-// visible to Bluetooth audio devices (car stereos, headphones, etc.).
 type Server struct {
 	conn   *dbus.Conn
 	mu     sync.Mutex
 	closed bool
-	CmdCh  chan string // buffered(1): "next","previous","play","pause","stop","playpause","seek:<us>"
-
-	// Property storage (keyed by interface → property name → value as Variant).
-	props map[string]map[string]dbus.Variant
+	CmdCh  chan string
+	props  map[string]map[string]dbus.Variant
 }
 
-// New creates and registers the MPRIS2 server on the D-Bus session bus.
-// Returns nil if D-Bus is unavailable.
 func New() *Server {
 	conn, err := dbus.SessionBus()
 	if err != nil {
@@ -103,7 +97,7 @@ func (s *Server) setup() error {
 		Interfaces: []introspect.Interface{
 			introspect.IntrospectData,
 			{
-				Name: dbusMediaPlayer2,
+				Name:       dbusMediaPlayer2,
 				Properties: s.buildIntrospectionProps(dbusMediaPlayer2),
 			},
 			{
@@ -139,8 +133,6 @@ func (s *Server) buildIntrospectionProps(iface string) []introspect.Property {
 	}
 	return result
 }
-
-// ── org.freedesktop.DBus.Properties ──────────────────────────────────
 
 func (s *Server) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
 	s.mu.Lock()
@@ -219,12 +211,12 @@ func (s *Server) sendCmd(cmd string) {
 	}
 }
 
-func (s *Server) Next() *dbus.Error          { s.sendCmd("next"); return nil }
-func (s *Server) Previous() *dbus.Error      { s.sendCmd("previous"); return nil }
-func (s *Server) Pause() *dbus.Error         { s.sendCmd("pause"); return nil }
-func (s *Server) PlayPause() *dbus.Error     { s.sendCmd("playpause"); return nil }
-func (s *Server) Stop() *dbus.Error          { s.sendCmd("stop"); return nil }
-func (s *Server) Play() *dbus.Error          { s.sendCmd("play"); return nil }
+func (s *Server) Next() *dbus.Error                                  { s.sendCmd("next"); return nil }
+func (s *Server) Previous() *dbus.Error                              { s.sendCmd("previous"); return nil }
+func (s *Server) Pause() *dbus.Error                                 { s.sendCmd("pause"); return nil }
+func (s *Server) PlayPause() *dbus.Error                             { s.sendCmd("playpause"); return nil }
+func (s *Server) Stop() *dbus.Error                                  { s.sendCmd("stop"); return nil }
+func (s *Server) Play() *dbus.Error                                  { s.sendCmd("play"); return nil }
 func (s *Server) SetPosition(_ dbus.ObjectPath, _ int64) *dbus.Error { return nil }
 
 func (s *Server) Seek(offset int64) *dbus.Error {

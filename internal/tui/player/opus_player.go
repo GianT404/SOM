@@ -317,9 +317,6 @@ func (p *Player) Volume() float64 {
 	return p.volume
 }
 
-// Generation returns the current playback generation counter.
-// It increments each time playFrom() is called; goroutines from
-// older generations must be discarded to avoid race conditions.
 func (p *Player) Generation() uint64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
