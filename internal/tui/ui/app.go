@@ -540,11 +540,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.avrcp.UpdatePlaybackStatus("Stopped")
 			}
 		default:
-			// Seek: "seek:<offset_us>"
 			if len(msg.Cmd) > 5 && msg.Cmd[:5] == "seek:" {
 				var offsetUs int64
 				fmt.Sscanf(msg.Cmd[5:], "%d", &offsetUs)
-				a.player.SeekBy(int(offsetUs / 1_000_000))
+				a.player.SeekBy(float64(offsetUs) / 1000000.0)
 			}
 		}
 		// Re-arm the watcher.

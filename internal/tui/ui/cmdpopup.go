@@ -112,7 +112,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			// Khởi động lại ffmpeg để ép ăn filter ngay lập tức
 			if a.nowPlay != nil {
 				pos := int(a.player.Position().Seconds())
-				a.player.SeekTo(pos)
+				a.player.SeekTo(float64(pos))
 			}
 			return nil
 		case "esc", ":", "q":

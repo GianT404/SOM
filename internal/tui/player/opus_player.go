@@ -121,7 +121,7 @@ func (p *Player) PlayWithHeaders(filePath string, headers map[string]string) err
 	return p.playFrom(filePath, 0, headers)
 }
 
-func (p *Player) playFrom(filePath string, startSec int, headers map[string]string) error {
+func (p *Player) playFrom(filePath string, startSec float64, headers map[string]string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -133,7 +133,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 
 	p.currentPath = filePath
 	p.headers = headers
-	p.startTime = time.Now().Add(-time.Duration(startSec) * time.Second)
+	p.startTime = time.Now().Add(-time.Duration(startSec * float64(time.Second)))
 	p.pauseOffset = 0
 	p.lastErr = nil
 	p.stopped = false
@@ -151,7 +151,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 		args = append(args, "-headers", hb.String())
 	}
 	if startSec > 0 {
-		args = append(args, "-ss", fmt.Sprintf("%d", startSec))
+		args = append(args, "-ss", fmt.Sprintf("%.3f", startSec))
 	}
 	args = append(args,
 		"-i", filePath,
@@ -266,29 +266,26 @@ func (p *Player) TogglePause() {
 }
 
 // SeekBy hỗ trợ tua tới / tua lùi nhạc
-func (p *Player) SeekBy(seconds int) {
+func (p *Player) SeekBy(seconds float64) {
 	p.mu.Lock()
 	path := p.currentPath
 	if path == "" || p.state == Stopped {
 		p.mu.Unlock()
 		return
 	}
-
 	elapsed := time.Since(p.startTime)
 	if p.state == Paused {
 		elapsed = p.pauseOffset
 	}
-	newSec := int(elapsed.Seconds()) + seconds
+	newSec := elapsed.Seconds() + seconds
 	if newSec < 0 {
 		newSec = 0
 	}
 	p.mu.Unlock()
-
 	_ = p.playFrom(path, newSec, p.currentHeaders())
 }
 
-// SeekTo nhảy tới giây cụ thể (absolute seek) và tiếp tục phát.
-func (p *Player) SeekTo(seconds int) {
+func (p *Player) SeekTo(seconds float64) {
 	p.mu.Lock()
 	path := p.currentPath
 	if path == "" || p.state == Stopped {
@@ -299,7 +296,6 @@ func (p *Player) SeekTo(seconds int) {
 		seconds = 0
 	}
 	p.mu.Unlock()
-
 	_ = p.playFrom(path, seconds, p.currentHeaders())
 }
 

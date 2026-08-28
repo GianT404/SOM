@@ -160,8 +160,25 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 				return r, nil
 			case "enter":
 				if r.manualSelect && r.highlightLine >= 0 && r.highlightLine < len(r.lyrics.Synced) {
-					targetSec := int(r.lyrics.Synced[r.highlightLine].Time)
-					r.elapsed = time.Duration(targetSec) * time.Second
+					targetSec := r.lyrics.Synced[r.highlightLine].Time
+
+					preRoll := 0.05
+					if r.highlightLine > 0 {
+						prevEnd := r.lyrics.Synced[r.highlightLine-1].End
+						if targetSec-preRoll < prevEnd {
+							preRoll = targetSec - prevEnd
+							if preRoll < 0 {
+								preRoll = 0
+							}
+						}
+					}
+
+					targetSec -= preRoll
+					if targetSec < 0 {
+						targetSec = 0
+					}
+
+					r.elapsed = time.Duration(targetSec * float64(time.Second))
 					r.manualSelect = false
 					return r, seekToCmd(r.player, targetSec)
 				}
@@ -225,7 +242,7 @@ func (r *RightPanel) scrollToHighlight() {
 }
 
 // seekToCmd trả về tea.Cmd gọi player.SeekTo(seconds).
-func seekToCmd(p *player.Player, seconds int) tea.Cmd {
+func seekToCmd(p *player.Player, seconds float64) tea.Cmd {
 	return func() tea.Msg {
 		p.SeekTo(seconds)
 		return nil
