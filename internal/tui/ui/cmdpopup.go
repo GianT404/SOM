@@ -223,7 +223,7 @@ func (a *App) runCmdOption(idx int) {
 	switch opts[idx] {
 	case "Audio settings":
 		a.presetActive = true
-		a.cmdCursor = 0
+		a.cmdCursor = a.activePreset
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
