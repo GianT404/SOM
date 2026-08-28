@@ -21,7 +21,11 @@
   <img src="./assets/thumbnail.png" alt="SOM Logo" width="100%" />
 </p>
 
+## Demo
 https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
+
+## Audio Visualizer
+https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 
 ---
 
@@ -49,7 +53,7 @@ https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
 ## Architecture
 
 ```
-SSOM/
+SOM/
 ├── cmd/
 │   ├── server/          # Go backend entry point
 │   │   └── main.go      # HTTP server (chi router)
