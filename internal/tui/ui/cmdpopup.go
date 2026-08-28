@@ -17,10 +17,19 @@ import (
 
 var cmdOptions = []string{
 	"Add to queue",
+	"Audio settings",
 	"Rename title",
 	"Delete track",
 	"Move to playlist",
 	"Show file info",
+}
+
+var audioPresets = []struct{ Name, Filter, Desc string }{
+	{"Normal", "dynaudnorm=f=250:g=11:p=0.9:m=10", "Normalize volume, preserve original quality"},
+	{"Bass Boost", "dynaudnorm=f=250:g=11:p=0.9:m=10,bass=g=8:f=100:w=0.5", "Significantly boost the sub-bass range."},
+	{"Nightcore", "dynaudnorm=f=250:g=11:p=0.9:m=10,asetrate=48000*1.2,aresample=44100", "Fast (1.25x), high-pitched voice (pitch up)"},
+	{"Daycore", "dynaudnorm=f=250:g=11:p=0.9:m=10,asetrate=48000*0.85,aresample=48000,aecho=0.8:0.88:60:0.4", "Slow (0.85x), deep and muffled + Reverb"},
+	{"Lo-Fi", "dynaudnorm=f=250:g=11:p=0.9:m=10,lowpass=f=800,volume=1.2", "High-cut filter, old radio/muffled effect"},
 }
 
 func (a *App) cmdOptionList() []string {
@@ -82,7 +91,36 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	}
+	if a.presetActive {
+		switch k.String() {
+		case "up", "k":
+			if a.cmdCursor > 0 {
+				a.cmdCursor--
+			}
+		case "down", "j":
+			if a.cmdCursor < len(audioPresets)-1 {
+				a.cmdCursor++
+			}
+		case "enter":
+			p := audioPresets[a.cmdCursor]
+			a.player.SetAudioFilter(p.Filter)
+			a.activePreset = a.cmdCursor
+			a.presetActive = false
+			a.showCmdPopup = false
+			a.setStatus(StatusOKStyle.Render("Applied: " + p.Name))
 
+			// Khởi động lại ffmpeg để ép ăn filter ngay lập tức
+			if a.nowPlay != nil {
+				pos := int(a.player.Position().Seconds())
+				a.player.SeekTo(pos)
+			}
+			return nil
+		case "esc", ":", "q":
+			a.presetActive = false
+			return nil
+		}
+		return nil
+	}
 	if a.plMoveActive {
 		switch k.String() {
 		case "up", "k":
@@ -183,6 +221,9 @@ func (a *App) runCmdOption(idx int) {
 		return
 	}
 	switch opts[idx] {
+	case "Audio settings":
+		a.presetActive = true
+		a.cmdCursor = 0
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
@@ -417,6 +458,40 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString("\n ")
 		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
 		return renderBox(56, "Remove from Playlist", b.String(), lipgloss.Color("#e8593c"))
+	}
+
+	if a.presetActive {
+		const boxW = 55
+		const innerW = boxW - 4
+
+		for i, p := range audioPresets {
+			cursor := " "
+			tick := " "
+			if i == a.activePreset {
+				tick = "+"
+			}
+
+			namePart := fmt.Sprintf(" %s [%s] %s", cursor, tick, p.Name)
+
+			if i == a.cmdCursor {
+				pad := innerW - runewidth.StringWidth(namePart)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
+			} else {
+				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
+			}
+		}
+
+		b.WriteString("\n")
+		activeDesc := audioPresets[a.cmdCursor].Desc
+		b.WriteString(DimItemStyle.Render("  "+activeDesc) + "\n")
+
+		b.WriteString("\n")
+		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
+
+		return renderBox(boxW, "Audio settings", b.String(), lipgloss.Color("#e8593c"))
 	}
 
 	if a.plMoveActive {

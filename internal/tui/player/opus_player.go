@@ -59,6 +59,7 @@ type Player struct {
 	stderrBuf   syncBuffer
 	volume      float64
 	generation  uint64
+	audioFilter string
 }
 
 func New() *Player {
@@ -76,12 +77,20 @@ func New() *Player {
 	<-ready
 
 	return &Player{
-		otoCtx: ctx,
-		state:  Stopped,
-		volume: 1.0,
+		otoCtx:      ctx,
+		state:       Stopped,
+		volume:      1.0,
+		audioFilter: "dynaudnorm=f=250:g=11:p=0.9:m=10",
 	}
 }
-
+func (p *Player) SetAudioFilter(filter string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if filter == "" {
+		filter = "dynaudnorm=f=250:g=11:p=0.9:m=10"
+	}
+	p.audioFilter = filter
+}
 func (p *Player) State() State {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -149,7 +158,7 @@ func (p *Player) playFrom(filePath string, startSec int, headers map[string]stri
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
-		"-af", "dynaudnorm=f=250:g=11:p=0.9:m=10",
+		"-af", p.audioFilter,
 		"-v", "error",
 		"-",
 	)

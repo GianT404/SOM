@@ -89,6 +89,8 @@ type App struct {
 	avrcp         *avrcp.Server
 	playerGen     uint64
 	resolveCancel context.CancelFunc
+	presetActive  bool
+	activePreset  int
 }
 
 const maxPendingKeys = 64
