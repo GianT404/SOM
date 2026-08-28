@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 	"strings"
 
@@ -65,19 +66,20 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 
 	for i, t := range r.lyrics.AllTracks {
 		label := languageLabel(t.Language)
-		marker := "  "
+		cursor := " "
+		tick := " "
 		if i == r.lyrics.LanguageIndex() {
-			marker = "+"
+			tick = "+"
 		}
+		line := fmt.Sprintf(" %s [%s] %s", cursor, tick, label)
+
 		if i == r.langCursor {
-			line := marker + " " + label
 			pad := innerW - runewidth.StringWidth(line)
 			if pad < 0 {
 				pad = 0
 			}
 			b.WriteString(LyricSelectStyle.Render(line + strings.Repeat(" ", pad)))
 		} else {
-			line := "  " + marker + " " + label
 			b.WriteString(LyricNormalStyle.Render(line))
 		}
 		b.WriteString("\n")
