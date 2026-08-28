@@ -13,6 +13,7 @@ require (
 	github.com/kkdai/youtube/v2 v2.10.6
 	github.com/mattn/go-runewidth v0.0.27
 	github.com/minio/selfupdate v0.6.0
+	github.com/spf13/cobra v1.10.2
 )
 
 require (
@@ -32,9 +33,11 @@ require (
 	github.com/ebitengine/purego v0.9.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b // indirect
 	golang.org/x/sync v0.22.0 // indirect

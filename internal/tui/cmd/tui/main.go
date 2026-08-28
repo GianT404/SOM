@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -12,31 +11,40 @@ import (
 	"som/internal/tui/ui"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	serverURL := flag.String("server", "", "SOM backend base URL (Để trống để chạy nội bộ/Local)")
-	flag.Parse()
+	var serverURL string
 
-	var provider domain.MusicProvider
-
-	if *serverURL == "" {
-		ytdlpPath := os.Getenv("YTDLP_PATH")
-		if ytdlpPath == "" {
-			ytdlpPath = "yt-dlp"
-		}
-		sc := scraper.NewYtdlpScraper(ytdlpPath)
-		provider = &local.DirectProvider{Scraper: sc}
-	} else {
-		// Bật Remote Mode
-		provider = api.NewHTTPProvider(*serverURL)
+	var rootCmd = &cobra.Command{
+		Use:   "som",
+		Short: "SOM - Terminal Music Player",
+		Run: func(cmd *cobra.Command, args []string) {
+			var provider domain.MusicProvider
+			if serverURL == "" {
+				ytdlpPath := os.Getenv("YTDLP_PATH")
+				if ytdlpPath == "" {
+					ytdlpPath = "yt-dlp"
+				}
+				sc := scraper.NewYtdlpScraper(ytdlpPath)
+				provider = &local.DirectProvider{Scraper: sc}
+			} else {
+				provider = api.NewHTTPProvider(serverURL)
+			}
+			app := ui.NewApp(provider)
+			p := tea.NewProgram(app)
+			if _, err := p.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
+				os.Exit(1)
+			}
+		},
 	}
 
-	app := ui.NewApp(provider)
-	p := tea.NewProgram(app)
+	rootCmd.Flags().StringVar(&serverURL, "server", "", "SOM backend base URL")
 
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
