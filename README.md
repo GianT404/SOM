@@ -279,7 +279,7 @@ curl -fsSL https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.s
 #Windows (PowerShell)
 curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.ps1 | iex
 ```
-# Shell Auto-Completion Setup
+## Shell Auto-Completion Setup
 Since SOM uses Cobra, you can seamlessly enable auto-completion for your shell of choice:
 
 ```bash
