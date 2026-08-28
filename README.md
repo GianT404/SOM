@@ -33,27 +33,30 @@ https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
 |  **Stream** | Stream audio directly without downloading the full video |
 |  **Offline Playback** | Download tracks (`.opus`) for offline listening |
 |  **Playlists** | Create, manage, and play custom playlists (TUI) |
-|  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback, with language selection |
+|  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback, with language selection and millisecond-precise pre-roll seeking |
+|  **Audio Presets** | Quick audio filtering via command menu: Normal, Bass Boost, Nightcore, Daycore, and Lo-Fi |
 |  **Media Controls** | Lock screen & notification controls (play, pause, skip, seek) |
 |  **Shuffle & Repeat** | Shuffle, repeat-all, and repeat-one modes |
 |  **Audio Visualizer** | Live 2D/3D visualizer driven by real-time system audio capture (TUI) |
 |  **Dynamic Theming** | Album art-based color extraction for immersive UI |
 |  **Audio Settings** | Configurable buffer size and sample rate |
+|  **CLI & Completion** | Powered by Cobra with built-in auto-completion scripts for Zsh, Bash, and Fish (`som completion [shell]`) |
 |  **Self Install/Update** | `som --install`, `som --upgrade`, `--check-update`, and `--uninstall` for one-command setup and updates |
-|  **Resilient YouTube Access** | Automatic yt-dlp client fallback against YouTube/CDN 403s, optional cookies & extra args via env vars |
-|  **Desktop App** | Tauri desktop shell for Linux and Windows with the existing Go backend as a sidecar (no longer actively maintained) |
+|  **Resilient YouTube Access** | Automatic yt-dlp client fallback against YouTube/CDN 403s, optional cookies & extra args via env vars
 
 ---
 
 ## Architecture
 
 ```
-SOM/
+SSOM/
 ├── cmd/
 │   ├── server/          # Go backend entry point
 │   │   └── main.go      # HTTP server (chi router)
-│   └── som/             # TUI (terminal) entry point
-│       └── main.go      # Bubble Tea TUI app
+│   └── som/             # TUI (terminal) entry point (Cobra CLI)
+│       ├── main.go      # Root command & flags setup
+│       ├── install.go   # Self-installation routines
+│       └── update.go    # Self-update & GitHub release checker
 ├── internal/
 │   ├── handler/         # API route handlers
 │   │   ├── search.go    # GET /api/v1/search
@@ -83,9 +86,9 @@ SOM/
 │   │       ├── search.go        # Search input view
 │   │       ├── downloads.go     # Local file scanning
 │   │       ├── playlists.go     # Playlist create/add/play/delete UI
-│   │       ├── palette.go       # Live 2D audio visualizer (opened with `\`)
+│   │       ├── palette.go       # Live 2D audio visualizer (opened with \)
 │   │       ├── visualizer_3d.go # 3D wireframe visualizer mode
-│   │       ├── help.go          # Keyboard shortcuts popup (`?`)
+│   │       ├── help.go          # Keyboard shortcuts popup (?)
 │   │       ├── sidebar.go       # Sidebar definition
 │   │       ├── logs.go          # Ring-buffer logger
 │   │       ├── styles.go        # Styles & nerd-font icons
@@ -191,7 +194,7 @@ go build -o som .
 ./som
 ```
 
-**Sidebar tabs (`1`-`5` or `Tab`):** Search, Downloads, Playlists, Lyrics, Logs.
+**Sidebar tabs (`1`-`6` or `Tab`):** Search, Downloads, Playlists, Lyrics, Logs.
 
 **Controls:**
 
@@ -199,7 +202,7 @@ go build -o som .
 |-----|--------|
 | `?` | Toggle help popup (full shortcut list) |
 | `Tab` | Cycle through sidebar tabs |
-| `1`-`5` | Jump directly to a tab |
+| `1`-`6` | Jump directly to a tab |
 | `/` | Focus search input (Playlists tab: create a new playlist) |
 | `:` | Command popup — Rename title, Delete track, Move to playlist, Show file info |
 | `\` | Open live audio visualizer |
@@ -212,6 +215,7 @@ go build -o som .
 | `Delete` | Remove selected playlist / track |
 | `d` | Download selected track |
 | `l` | Choose lyrics language |
+| `pgup` / `pgdown` | scroll lyric page|
 | `alt + q` | Quit from anywhere (also during startup) |
 
 **Features:**
@@ -227,7 +231,7 @@ go build -o som .
 - Resilient YouTube streaming via client fallback chain (see *YouTube Stability & Cookies*)
 - Built-in self-installer and self-updater (see below)
 
-**Logging (`5` / Logs tab):**
+**Logging (`6` / Logs tab):**
 
 - Captures **all** `log` output in-process (TUI + backend) into a thread-safe in-memory ring buffer (last 2000 lines) — search, stream, download, and lyrics actions are logged on the happy path in local mode.
 - Logs live **only in RAM** — quitting normally (`q`/`Ctrl+C`) never touches the disk; the old `~/som_debug.log` file was removed.
@@ -238,7 +242,9 @@ go build -o som .
 ```bash
 # Linux
 GOOS=linux GOARCH=amd64 go build -o som-linux-amd64 ./cmd/som
+```
 
+```bash
 # Windows
 GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 ```
@@ -254,6 +260,8 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 | `--uninstall` | Remove the installed `som` binary |
 | `--update-ytdlp` | Update the bundled yt-dlp binary to the latest version |
 | `--version` | Print the current version and exit |
+| `--changelog` | Print the commits of the current version |
+| `--help`| Help for som |
 
 > Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`. `ffprobe` is also used for local file duration detection.
 
@@ -265,9 +273,30 @@ You can automatically install SOM and its dependencies (yt-dlp, ffmpeg) using th
 ```bash
 #Linux
 curl -fsSL https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.sh | bash
+```
 
+```bash
 #Windows (PowerShell)
 curl.exe -O https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.ps1 | iex
+```
+# Shell Auto-Completion Setup
+Since SOM uses Cobra, you can seamlessly enable auto-completion for your shell of choice:
+
+```bash
+#zsh
+mkdir -p ~/.zfunc
+som completion zsh > ~/.zfunc/_som
+```
+>(Ensure fpath=(~/.zfunc $fpath) and autoload -U compinit && compinit are set in your ~/.zshrc).
+
+```bash
+#Bash
+som completion bash > /etc/bash_completion.d/som
+```
+
+```bash
+#Fish
+som completion fish > ~/.config/fish/completions/som.fish
 ```
 
 ## YouTube Stability & Cookies
