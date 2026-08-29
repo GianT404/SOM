@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"sync"
@@ -44,6 +45,28 @@ func (s *syncBuffer) Reset() {
 	s.buf.Reset()
 }
 
+type gaplessReader struct {
+	buf    []byte
+	offset int
+	pipe   io.ReadCloser
+}
+
+func (r *gaplessReader) Read(p []byte) (n int, err error) {
+	if r.offset < len(r.buf) {
+		n = copy(p, r.buf[r.offset:])
+		r.offset += n
+		return n, nil
+	}
+	return r.pipe.Read(p)
+}
+
+func (r *gaplessReader) Close() error {
+	if r.pipe != nil {
+		return r.pipe.Close()
+	}
+	return nil
+}
+
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -61,6 +84,14 @@ type Player struct {
 	generation  uint64
 	audioFilter string
 	speed       float64
+
+	// Gapless playback: pre-decoded next track.
+	nextCmd   *exec.Cmd
+	nextPipe  io.ReadCloser
+	nextBuf   []byte
+	nextPath  string
+	nextGen   uint64
+	nextReady bool
 }
 
 func New() *Player {
@@ -160,39 +191,7 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 	p.stopped = false
 	p.generation++
 
-	var args []string
-	if strings.HasPrefix(filePath, "http://") {
-		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
-	}
-	if len(headers) > 0 {
-		var hb strings.Builder
-		for k, v := range headers {
-			fmt.Fprintf(&hb, "%s: %s\r\n", k, v)
-		}
-		args = append(args, "-headers", hb.String())
-	}
-	if startSec > 0 {
-		args = append(args, "-ss", fmt.Sprintf("%.3f", startSec))
-	}
-
-	af := p.audioFilter
-	if speed != 1.0 {
-		if speed == 0.25 {
-			af += ",atempo=0.5,atempo=0.5"
-		} else {
-			af += fmt.Sprintf(",atempo=%.2f", speed)
-		}
-	}
-
-	args = append(args,
-		"-i", filePath,
-		"-f", "s16le",
-		"-ar", "48000",
-		"-ac", "2",
-		"-af", af,
-		"-v", "error",
-		"-",
-	)
+	args := p.buildFFmpegArgs(filePath, headers, startSec, speed)
 
 	p.decoder = exec.Command("ffmpeg", args...)
 
@@ -269,6 +268,7 @@ func (p *Player) stopLocked() {
 		p.currentPath = ""
 		p.headers = nil
 	}
+	p.cancelPreDecodeLocked()
 }
 
 // PlaybackError trả về lỗi của lần phát vừa kết thúc nếu ffmpeg thoát do lỗi(stream chết giữa chừng, file hỏng...). Nil nếu phát hoàn tất hoặc user dừng.
@@ -384,4 +384,201 @@ func (p *Player) Generation() uint64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.generation
+}
+
+func (p *Player) CurrentPath() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.currentPath
+}
+
+func (p *Player) PreDecodeNext(filePath string, headers map[string]string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.cancelPreDecodeLocked()
+
+	speed := p.speed
+	if speed <= 0 {
+		speed = 1.0
+	}
+
+	args := p.buildFFmpegArgs(filePath, headers, 0, speed)
+
+	cmd := exec.Command("ffmpeg", args...)
+	var stderr syncBuffer
+	cmd.Stderr = &stderr
+
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		return
+	}
+
+	p.nextCmd = cmd
+	p.nextPipe = pipe
+	p.nextPath = filePath
+	p.nextGen = p.generation
+	p.nextReady = false
+
+	const maxBuf = 960000
+	go func() {
+		buf := make([]byte, 0, maxBuf)
+		tmp := make([]byte, 4096)
+		for len(buf) < maxBuf {
+			n, err := pipe.Read(tmp)
+			if n > 0 {
+				buf = append(buf, tmp[:n]...)
+			}
+			if err != nil {
+				break
+			}
+		}
+
+		p.mu.Lock()
+		defer p.mu.Unlock()
+
+		if p.nextCmd != cmd || p.generation != p.nextGen {
+			pipe.Close()
+			cmd.Process.Kill()
+			return
+		}
+
+		p.nextBuf = buf
+		p.nextReady = true
+	}()
+}
+
+func (p *Player) CancelPreDecode() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cancelPreDecodeLocked()
+}
+
+func (p *Player) cancelPreDecodeLocked() {
+	if p.nextCmd != nil {
+		if p.nextPipe != nil {
+			p.nextPipe.Close()
+		}
+		if p.nextCmd.Process != nil {
+			p.nextCmd.Process.Kill()
+		}
+		p.nextCmd = nil
+		p.nextPipe = nil
+		p.nextBuf = nil
+		p.nextReady = false
+	}
+}
+
+// PlayFromBuffer starts playing the pre-decoded next track seamlessly.
+// Returns true if gapless playback was used, false if fallback to normal Play().
+func (p *Player) PlayFromBuffer() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.nextReady || p.nextCmd == nil || p.nextPipe == nil {
+		return false
+	}
+
+	// Save pre-decoded data before stopLocked() clears them via cancelPreDecodeLocked().
+	cmd := p.nextCmd
+	pipe := p.nextPipe
+	buf := p.nextBuf
+	nextPath := p.nextPath
+	p.nextCmd = nil
+	p.nextPipe = nil
+	p.nextBuf = nil
+	p.nextReady = false
+
+	p.stopLocked()
+
+	if p.otoCtx == nil {
+		pipe.Close()
+		cmd.Process.Kill()
+		return false
+	}
+
+	p.currentPath = nextPath
+	p.headers = nil
+	p.startTime = time.Now()
+	p.pauseOffset = 0
+	p.lastErr = nil
+	p.stopped = false
+	p.generation++
+	p.decoder = cmd
+
+	reader := &gaplessReader{buf: buf, pipe: pipe}
+
+	p.player = p.otoCtx.NewPlayer(reader)
+	p.player.SetVolume(p.volume)
+	p.player.Play()
+	p.state = Playing
+
+	go func(c *exec.Cmd, gen uint64, optr *oto.Player) {
+		err := c.Wait()
+
+		if optr != nil {
+			for optr.IsPlaying() {
+				time.Sleep(50 * time.Millisecond)
+				p.mu.Lock()
+				isStopped := p.stopped
+				p.mu.Unlock()
+				if isStopped {
+					break
+				}
+			}
+		}
+
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.decoder == c && p.generation == gen {
+			if err != nil && !p.stopped {
+				p.lastErr = err
+			}
+			p.state = Stopped
+			p.stopped = false
+		}
+	}(cmd, p.generation, p.player)
+
+	return true
+}
+
+func (p *Player) buildFFmpegArgs(filePath string, headers map[string]string, startSec float64, speed float64) []string {
+	var args []string
+	if strings.HasPrefix(filePath, "http://") {
+		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
+	}
+	if len(headers) > 0 {
+		var hb strings.Builder
+		for k, v := range headers {
+			fmt.Fprintf(&hb, "%s: %s\r\n", k, v)
+		}
+		args = append(args, "-headers", hb.String())
+	}
+	if startSec > 0 {
+		args = append(args, "-ss", fmt.Sprintf("%.3f", startSec))
+	}
+
+	af := p.audioFilter
+	if speed != 1.0 {
+		if speed == 0.25 {
+			af += ",atempo=0.5,atempo=0.5"
+		} else {
+			af += fmt.Sprintf(",atempo=%.2f", speed)
+		}
+	}
+
+	args = append(args,
+		"-i", filePath,
+		"-f", "s16le",
+		"-ar", "48000",
+		"-ac", "2",
+		"-af", af,
+		"-v", "error",
+		"-",
+	)
+	return args
 }

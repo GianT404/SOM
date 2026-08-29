@@ -195,6 +195,34 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if playErr != nil {
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
+			} else if a.player.PlayFromBuffer() {
+				// Gapless: pre-decoded buffer was ready, playback continued seamlessly.
+				var nextTrack *domain.Track
+				if len(a.trackQueue) > 0 {
+					t := a.trackQueue[0]
+					nextTrack = &t
+				} else if len(a.playlist) > 0 {
+					idx := a.currentIdx + 1
+					if a.random {
+						idx = a.pickAntiClumpIndex()
+					}
+					if idx < len(a.playlist) {
+						nextTrack = &a.playlist[idx]
+						a.currentIdx = idx
+					}
+				}
+				if nextTrack != nil {
+					a.nowPlay = nextTrack
+					a.songStarted = true
+					a.playerGen = a.player.Generation()
+					a.right.SetTrack(nextTrack)
+					a.setStatus(StatusOKStyle.Render(">  " + nextTrack.Title))
+					if a.avrcp != nil {
+						a.avrcp.UpdateMetadata(nextTrack.ID, nextTrack.Title, nextTrack.Artist, "", nextTrack.Thumbnail, int64(nextTrack.Duration)*1_000_000)
+						a.avrcp.UpdatePlaybackStatus("Playing")
+					}
+					a.loadLyricsForTrack(*nextTrack)
+				}
 			} else if len(a.trackQueue) > 0 {
 				t := a.trackQueue[0]
 				a.trackQueue = a.trackQueue[1:]
@@ -206,6 +234,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 			} else {
 				cmds = append(cmds, a.playNext())
+			}
+		}
+
+		// Gapless: pre-decode next track when current has < 3s remaining.
+		if a.songStarted && a.player.State() == player.Playing && a.nowPlay != nil {
+			pos := a.player.Position()
+			dur := time.Duration(a.nowPlay.Duration) * time.Second
+			remaining := dur - pos
+			if remaining > 0 && remaining <= 3*time.Second {
+				a.triggerPreDecodeNext()
 			}
 		}
 
@@ -1045,6 +1083,50 @@ func (a *App) playPrev() tea.Cmd {
 		return nil
 	}
 	return a.playTrackAt(prev, a.playlist[prev])
+}
+
+// triggerPreDecodeNext pre-decodes the next track for gapless playback.
+// Only works for local files (no headers needed).
+func (a *App) triggerPreDecodeNext() {
+	var next domain.Track
+
+	if len(a.trackQueue) > 0 {
+		next = a.trackQueue[0]
+	} else if len(a.playlist) > 0 {
+		idx := a.currentIdx + 1
+		if a.random {
+			idx = a.pickAntiClumpIndex()
+		}
+		if idx >= len(a.playlist) {
+			return
+		}
+		next = a.playlist[idx]
+	} else {
+		return
+	}
+
+	if !strings.HasPrefix(next.ID, "local:") {
+		return
+	}
+	path := strings.TrimPrefix(next.ID, "local:")
+	a.player.PreDecodeNext(path, nil)
+}
+
+// loadLyricsForTrack reads lyrics from SQLite for local files or sets placeholder.
+func (a *App) loadLyricsForTrack(t domain.Track) {
+	if strings.HasPrefix(t.ID, "local:") {
+		path := strings.TrimPrefix(t.ID, "local:")
+		if a.left.plStore != nil {
+			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
+				var lr domain.LyricsResp
+				if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
+					a.right.SetLyrics(lr)
+					return
+				}
+			}
+		}
+	}
+	a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 }
 
 func (a *App) pickAntiClumpIndex() int {
