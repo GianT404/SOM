@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 
 ## Features
 
-| Feature | Description |
+| Feature | Description | 
 |---------|-------------|
 |  **Search** | Search YouTube for any song or artist |
 |  **Stream** | Stream audio directly without downloading the full video |
@@ -40,7 +40,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 |  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback, with language selection and millisecond-precise pre-roll seeking |
 |  **Audio Presets** | Quick audio filtering via command menu: Normal, Bass Boost, Nightcore, Daycore, and Lo-Fi |
 |  **Media Controls** | Lock screen & notification controls (play, pause, skip, seek) |
-|  **Shuffle & Repeat** | Shuffle, repeat-all, and repeat-one modes |
+|  **Shuffle** | 	Randomized playback that avoids replaying recently-played tracks and back-to-back songs by the same artist |
 |  **Audio Visualizer** | Live 2D/3D visualizer driven by real-time system audio capture (TUI) |
 |  **Dynamic Theming** | Album art-based color extraction for immersive UI |
 |  **Audio Settings** | Configurable buffer size and sample rate |
