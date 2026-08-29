@@ -42,6 +42,7 @@ type LeftPanel struct {
 	plInput         textinput.Model
 	showPlInput     bool
 	downloadDir     string
+	sortPref        string
 
 	inputSearch   string
 	inputDownload string
@@ -91,6 +92,10 @@ func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 		if pls, err := store.LoadAllPlaylists(); err == nil {
 			panel.playlists = pls
 		}
+		panel.sortPref = store.GetSetting("sort_downloads")
+		if panel.sortPref == "" {
+			panel.sortPref = "name"
+		}
 	}
 
 	panel.scanLocalFiles()
@@ -119,21 +124,21 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 			case "enter":
 				if p.deletePopupCursor == 1 {
-			if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-					trackID := p.activePlaylist.Tracks[p.plCursor].ID
-					p.plStore.RemoveTrackFromPlaylist(p.activePlaylist.ID, trackID)
-					var filtered []storage.PlaylistTrack
-					for _, t := range p.activePlaylist.Tracks {
-						if t.ID != trackID {
-							filtered = append(filtered, t)
+					if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
+						trackID := p.activePlaylist.Tracks[p.plCursor].ID
+						p.plStore.RemoveTrackFromPlaylist(p.activePlaylist.ID, trackID)
+						var filtered []storage.PlaylistTrack
+						for _, t := range p.activePlaylist.Tracks {
+							if t.ID != trackID {
+								filtered = append(filtered, t)
+							}
 						}
-					}
-					p.activePlaylist.Tracks = filtered
-					for i, pl := range p.playlists {
-						if pl.ID == p.activePlaylist.ID {
-							p.playlists[i] = *p.activePlaylist
+						p.activePlaylist.Tracks = filtered
+						for i, pl := range p.playlists {
+							if pl.ID == p.activePlaylist.ID {
+								p.playlists[i] = *p.activePlaylist
+							}
 						}
-					}
 
 						if p.plCursor >= len(p.activePlaylist.Tracks) {
 							p.plCursor = len(p.activePlaylist.Tracks) - 1
@@ -395,7 +400,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 							p.qOffset++
 						}
 					}
-			} else if p.activeTab == SidePlaylists {
+				} else if p.activeTab == SidePlaylists {
 					if p.plCursor < items-1 {
 						p.plCursor++
 						if p.plCursor >= p.plOffset+p.visibleRows() {

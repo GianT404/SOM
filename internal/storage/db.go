@@ -174,6 +174,11 @@ func (db *DB) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position);
+
+	CREATE TABLE IF NOT EXISTS settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);
 	`
 	if _, err := db.conn.Exec(schema); err != nil {
 		return err
@@ -217,4 +222,17 @@ func (db *DB) migrate() error {
 
 func now() string {
 	return time.Now().UTC().Format("2006-01-02 15:04:05")
+}
+
+func (db *DB) GetSetting(key string) string {
+	var v string
+	err := db.conn.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&v)
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
+func (db *DB) SetSetting(key, value string) {
+	_, _ = db.conn.Exec("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value)
 }

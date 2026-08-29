@@ -144,8 +144,21 @@ func (db *DB) RenameLocalFile(oldPath, newPath, newName string) error {
 }
 
 func (db *DB) ListAllLocalFiles() ([]LocalFile, error) {
+	return db.ListAllLocalFilesSorted("name")
+}
+
+func (db *DB) ListAllLocalFilesSorted(sort string) ([]LocalFile, error) {
+	var orderBy string
+	switch sort {
+	case "date":
+		orderBy = "created_at DESC"
+	case "duration":
+		orderBy = "duration DESC"
+	default:
+		orderBy = "name COLLATE NOCASE"
+	}
 	rows, err := db.conn.Query(
-		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime, created_at FROM local_files ORDER BY name COLLATE NOCASE",
+		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime, created_at FROM local_files ORDER BY "+orderBy,
 	)
 	if err != nil {
 		return nil, err

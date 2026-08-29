@@ -95,6 +95,8 @@ type App struct {
 	activePreset  int
 	speedActive   bool
 	activeSpeed   int
+	sortActive    bool
+	activeSort    string // "name", "date", "duration"
 }
 
 const maxPendingKeys = 64

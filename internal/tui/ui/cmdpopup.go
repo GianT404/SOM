@@ -20,6 +20,7 @@ var cmdOptions = []string{
 	"Add to queue",
 	"Audio settings",
 	"Playback speed",
+	"Sort",
 	"Rename title",
 	"Delete track",
 	"Move to playlist",
@@ -41,6 +42,15 @@ var playbackSpeeds = []struct {
 	{"0.25x", 0.25}, {"0.5x", 0.5}, {"0.75x", 0.75},
 	{"1.0x", 1.0}, {"1.25x", 1.25}, {"1.5x", 1.5},
 	{"1.75x", 1.75}, {"2.0x", 2.0},
+}
+
+var sortOptions = []struct {
+	Key  string
+	Name string
+}{
+	{"name", "Name"},
+	{"date", "Date downloaded"},
+	{"duration", "Duration"},
 }
 
 func (a *App) cmdOptionList() []string {
@@ -213,6 +223,38 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
+	if a.sortActive {
+		switch k.String() {
+		case "up", "k":
+			if a.cmdCursor > 0 {
+				a.cmdCursor--
+			} else {
+				a.cmdCursor = len(sortOptions) - 1
+			}
+		case "down", "j":
+			if a.cmdCursor < len(sortOptions)-1 {
+				a.cmdCursor++
+			} else {
+				a.cmdCursor = 0
+			}
+		case "enter":
+			chosen := sortOptions[a.cmdCursor]
+			a.left.sortPref = chosen.Key
+			if a.left.plStore != nil {
+				a.left.plStore.SetSetting("sort_downloads", chosen.Key)
+			}
+			a.left.scanLocalFiles()
+			a.sortActive = false
+			a.showCmdPopup = false
+			a.setStatus(StatusOKStyle.Render("> Sorted by " + chosen.Name))
+			return nil
+		case "esc", ":":
+			a.sortActive = false
+			return nil
+		}
+		return nil
+	}
+
 	if a.renameActive {
 		switch k.String() {
 		case "enter":
@@ -301,6 +343,15 @@ func (a *App) runCmdOption(idx int) {
 	case "Audio settings":
 		a.presetActive = true
 		a.cmdCursor = a.activePreset
+	case "Sort":
+		a.sortActive = true
+		// Find current sort index
+		for i, s := range sortOptions {
+			if s.Key == a.left.sortPref {
+				a.cmdCursor = i
+				break
+			}
+		}
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
@@ -592,6 +643,31 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString("\n")
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 		return renderBox(boxW, "Playback speed", b.String(), lipgloss.Color("#e8593c"))
+	}
+	if a.sortActive {
+		const boxW = 35
+		const innerW = boxW - 4
+		var b strings.Builder
+		b.WriteString("\n")
+		for i, s := range sortOptions {
+			tick := " "
+			if s.Key == a.left.sortPref {
+				tick = "+"
+			}
+			namePart := fmt.Sprintf("   [%s] %s", tick, s.Name)
+			if i == a.cmdCursor {
+				pad := innerW - runewidth.StringWidth(namePart)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
+			} else {
+				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
+			}
+		}
+		b.WriteString("\n")
+		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
+		return renderBox(boxW, "Sort by", b.String(), lipgloss.Color("#e8593c"))
 	}
 	if a.presetActive {
 		const boxW = 55

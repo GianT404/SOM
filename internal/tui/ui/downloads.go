@@ -14,7 +14,7 @@ func (p *LeftPanel) scanLocalFiles() {
 	if p.plStore == nil {
 		return
 	}
-	files, err := p.plStore.ListAllLocalFiles()
+	files, err := p.plStore.ListAllLocalFilesSorted(p.sortPref)
 	if err != nil {
 		p.errMsg = "DB error: " + err.Error()
 		return
