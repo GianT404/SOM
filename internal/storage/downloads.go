@@ -22,6 +22,7 @@ type LocalFile struct {
 	Thumbnail string `json:"thumbnail"`
 	FileSize  int64  `json:"file_size"`
 	FileMTime string `json:"file_mtime"`
+	CreatedAt string `json:"created_at"`
 }
 
 type LocalFileMeta struct {
@@ -144,7 +145,7 @@ func (db *DB) RenameLocalFile(oldPath, newPath, newName string) error {
 
 func (db *DB) ListAllLocalFiles() ([]LocalFile, error) {
 	rows, err := db.conn.Query(
-		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime FROM local_files ORDER BY name COLLATE NOCASE",
+		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime, created_at FROM local_files ORDER BY name COLLATE NOCASE",
 	)
 	if err != nil {
 		return nil, err
@@ -154,7 +155,7 @@ func (db *DB) ListAllLocalFiles() ([]LocalFile, error) {
 	var files []LocalFile
 	for rows.Next() {
 		var f LocalFile
-		if err := rows.Scan(&f.Path, &f.Name, &f.Artist, &f.Duration, &f.VideoID, &f.Thumbnail, &f.FileSize, &f.FileMTime); err != nil {
+		if err := rows.Scan(&f.Path, &f.Name, &f.Artist, &f.Duration, &f.VideoID, &f.Thumbnail, &f.FileSize, &f.FileMTime, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		files = append(files, f)

@@ -173,17 +173,6 @@ func (db *DB) migrate() error {
 		created_at TEXT DEFAULT (datetime('now'))
 	);
 
-	CREATE TABLE IF NOT EXISTS history (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		track_id TEXT NOT NULL,
-		track_type TEXT NOT NULL DEFAULT 'remote',
-		title TEXT NOT NULL,
-		artist TEXT DEFAULT '',
-		played_at TEXT DEFAULT (datetime('now'))
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_history_played_at ON history(played_at DESC);
-	CREATE INDEX IF NOT EXISTS idx_history_track_id ON history(track_id);
 	CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position);
 	`
 	if _, err := db.conn.Exec(schema); err != nil {

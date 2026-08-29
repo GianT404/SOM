@@ -48,6 +48,9 @@ type LocalFile struct {
 	Duration  int
 	VideoID   string
 	Thumbnail string
+	FileSize  int64
+	FileMTime string
+	CreatedAt string
 }
 
 type Pane int

@@ -497,15 +497,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
 
-		// Record to history.
-		if a.left.plStore != nil {
-			trackType := "remote"
-			if strings.HasPrefix(msg.Track.ID, "local:") {
-				trackType = "local"
-			}
-			_ = a.left.plStore.RecordPlay(msg.Track.ID, trackType, msg.Track.Title, msg.Track.Artist)
-		}
-
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))

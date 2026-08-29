@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"som/internal/domain"
 	"som/internal/storage"
@@ -493,6 +494,23 @@ func formatBytes(n int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "kMGTPE"[exp])
 }
 
+func formatDBTime(s string) string {
+	if s == "" {
+		return "-"
+	}
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format("15:04:05 02-01-2006")
+		}
+	}
+	return s
+}
+
 func (a *App) renameTarget() (*LocalFile, bool) {
 	if a.sidebarActive == SideDownloads {
 		q := strings.ToLower(strings.TrimSpace(a.left.input.Value()))
@@ -662,6 +680,9 @@ func (a *App) renderCmdPopup() string {
 			b.WriteString("\n " + DimItemStyle.Render(" Duration: ") + LocalFileStyle.Render(durStr))
 			b.WriteString("\n " + DimItemStyle.Render(" Size: ") + LocalFileStyle.Render(sizeStr))
 			b.WriteString("\n " + DimItemStyle.Render(" Bitrate: ") + LocalFileStyle.Render(bitrateStr))
+			b.WriteString("\n " + DimItemStyle.Render(" Video ID: ") + LocalFileStyle.Render(" "+target.VideoID))
+			b.WriteString("\n " + DimItemStyle.Render(" Modified: ") + LocalFileStyle.Render(" "+formatDBTime(target.FileMTime)))
+			b.WriteString("\n " + DimItemStyle.Render(" Created: ") + LocalFileStyle.Render(" "+formatDBTime(target.CreatedAt)))
 			b.WriteString("\n " + DimItemStyle.Render(" Path: ") + LocalFileStyle.Render(pathStr))
 			b.WriteString("\n\n")
 			b.WriteString(DimItemStyle.Render(" (esc: close)"))

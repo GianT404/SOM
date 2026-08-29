@@ -28,6 +28,9 @@ func (p *LeftPanel) scanLocalFiles() {
 			Duration:  f.Duration,
 			VideoID:   f.VideoID,
 			Thumbnail: f.Thumbnail,
+			FileSize:  f.FileSize,
+			FileMTime: f.FileMTime,
+			CreatedAt: f.CreatedAt,
 		}
 	}
 }

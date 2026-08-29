@@ -193,41 +193,6 @@ func TestFTSSearch(t *testing.T) {
 	}
 }
 
-func TestHistory(t *testing.T) {
-	db := testDB(t)
-
-	err := db.RecordPlay("abc", "remote", "Test Song", "Artist")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = db.RecordPlay("local:/tmp/x.opus", "local", "Local Song", "Local Artist")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	history, err := db.GetRecentHistory(10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(history) != 2 {
-		t.Fatalf("expected 2 history entries, got %d", len(history))
-	}
-	// Most recent (highest id) first.
-	if history[0].TrackID != "local:/tmp/x.opus" {
-		t.Fatalf("expected 'local:/tmp/x.opus' first, got %q", history[0].TrackID)
-	}
-
-	err = db.ClearHistory()
-	if err != nil {
-		t.Fatal(err)
-	}
-	history, _ = db.GetRecentHistory(10)
-	if len(history) != 0 {
-		t.Fatalf("expected 0 after clear, got %d", len(history))
-	}
-}
-
 func TestRenameLocalFile(t *testing.T) {
 	db := testDB(t)
 
