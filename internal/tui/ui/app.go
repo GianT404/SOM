@@ -91,6 +91,8 @@ type App struct {
 	resolveCancel context.CancelFunc
 	presetActive  bool
 	activePreset  int
+	speedActive   bool
+	activeSpeed   int
 }
 
 const maxPendingKeys = 64
@@ -105,6 +107,7 @@ func NewApp(provider domain.MusicProvider) *App {
 		palette:       NewCommandPalette(),
 		renameInput:   ri,
 		booting:       true,
+		activeSpeed:   3,
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 var cmdOptions = []string{
 	"Add to queue",
 	"Audio settings",
+	"Playback speed",
 	"Rename title",
 	"Delete track",
 	"Move to playlist",
@@ -30,6 +31,15 @@ var audioPresets = []struct{ Name, Filter, Desc string }{
 	{"Nightcore", "dynaudnorm=f=250:g=11:p=0.9:m=10,asetrate=48000*1.2,aresample=44100", "Fast (1.25x), high-pitched voice (pitch up)"},
 	{"Daycore", "dynaudnorm=f=250:g=11:p=0.9:m=10,asetrate=48000*0.85,aresample=48000,aecho=0.8:0.88:60:0.4", "Slow (0.85x), deep and muffled + Reverb"},
 	{"Lo-Fi", "dynaudnorm=f=250:g=11:p=0.9:m=10,lowpass=f=800,volume=1.2", "High-cut filter, old radio/muffled effect"},
+}
+
+var playbackSpeeds = []struct {
+	Label string
+	Value float64
+}{
+	{"0.25x", 0.25}, {"0.5x", 0.5}, {"0.75x", 0.75},
+	{"1.0x", 1.0}, {"1.25x", 1.25}, {"1.5x", 1.5},
+	{"1.75x", 1.75}, {"2.0x", 2.0},
 }
 
 func (a *App) cmdOptionList() []string {
@@ -115,7 +125,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 				a.player.SeekTo(float64(pos))
 			}
 			return nil
-		case "esc", ":", "q":
+		case "esc", ":":
 			a.presetActive = false
 			return nil
 		}
@@ -198,6 +208,40 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		return cmd
 	}
 
+	if a.speedActive {
+		switch k.String() {
+		case "up", "k":
+			if a.cmdCursor > 0 {
+				a.cmdCursor--
+			}
+		case "down", "j":
+			if a.cmdCursor < len(playbackSpeeds)-1 {
+				a.cmdCursor++
+			}
+		case "enter":
+			pos := 0.0
+			if a.nowPlay != nil {
+				pos = a.player.Position().Seconds()
+			}
+
+			s := playbackSpeeds[a.cmdCursor]
+			a.player.SetSpeed(s.Value)
+			a.activeSpeed = a.cmdCursor
+			a.speedActive = false
+			a.showCmdPopup = false
+			a.setStatus(StatusOKStyle.Render("Speed set to: " + s.Label))
+
+			if a.nowPlay != nil {
+				a.player.SeekTo(pos)
+			}
+			return nil
+		case "esc", ":", "q":
+			a.speedActive = false
+			return nil
+		}
+		return nil
+	}
+
 	switch k.String() {
 	case "esc", ":":
 		a.showCmdPopup = false
@@ -255,6 +299,10 @@ func (a *App) runCmdOption(idx int) {
 			a.renameInput.SetValue("")
 		}
 		a.renameInput.CursorEnd()
+
+	case "Playback speed":
+		a.speedActive = true
+		a.cmdCursor = a.activeSpeed
 	case "Delete track":
 		if _, ok := a.renameTarget(); ok {
 			a.delActive = true
@@ -459,11 +507,36 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
 		return renderBox(56, "Remove from Playlist", b.String(), lipgloss.Color("#e8593c"))
 	}
-
+	if a.speedActive {
+		const boxW = 35
+		const innerW = boxW - 4
+		var b strings.Builder
+		b.WriteString("\n")
+		for i, s := range playbackSpeeds {
+			cursor := "   "
+			tick := " "
+			if i == a.activeSpeed {
+				tick = "+"
+			}
+			namePart := fmt.Sprintf(" %s [%s] %s", cursor, tick, s.Label)
+			if i == a.cmdCursor {
+				pad := innerW - runewidth.StringWidth(namePart)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
+			} else {
+				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
+			}
+		}
+		b.WriteString("\n")
+		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
+		return renderBox(boxW, "Playback speed", b.String(), lipgloss.Color("#e8593c"))
+	}
 	if a.presetActive {
 		const boxW = 55
 		const innerW = boxW - 4
-
+		b.WriteString("\n")
 		for i, p := range audioPresets {
 			cursor := " "
 			tick := " "
@@ -592,7 +665,7 @@ func (a *App) renderCmdPopup() string {
 		return renderBox(w, "Rename Title", b.String(), lipgloss.Color("#e8593c"))
 	}
 
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 	for i, opt := range a.cmdOptionList() {
 		line := "  " + opt
 		if i == a.cmdMenuCursor {

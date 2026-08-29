@@ -60,6 +60,7 @@ type Player struct {
 	volume      float64
 	generation  uint64
 	audioFilter string
+	speed       float64
 }
 
 func New() *Player {
@@ -80,9 +81,20 @@ func New() *Player {
 		otoCtx:      ctx,
 		state:       Stopped,
 		volume:      1.0,
+		speed:       1.0,
 		audioFilter: "dynaudnorm=f=250:g=11:p=0.9:m=10",
 	}
 }
+
+func (p *Player) SetSpeed(s float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if s <= 0 {
+		s = 1.0
+	}
+	p.speed = s
+}
+
 func (p *Player) SetAudioFilter(filter string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -101,9 +113,13 @@ func (p *Player) State() State {
 func (p *Player) Position() time.Duration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	speed := p.speed
+	if speed <= 0 {
+		speed = 1.0
+	}
 	switch p.state {
 	case Playing:
-		return time.Since(p.startTime)
+		return time.Duration(float64(time.Since(p.startTime)) * speed)
 	case Paused:
 		return p.pauseOffset
 	default:
@@ -131,9 +147,14 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 		return fmt.Errorf("oto context is not initialized")
 	}
 
+	speed := p.speed
+	if speed <= 0 {
+		speed = 1.0
+	}
+
 	p.currentPath = filePath
 	p.headers = headers
-	p.startTime = time.Now().Add(-time.Duration(startSec * float64(time.Second)))
+	p.startTime = time.Now().Add(-time.Duration((startSec / speed) * float64(time.Second)))
 	p.pauseOffset = 0
 	p.lastErr = nil
 	p.stopped = false
@@ -153,12 +174,22 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 	if startSec > 0 {
 		args = append(args, "-ss", fmt.Sprintf("%.3f", startSec))
 	}
+
+	af := p.audioFilter
+	if speed != 1.0 {
+		if speed == 0.25 {
+			af += ",atempo=0.5,atempo=0.5"
+		} else {
+			af += fmt.Sprintf(",atempo=%.2f", speed)
+		}
+	}
+
 	args = append(args,
 		"-i", filePath,
 		"-f", "s16le",
 		"-ar", "48000",
 		"-ac", "2",
-		"-af", p.audioFilter,
+		"-af", af,
 		"-v", "error",
 		"-",
 	)
@@ -249,19 +280,21 @@ func (p *Player) PlaybackError() error {
 func (p *Player) TogglePause() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	if p.player == nil || p.state == Stopped {
 		return
 	}
-
+	speed := p.speed
+	if speed <= 0 {
+		speed = 1.0
+	}
 	if p.state == Playing {
 		p.player.Pause()
 		p.state = Paused
-		p.pauseOffset = time.Since(p.startTime)
+		p.pauseOffset = time.Duration(float64(time.Since(p.startTime)) * speed)
 	} else if p.state == Paused {
 		p.player.Play()
 		p.state = Playing
-		p.startTime = time.Now().Add(-p.pauseOffset)
+		p.startTime = time.Now().Add(-time.Duration(float64(p.pauseOffset) / speed))
 	}
 }
 
@@ -273,11 +306,17 @@ func (p *Player) SeekBy(seconds float64) {
 		p.mu.Unlock()
 		return
 	}
-	elapsed := time.Since(p.startTime)
-	if p.state == Paused {
-		elapsed = p.pauseOffset
+	speed := p.speed
+	if speed <= 0 {
+		speed = 1.0
 	}
-	newSec := elapsed.Seconds() + seconds
+	var elapsed float64
+	if p.state == Paused {
+		elapsed = p.pauseOffset.Seconds()
+	} else {
+		elapsed = time.Since(p.startTime).Seconds() * speed
+	}
+	newSec := elapsed + seconds
 	if newSec < 0 {
 		newSec = 0
 	}
