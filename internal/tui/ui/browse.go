@@ -309,10 +309,23 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					if p.searchCursor < p.searchOffset {
 						p.searchOffset = p.searchCursor
 					}
+				} else if p.activeTab == SideSearch {
+					p.searchCursor = p.itemCount() - 1
+					if p.searchCursor >= p.searchOffset+p.visibleRows() {
+						p.searchOffset = p.searchCursor - p.visibleRows() + 1
+					}
 				} else if p.activeTab == SideDownloads && p.dlCursor > 0 {
 					p.dlCursor--
 					if p.dlCursor < p.dlOffset {
 						p.dlOffset = p.dlCursor
+					}
+				} else if p.activeTab == SideDownloads {
+					items := p.itemCount()
+					if items > 0 {
+						p.dlCursor = items - 1
+						if p.dlCursor >= p.dlOffset+p.visibleRows()+1 {
+							p.dlOffset = p.dlCursor - p.visibleRows()
+						}
 					}
 				} else if p.activeTab == SideQueue && p.qCursor > 0 {
 					p.qCursor--
@@ -361,6 +374,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						if p.searchCursor >= p.searchOffset+p.visibleRows() {
 							p.searchOffset++
 						}
+					} else if items > 0 {
+						p.searchCursor = 0
+						p.searchOffset = 0
 					}
 				} else if p.activeTab == SideDownloads {
 					if p.dlCursor < items-1 {
@@ -368,6 +384,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						if p.dlCursor >= p.dlOffset+p.visibleRows()+1 {
 							p.dlOffset++
 						}
+					} else if items > 0 {
+						p.dlCursor = 0
+						p.dlOffset = 0
 					}
 				} else if p.activeTab == SideQueue {
 					if p.qCursor < items-1 {
