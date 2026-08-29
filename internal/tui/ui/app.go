@@ -97,6 +97,7 @@ type App struct {
 	activeSpeed   int
 	sortActive    bool
 	activeSort    string // "name", "date", "duration"
+	nextPlay      *domain.Track
 }
 
 const maxPendingKeys = 64
@@ -196,33 +197,36 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if playErr != nil {
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
 			} else if a.player.PlayFromBuffer() {
-				// Gapless: pre-decoded buffer was ready, playback continued seamlessly.
-				var nextTrack *domain.Track
-				if len(a.trackQueue) > 0 {
-					t := a.trackQueue[0]
-					nextTrack = &t
-				} else if len(a.playlist) > 0 {
-					idx := a.currentIdx + 1
-					if a.random {
-						idx = a.pickAntiClumpIndex()
+				if a.nextPlay != nil {
+					a.nowPlay = a.nextPlay
+
+					if len(a.trackQueue) > 0 && a.trackQueue[0].ID == a.nowPlay.ID {
+						a.trackQueue = a.trackQueue[1:]
+						if a.left.qCursor >= len(a.trackQueue) {
+							a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+						}
+					} else {
+						for i, tr := range a.playlist {
+							if tr.ID == a.nowPlay.ID {
+								a.currentIdx = i
+								break
+							}
+						}
 					}
-					if idx < len(a.playlist) {
-						nextTrack = &a.playlist[idx]
-						a.currentIdx = idx
-					}
-				}
-				if nextTrack != nil {
-					a.nowPlay = nextTrack
+
+					a.nextPlay = nil // Reset trạng thái
 					a.songStarted = true
 					a.playerGen = a.player.Generation()
-					a.updateCursorForTrack(*nextTrack)
-					a.right.SetTrack(nextTrack)
-					a.setStatus(StatusOKStyle.Render(">  " + nextTrack.Title))
+
+					a.updateCursorForTrack(*a.nowPlay)
+					a.right.SetTrack(a.nowPlay)
+					a.setStatus(StatusOKStyle.Render(">  " + a.nowPlay.Title))
+
 					if a.avrcp != nil {
-						a.avrcp.UpdateMetadata(nextTrack.ID, nextTrack.Title, nextTrack.Artist, "", nextTrack.Thumbnail, int64(nextTrack.Duration)*1_000_000)
+						a.avrcp.UpdateMetadata(a.nowPlay.ID, a.nowPlay.Title, a.nowPlay.Artist, "", a.nowPlay.Thumbnail, int64(a.nowPlay.Duration)*1_000_000)
 						a.avrcp.UpdatePlaybackStatus("Playing")
 					}
-					a.loadLyricsForTrack(*nextTrack)
+					a.loadLyricsForTrack(*a.nowPlay)
 				}
 			} else if len(a.trackQueue) > 0 {
 				t := a.trackQueue[0]
@@ -923,6 +927,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.currentIdx = idx
 	a.nowPlay = &t
 	a.songStarted = false
+	a.nextPlay = nil
 	a.syncPlaylistState()
 
 	if idx >= 0 {
@@ -1054,14 +1059,12 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 		path := strings.TrimPrefix(t.ID, "local:")
 		for i, lf := range a.left.locals {
 			if lf.Path == path {
-				switch a.activeContext {
-				case SideDownloads:
-					a.left.dlCursor = i
-					a.left.dlOffset = 0
-					if i >= vis {
-						a.left.dlOffset = i - vis + 1
-					}
-				case SidePlaylists:
+				a.left.dlCursor = i
+				a.left.dlOffset = 0
+				if i >= vis {
+					a.left.dlOffset = i - vis + 1
+				}
+				if a.activeContext == SidePlaylists {
 					a.left.plCursor = i
 					a.left.plOffset = 0
 					if i >= vis {
@@ -1074,14 +1077,12 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 	} else {
 		for i, tr := range a.left.tracks {
 			if tr.ID == t.ID {
-				switch a.activeContext {
-				case SideSearch:
-					a.left.searchCursor = i
-					a.left.searchOffset = 0
-					if i >= vis {
-						a.left.searchOffset = i - vis + 1
-					}
-				case SidePlaylists:
+				a.left.searchCursor = i
+				a.left.searchOffset = 0
+				if i >= vis {
+					a.left.searchOffset = i - vis + 1
+				}
+				if a.activeContext == SidePlaylists {
 					a.left.plCursor = i
 					a.left.plOffset = 0
 					if i >= vis {
@@ -1135,8 +1136,11 @@ func (a *App) playPrev() tea.Cmd {
 // triggerPreDecodeNext pre-decodes the next track for gapless playback.
 // Only works for local files (no headers needed).
 func (a *App) triggerPreDecodeNext() {
-	var next domain.Track
+	if a.nextPlay != nil {
+		return
+	}
 
+	var next domain.Track
 	if len(a.trackQueue) > 0 {
 		next = a.trackQueue[0]
 	} else if len(a.playlist) > 0 {
@@ -1156,6 +1160,8 @@ func (a *App) triggerPreDecodeNext() {
 		return
 	}
 	path := strings.TrimPrefix(next.ID, "local:")
+
+	a.nextPlay = &next
 	a.player.PreDecodeNext(path, nil)
 }
 
