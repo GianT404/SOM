@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"som/internal/domain"
-	"som/internal/playlist"
+	"som/internal/storage"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -83,7 +83,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			if a.cmdCursor < len(idxs) && a.left.plStore != nil {
 				pl := a.left.playlists[idxs[a.cmdCursor]]
 				track, _ := a.selectedTrackForPlaylist()
-				if err := a.left.plStore.RemoveTrack(pl.ID, track.ID); err == nil {
+				if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, track.ID); err == nil {
 					for j := range pl.Tracks {
 						if pl.Tracks[j].ID == track.ID {
 							a.left.playlists[idxs[a.cmdCursor]].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
@@ -145,8 +145,20 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			track, ok := a.selectedTrackForPlaylist()
 			if ok && a.left.plStore != nil && a.cmdCursor < len(a.left.playlists) {
 				pl := a.left.playlists[a.cmdCursor]
-				if err := a.left.plStore.AddTrack(pl.ID, track); err == nil {
-					a.left.playlists[a.cmdCursor].Tracks = append(a.left.playlists[a.cmdCursor].Tracks, track)
+				if err := a.left.plStore.AddTrackToPlaylist(pl.ID, storage.PlaylistTrack{
+					ID:       track.ID,
+					Title:    track.Title,
+					Artist:   track.Artist,
+					Duration: track.Duration,
+					IsLocal:  track.IsLocal,
+				}); err == nil {
+					a.left.playlists[a.cmdCursor].Tracks = append(a.left.playlists[a.cmdCursor].Tracks, storage.PlaylistTrack{
+						ID:       track.ID,
+						Title:    track.Title,
+						Artist:   track.Artist,
+						Duration: track.Duration,
+						IsLocal:  track.IsLocal,
+					})
 					a.setStatus(StatusOKStyle.Render("> Added to \"" + pl.Name + "\""))
 				}
 			}
@@ -368,6 +380,11 @@ func (a *App) applyRenameTitle(newTitle string) {
 		}
 	}
 
+	// Update SQLite records.
+	if a.left.plStore != nil {
+		_ = a.left.plStore.RenameLocalFile(oldPath, newPath, newTitle)
+	}
+
 	target.Name = newTitle
 	target.Path = newPath
 
@@ -401,6 +418,11 @@ func (a *App) applyDeleteTrack() {
 	os.Remove(path)
 	os.Remove(localFileSidecar(path))
 
+	// Remove from SQLite.
+	if a.left.plStore != nil {
+		_ = a.left.plStore.DeleteLocalFile(path)
+	}
+
 	for i := range a.left.locals {
 		if a.left.locals[i].Path == path {
 			a.left.locals = append(a.left.locals[:i], a.left.locals[i+1:]...)
@@ -422,15 +444,15 @@ func (a *App) applyDeleteTrack() {
 	a.setStatus(StatusOKStyle.Render("> Deleted " + target.Name))
 }
 
-func (a *App) selectedTrackForPlaylist() (playlist.Track, bool) {
+func (a *App) selectedTrackForPlaylist() (storage.PlaylistTrack, bool) {
 	if a.sidebarActive == SideSearch && a.left.searchCursor < len(a.left.tracks) {
 		t := a.left.tracks[a.left.searchCursor]
-		return playlist.Track{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: a.left.isDownloaded(t)}, true
+		return storage.PlaylistTrack{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: a.left.isDownloaded(t)}, true
 	}
 	if lf, ok := a.renameTarget(); ok {
-		return playlist.Track{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, IsLocal: true}, true
+		return storage.PlaylistTrack{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, IsLocal: true}, true
 	}
-	return playlist.Track{}, false
+	return storage.PlaylistTrack{}, false
 }
 
 func sanitizeLocalName(s string) string {

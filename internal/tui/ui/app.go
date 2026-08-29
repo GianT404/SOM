@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"som/internal/domain"
+	"som/internal/storage"
 	"som/internal/tui/avrcp"
 	"som/internal/tui/player"
 
@@ -494,10 +495,47 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
 
+		// Record to history.
+		if a.left.plStore != nil {
+			trackType := "remote"
+			if strings.HasPrefix(msg.Track.ID, "local:") {
+				trackType = "local"
+			}
+			_ = a.left.plStore.RecordPlay(msg.Track.ID, trackType, msg.Track.Title, msg.Track.Artist)
+		}
+
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))
 		} else {
+			// Save to SQLite.
+			if a.left.plStore != nil && msg.Path != "" {
+				info, _ := os.Stat(msg.Path)
+				fileSize := int64(0)
+				fileMTime := ""
+				if info != nil {
+					fileSize = info.Size()
+					fileMTime = info.ModTime().Format("2006-01-02 15:04:05")
+				}
+				lr, _ := getCachedLyrics(a.provider, msg.Track.ID, msg.Track.Title, msg.Track.Artist, msg.Track.Duration)
+				lrJSON, _ := json.Marshal(lr)
+				_ = a.left.plStore.UpsertLocalFileWithMeta(storage.LocalFile{
+					Path:      msg.Path,
+					Name:      msg.Track.Title,
+					Artist:    msg.Track.Artist,
+					Duration:  msg.Track.Duration,
+					VideoID:   msg.Track.ID,
+					Thumbnail: msg.Track.Thumbnail,
+					FileSize:  fileSize,
+					FileMTime: fileMTime,
+				}, &storage.LocalFileMeta{
+					Artist:     msg.Track.Artist,
+					Title:      msg.Track.Title,
+					VideoID:    msg.Track.ID,
+					Thumbnail:  msg.Track.Thumbnail,
+					LyricsJSON: string(lrJSON),
+				})
+			}
 			a.setStatus(StatusOKStyle.Render("Saved " + msg.Path))
 		}
 
@@ -894,13 +932,23 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.playerGen = a.player.Generation()
 		a.songStarted = true
 		a.right.SetTrack(&t)
-		jsonPath := localFileSidecar(path)
-		data, err := os.ReadFile(jsonPath)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		if a.avrcp != nil {
 			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
+		// Read lyrics from SQLite first, fall back to sidecar JSON.
+		if a.left.plStore != nil {
+			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
+				var lr domain.LyricsResp
+				if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
+					a.right.SetLyrics(lr)
+					return nil
+				}
+			}
+		}
+		jsonPath := localFileSidecar(path)
+		data, err := os.ReadFile(jsonPath)
 		if err == nil {
 			var lr domain.LyricsResp
 			if json.Unmarshal(data, &lr) == nil {

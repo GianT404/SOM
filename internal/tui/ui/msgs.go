@@ -26,8 +26,9 @@ type PlayLocalMsg struct {
 	Title string
 }
 type DownloadDoneMsg struct {
-	Path string
-	Err  error
+	Path  string
+	Err   error
+	Track domain.Track
 }
 type StreamStartedMsg struct {
 	Track     domain.Track

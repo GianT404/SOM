@@ -1,13 +1,8 @@
 package ui
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -16,86 +11,25 @@ import (
 
 func (p *LeftPanel) scanLocalFiles() {
 	p.locals = nil
-
-	dir, err := getDownloadDir()
+	if p.plStore == nil {
+		return
+	}
+	files, err := p.plStore.ListAllLocalFiles()
 	if err != nil {
-		p.errMsg = "Cannot find home directory"
+		p.errMsg = "DB error: " + err.Error()
 		return
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		p.errMsg = fmt.Sprintf("Create dir error: %s", err.Error())
-		return
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		p.errMsg = fmt.Sprintf("Dir error: %s", err.Error())
-		return
-	}
-	p.errMsg = ""
-
-	for _, e := range entries {
-		if !e.IsDir() && isSupportedAudio(e.Name()) {
-			localPath := filepath.Join(dir, e.Name())
-			ext := filepath.Ext(e.Name())
-			baseName := strings.TrimSuffix(localPath, ext)
-			name := strings.TrimSuffix(e.Name(), ext)
-			artist := ""
-			videoID := ""
-			thumbnail := ""
-
-			jsonPath := strings.TrimSuffix(localPath, ext) + ".json"
-			if data, err := os.ReadFile(jsonPath); err == nil {
-				var meta struct {
-					Artist    string `json:"artist"`
-					Title     string `json:"title"`
-					VideoID   string `json:"video_id"`
-					Thumbnail string `json:"thumbnail"`
-				}
-				if json.Unmarshal(data, &meta) == nil {
-					artist = meta.Artist
-					videoID = meta.VideoID
-					thumbnail = meta.Thumbnail
-					if meta.Title != "" {
-						name = meta.Title
-					}
-				}
-			}
-			if thumbnail == "" {
-				imgPath := baseName + ".jpg"
-				if _, errStat := os.Stat(imgPath); errStat == nil {
-					absPath, _ := filepath.Abs(imgPath)
-					thumbnail = "file://" + absPath
-				}
-			}
-			p.locals = append(p.locals, LocalFile{
-				Name:      name,
-				Path:      localPath,
-				Artist:    artist,
-				Duration:  getFileDuration(localPath),
-				VideoID:   videoID,
-				Thumbnail: thumbnail,
-			})
+	p.locals = make([]LocalFile, len(files))
+	for i, f := range files {
+		p.locals[i] = LocalFile{
+			Name:      f.Name,
+			Path:      f.Path,
+			Artist:    f.Artist,
+			Duration:  f.Duration,
+			VideoID:   f.VideoID,
+			Thumbnail: f.Thumbnail,
 		}
 	}
-}
-
-func getFileDuration(path string) int {
-	cmd := exec.Command("ffprobe", "-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		path,
-	)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return 0
-	}
-	sec, err := strconv.ParseFloat(strings.TrimSpace(out.String()), 64)
-	if err != nil {
-		return 0
-	}
-	return int(sec)
 }
 
 func (p LeftPanel) ViewDownloadsContent(w, h int) string {
@@ -184,13 +118,6 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 
 	return b.String()
-}
-
-func isSupportedAudio(name string) bool {
-	lower := strings.ToLower(name)
-	return strings.HasSuffix(lower, ".opus") ||
-		strings.HasSuffix(lower, ".mp3") ||
-		strings.HasSuffix(lower, ".mp4")
 }
 
 func localFileSidecar(path string) string {

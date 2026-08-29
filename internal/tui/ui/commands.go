@@ -84,7 +84,7 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 			data, _ := json.MarshalIndent(lr, "", "  ")
 			_ = os.WriteFile(jsonPath, data, 0644)
 
-			return DownloadDoneMsg{Path: path, Err: err}
+			return DownloadDoneMsg{Path: path, Err: err, Track: t}
 		}
 		return DownloadDoneMsg{Path: path, Err: err}
 	}

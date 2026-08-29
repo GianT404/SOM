@@ -1,8 +1,9 @@
 package ui
 
 import (
+	"log"
 	"som/internal/domain"
-	"som/internal/playlist"
+	"som/internal/storage"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -35,9 +36,9 @@ type LeftPanel struct {
 	height          int
 	searchOnEnter   bool
 	activeTab       SidebarItem
-	plStore         *playlist.Store
-	playlists       []playlist.Playlist
-	activePlaylist  *playlist.Playlist
+	plStore         *storage.DB
+	playlists       []storage.Playlist
+	activePlaylist  *storage.Playlist
 	plInput         textinput.Model
 	showPlInput     bool
 
@@ -80,9 +81,15 @@ func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 		plInput:   plInput,
 	}
 
-	if store, err := playlist.NewStore(); err == nil {
+	if store, err := storage.Open(); err == nil {
 		panel.plStore = store
-		if pls, err := store.Load(); err == nil {
+		// One-time migration: import existing files from disk into SQLite.
+		if dir, err := getDownloadDir(); err == nil {
+			if n, err := store.ImportFromFilesystem(dir); err == nil && n > 0 {
+				log.Printf("[storage] imported %d local files from filesystem", n)
+			}
+		}
+		if pls, err := store.LoadAllPlaylists(); err == nil {
 			panel.playlists = pls
 		}
 	}
@@ -113,21 +120,21 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 			case "enter":
 				if p.deletePopupCursor == 1 {
-					if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-						trackID := p.activePlaylist.Tracks[p.plCursor].ID
-						p.plStore.RemoveTrack(p.activePlaylist.ID, trackID)
-						var filtered []playlist.Track
-						for _, t := range p.activePlaylist.Tracks {
-							if t.ID != trackID {
-								filtered = append(filtered, t)
-							}
+			if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
+					trackID := p.activePlaylist.Tracks[p.plCursor].ID
+					p.plStore.RemoveTrackFromPlaylist(p.activePlaylist.ID, trackID)
+					var filtered []storage.PlaylistTrack
+					for _, t := range p.activePlaylist.Tracks {
+						if t.ID != trackID {
+							filtered = append(filtered, t)
 						}
-						p.activePlaylist.Tracks = filtered
-						for i, pl := range p.playlists {
-							if pl.ID == p.activePlaylist.ID {
-								p.playlists[i] = *p.activePlaylist
-							}
+					}
+					p.activePlaylist.Tracks = filtered
+					for i, pl := range p.playlists {
+						if pl.ID == p.activePlaylist.ID {
+							p.playlists[i] = *p.activePlaylist
 						}
+					}
 
 						if p.plCursor >= len(p.activePlaylist.Tracks) {
 							p.plCursor = len(p.activePlaylist.Tracks) - 1
