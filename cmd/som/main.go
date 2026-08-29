@@ -15,6 +15,7 @@ import (
 	"som/internal/domain"
 	"som/internal/local"
 	"som/internal/scraper"
+	"som/internal/storage"
 	"som/internal/tui/api"
 	"som/internal/tui/ui"
 
@@ -27,6 +28,7 @@ var Version = "dev"
 
 func main() {
 	var serverURL string
+	var downloadDir string
 	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag bool
 
 	var rootCmd = &cobra.Command{
@@ -101,7 +103,18 @@ func main() {
 				provider = api.NewHTTPProvider(serverURL)
 			}
 
-			app := ui.NewApp(provider)
+			if downloadDir == "" {
+				if env := os.Getenv("SOM_DOWNLOAD_DIR"); env != "" {
+					downloadDir = env
+				} else {
+					downloadDir = storage.DefaultDir()
+				}
+			}
+			if err := storage.MigrateFromLegacy(downloadDir); err != nil {
+				log.Printf("[storage] migration warning: %v", err)
+			}
+
+			app := ui.NewApp(provider, downloadDir)
 
 			defer func() {
 				if r := recover(); r != nil {
@@ -144,6 +157,7 @@ func main() {
 
 	// Đăng ký toàn bộ cờ vào Cobra (tự động ăn khớp completion)
 	rootCmd.Flags().StringVar(&serverURL, "server", "", "URL of Google Cloud backend (leave empty to run locally)")
+	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Directory to store downloaded tracks (default: ~/.local/share/som)")
 	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "download and install the latest SOM release from GitHub")
 	rootCmd.Flags().BoolVar(&installFlag, "install", false, "copy this binary to /usr/local/bin (or platform equivalent)")
 	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "print the current version and exit")

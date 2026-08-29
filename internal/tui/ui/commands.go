@@ -39,14 +39,6 @@ func suggestCmd(query string) tea.Cmd {
 	}
 }
 
-func getDownloadDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(homeDir, "Music", "SOM_Downloads"), nil
-}
-
 func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd {
 	return func() tea.Msg {
 		path, err := p.DownloadOPUS(context.Background(), t.ID, t.Title, destDir)

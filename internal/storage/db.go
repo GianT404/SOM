@@ -3,6 +3,8 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,14 +14,26 @@ import (
 
 type DB struct {
 	conn *sql.DB
+	dir  string
 }
 
-func Open() (*DB, error) {
+// DefaultDir returns the default download directory (~/.local/share/som).
+func DefaultDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return filepath.Join(".", "som")
 	}
-	dir := filepath.Join(home, "Music", "SOM_Downloads")
+	return filepath.Join(home, ".local", "share", "som")
+}
+
+// legacyDirs returns previous default directories in reverse chronological order.
+func legacyDirs(home string) []string {
+	return []string{
+		filepath.Join(home, "Music", "SOM_Downloads"),
+	}
+}
+
+func Open(dir string) (*DB, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -31,12 +45,95 @@ func Open() (*DB, error) {
 	}
 	conn.SetMaxOpenConns(1)
 
-	db := &DB{conn: conn}
+	db := &DB{conn: conn, dir: dir}
 	if err := db.migrate(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return db, nil
+}
+
+func (db *DB) Dir() string { return db.dir }
+
+func MigrateFromLegacy(dir string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+
+	for _, legacy := range legacyDirs(home) {
+		if legacy == dir {
+			continue
+		}
+		if _, err := os.Stat(legacy); os.IsNotExist(err) {
+			continue
+		}
+
+		log.Printf("[storage] migrating from legacy dir %s -> %s", legacy, dir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create target dir: %w", err)
+		}
+
+		// Move files (including som.db) from legacy to target.
+		entries, err := os.ReadDir(legacy)
+		if err != nil {
+			return err
+		}
+
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			src := filepath.Join(legacy, e.Name())
+			dst := filepath.Join(dir, e.Name())
+			if _, err := os.Stat(dst); err == nil {
+				continue
+			}
+			if err := os.Rename(src, dst); err != nil {
+				log.Printf("[storage] migrate: rename %s -> %s failed: %v", src, dst, err)
+				if err := copyFile(src, dst); err != nil {
+					log.Printf("[storage] migrate: copy %s -> %s failed: %v", src, dst, err)
+					continue
+				}
+				os.Remove(src)
+			}
+		}
+
+		// Update paths in the moved DB.
+		dbPath := filepath.Join(dir, "som.db")
+		conn, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL")
+		if err == nil {
+			legacyPrefix := legacy + "/"
+			newPrefix := dir + "/"
+			_, _ = conn.Exec("UPDATE local_files SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
+				legacyPrefix, newPrefix, legacyPrefix+"%")
+			_, _ = conn.Exec("UPDATE playlist_tracks SET track_id = REPLACE(track_id, ?, ?) WHERE track_id LIKE ?",
+				"local:"+legacyPrefix, "local:"+newPrefix, "local:"+legacyPrefix+"%")
+			conn.Close()
+		}
+
+		os.Remove(filepath.Join(legacy, ".query_cache"))
+		os.Remove(legacy)
+	}
+
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func (db *DB) Close() error {
@@ -94,7 +191,7 @@ func (db *DB) migrate() error {
 	}
 
 	// FTS5 virtual table (separate statement — CREATE VIRTUAL TABLE can't be inside transactions on some builds).
-_fts := `CREATE VIRTUAL TABLE IF NOT EXISTS local_files_fts USING fts5(
+	_fts := `CREATE VIRTUAL TABLE IF NOT EXISTS local_files_fts USING fts5(
 		name, artist, video_id,
 		content='local_files',
 		content_rowid='rowid'

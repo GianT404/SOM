@@ -53,6 +53,7 @@ func logoTick() tea.Cmd {
 
 type App struct {
 	provider      domain.MusicProvider
+	downloadDir   string
 	player        *player.Player
 	nowPlay       *domain.Track
 	songStarted   bool
@@ -98,11 +99,12 @@ type App struct {
 
 const maxPendingKeys = 64
 
-func NewApp(provider domain.MusicProvider) *App {
+func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 	ri := textinput.New()
 	ri.CharLimit = 200
 	return &App{
 		provider:      provider,
+		downloadDir:   downloadDir,
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
 		palette:       NewCommandPalette(),
@@ -113,7 +115,7 @@ func NewApp(provider domain.MusicProvider) *App {
 }
 
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(splashTick(), bootCmd(a.provider))
+	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

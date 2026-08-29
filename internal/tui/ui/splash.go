@@ -11,8 +11,9 @@ import (
 )
 
 type splashDoneMsg struct {
-	player *player.Player
-	left   LeftPanel
+	player      *player.Player
+	left        LeftPanel
+	downloadDir string
 }
 
 type splashTickMsg time.Time
@@ -24,11 +25,11 @@ func splashTick() tea.Cmd {
 }
 
 // không chặn vòng lặp Bubble Tea nên splash vẫn animate mượt trong lúc chờ.
-func bootCmd(provider domain.MusicProvider) tea.Cmd {
+func bootCmd(provider domain.MusicProvider, downloadDir string) tea.Cmd {
 	return func() tea.Msg {
 		p := player.New()
-		left := NewLeftPanel(provider)
-		return splashDoneMsg{player: p, left: left}
+		left := NewLeftPanel(provider, downloadDir)
+		return splashDoneMsg{player: p, left: left, downloadDir: downloadDir}
 	}
 }
 

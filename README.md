@@ -164,6 +164,7 @@ The server starts on port `8080` by default. Configure with environment variable
 | `PORT` | `8080` | Server port |
 | `HOST` | (all interfaces) | Bind host |
 | `YTDLP_PATH` | `yt-dlp` | Path to yt-dlp binary |
+| `SOM_DOWNLOAD_DIR` | `~/.local/share/som` | Directory to store downloaded tracks (overridden by `--download-dir` flag) |
 | `SOM_API_KEY` | — | Require an API key for requests |
 | `BANNED_DEVICES` | — | Comma-separated device IDs to ban |
 | `TRUSTED_PROXIES` | — | Comma-separated IP/CIDR allowed to supply `X-Forwarded-For` |
@@ -262,6 +263,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 | Flag | Description |
 |------|-------------|
 | `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one |
+| `--download-dir <DIR>` | Directory to store downloaded tracks (default: `~/.local/share/som`) |
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
 | `--upgrade` | Download and install the latest SOM release from GitHub |
 | `--check-update` | Check whether a newer SOM release exists without installing |

@@ -41,6 +41,7 @@ type LeftPanel struct {
 	activePlaylist  *storage.Playlist
 	plInput         textinput.Model
 	showPlInput     bool
+	downloadDir     string
 
 	inputSearch   string
 	inputDownload string
@@ -59,7 +60,7 @@ type LeftPanel struct {
 
 const suggestMaxShow = 5
 
-func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
+func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 	ti := textinput.New()
 	ti.CharLimit = 120
 	ti.SetVirtualCursor(false)
@@ -74,20 +75,18 @@ func NewLeftPanel(prov domain.MusicProvider) LeftPanel {
 	plInput.Prompt = ""
 
 	panel := LeftPanel{
-		provider:  prov,
-		input:     ti,
-		spinner:   sp,
-		activeTab: SideDownloads,
-		plInput:   plInput,
+		provider:    prov,
+		input:       ti,
+		spinner:     sp,
+		activeTab:   SideDownloads,
+		plInput:     plInput,
+		downloadDir: downloadDir,
 	}
 
-	if store, err := storage.Open(); err == nil {
+	if store, err := storage.Open(downloadDir); err == nil {
 		panel.plStore = store
-		// One-time migration: import existing files from disk into SQLite.
-		if dir, err := getDownloadDir(); err == nil {
-			if n, err := store.ImportFromFilesystem(dir); err == nil && n > 0 {
-				log.Printf("[storage] imported %d local files from filesystem", n)
-			}
+		if n, err := store.ImportFromFilesystem(downloadDir); err == nil && n > 0 {
+			log.Printf("[storage] imported %d local files from filesystem", n)
 		}
 		if pls, err := store.LoadAllPlaylists(); err == nil {
 			panel.playlists = pls
@@ -406,13 +405,8 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		case "d":
 			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.searchCursor]
-				dir, err := getDownloadDir()
-				if err != nil {
-					p.errMsg = "Cannot find home directory"
-					return p, nil
-				}
 				p.loadingDownload = true
-				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, dir))
+				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, p.downloadDir))
 			}
 
 		case "/":

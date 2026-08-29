@@ -72,7 +72,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
 			return DimItemStyle.Render(" No matching downloaded files found.") + "\n"
 		}
-		return DimItemStyle.Render(" No downloaded files in ~/Music/SOM_Downloads/") + "\n"
+		return DimItemStyle.Render(" No downloaded files in " + p.downloadDir + "/") + "\n"
 	}
 	var b strings.Builder
 	// +1: reclaim the row previously wasted by the trailing blank line below
