@@ -107,6 +107,8 @@ func MigrateFromLegacy(dir string) error {
 			newPrefix := dir + "/"
 			_, _ = conn.Exec("UPDATE local_files SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
 				legacyPrefix, newPrefix, legacyPrefix+"%")
+			_, _ = conn.Exec("UPDATE local_files SET thumbnail = REPLACE(thumbnail, ?, ?) WHERE thumbnail LIKE ?",
+				"file://"+legacyPrefix, "file://"+newPrefix, "file://"+legacyPrefix+"%")
 			_, _ = conn.Exec("UPDATE playlist_tracks SET track_id = REPLACE(track_id, ?, ?) WHERE track_id LIKE ?",
 				"local:"+legacyPrefix, "local:"+newPrefix, "local:"+legacyPrefix+"%")
 			conn.Close()
