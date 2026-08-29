@@ -215,6 +215,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.nowPlay = nextTrack
 					a.songStarted = true
 					a.playerGen = a.player.Generation()
+					a.updateCursorForTrack(*nextTrack)
 					a.right.SetTrack(nextTrack)
 					a.setStatus(StatusOKStyle.Render(">  " + nextTrack.Title))
 					if a.avrcp != nil {
@@ -1040,6 +1041,52 @@ func (a *App) highlightTrackInSidebar(t domain.Track) {
 				a.left.searchOffset = 0
 				if i >= a.left.visibleRows() {
 					a.left.searchOffset = i - a.left.visibleRows() + 1
+				}
+				break
+			}
+		}
+	}
+}
+
+func (a *App) updateCursorForTrack(t domain.Track) {
+	vis := a.left.visibleRows()
+	if strings.HasPrefix(t.ID, "local:") {
+		path := strings.TrimPrefix(t.ID, "local:")
+		for i, lf := range a.left.locals {
+			if lf.Path == path {
+				switch a.activeContext {
+				case SideDownloads:
+					a.left.dlCursor = i
+					a.left.dlOffset = 0
+					if i >= vis {
+						a.left.dlOffset = i - vis + 1
+					}
+				case SidePlaylists:
+					a.left.plCursor = i
+					a.left.plOffset = 0
+					if i >= vis {
+						a.left.plOffset = i - vis + 1
+					}
+				}
+				break
+			}
+		}
+	} else {
+		for i, tr := range a.left.tracks {
+			if tr.ID == t.ID {
+				switch a.activeContext {
+				case SideSearch:
+					a.left.searchCursor = i
+					a.left.searchOffset = 0
+					if i >= vis {
+						a.left.searchOffset = i - vis + 1
+					}
+				case SidePlaylists:
+					a.left.plCursor = i
+					a.left.plOffset = 0
+					if i >= vis {
+						a.left.plOffset = i - vis + 1
+					}
 				}
 				break
 			}
