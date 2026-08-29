@@ -106,7 +106,6 @@ SOM/
 │   │       ├── msgs.go          # Message types
 │   │       ├── cache.go         # Lyrics/search caching
 │   │       └── lyrics.go        # Lyric line parsing
-│   └── cleaner/          # Audio stream processing
 ├── app/                 # React Native (Expo) mobile app
 │   ├── src/
 │   │   ├── screens/     # HomeScreen, SearchScreen, NowPlayingScreen, ...
