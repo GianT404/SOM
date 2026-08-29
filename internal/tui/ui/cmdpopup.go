@@ -74,10 +74,14 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		case "up", "k":
 			if a.cmdCursor > 0 {
 				a.cmdCursor--
+			} else {
+				a.cmdCursor = len(idxs) - 1
 			}
 		case "down", "j":
 			if a.cmdCursor < len(idxs)-1 {
 				a.cmdCursor++
+			} else {
+				a.cmdCursor = 0
 			}
 		case "enter":
 			if a.cmdCursor < len(idxs) && a.left.plStore != nil {
@@ -106,10 +110,14 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		case "up", "k":
 			if a.cmdCursor > 0 {
 				a.cmdCursor--
+			} else {
+				a.cmdCursor = len(audioPresets) - 1
 			}
 		case "down", "j":
 			if a.cmdCursor < len(audioPresets)-1 {
 				a.cmdCursor++
+			} else {
+				a.cmdCursor = 0
 			}
 		case "enter":
 			p := audioPresets[a.cmdCursor]
@@ -136,10 +144,14 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		case "up", "k":
 			if a.cmdCursor > 0 {
 				a.cmdCursor--
+			} else {
+				a.cmdCursor = len(a.left.playlists) - 1
 			}
 		case "down", "j":
 			if a.cmdCursor < len(a.left.playlists)-1 {
 				a.cmdCursor++
+			} else {
+				a.cmdCursor = 0
 			}
 		case "enter":
 			track, ok := a.selectedTrackForPlaylist()
@@ -225,10 +237,14 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		case "up", "k":
 			if a.cmdCursor > 0 {
 				a.cmdCursor--
+			} else {
+				a.cmdCursor = len(playbackSpeeds) - 1
 			}
 		case "down", "j":
 			if a.cmdCursor < len(playbackSpeeds)-1 {
 				a.cmdCursor++
+			} else {
+				a.cmdCursor = 0
 			}
 		case "enter":
 			pos := 0.0
@@ -260,10 +276,14 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 	case "up", "k":
 		if a.cmdMenuCursor > 0 {
 			a.cmdMenuCursor--
+		} else {
+			a.cmdMenuCursor = len(a.cmdOptionList()) - 1
 		}
 	case "down", "j":
 		if a.cmdMenuCursor < len(a.cmdOptionList())-1 {
 			a.cmdMenuCursor++
+		} else {
+			a.cmdMenuCursor = 0
 		}
 	case "enter":
 		a.runCmdOption(a.cmdMenuCursor)
