@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -70,19 +69,6 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 					}
 				}
 			}
-
-			lr, errLyr := getCachedLyrics(p, t.ID, t.Title, t.Artist, t.Duration)
-			if errLyr != nil {
-				lr = domain.LyricsResp{}
-			}
-			lr.Artist = t.Artist
-			lr.Title = t.Title
-			lr.VideoID = t.ID
-			lr.Thumbnail = t.Thumbnail
-
-			jsonPath := localFileSidecar(path)
-			data, _ := json.MarshalIndent(lr, "", "  ")
-			_ = os.WriteFile(jsonPath, data, 0644)
 
 			return DownloadDoneMsg{Path: path, Err: err, Track: t}
 		}

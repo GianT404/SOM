@@ -937,7 +937,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
-		// Read lyrics from SQLite first, fall back to sidecar JSON.
+		// Read lyrics from SQLite.
 		if a.left.plStore != nil {
 			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
 				var lr domain.LyricsResp
@@ -947,16 +947,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 				}
 			}
 		}
-		jsonPath := localFileSidecar(path)
-		data, err := os.ReadFile(jsonPath)
-		if err == nil {
-			var lr domain.LyricsResp
-			if json.Unmarshal(data, &lr) == nil {
-				a.right.SetLyrics(lr)
-			}
-		} else {
-			a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
-		}
+		a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 		return nil
 	}
 	if a.resolveCancel != nil {

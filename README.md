@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 |---------|-------------|
 |  **Search** | Search YouTube for any song or artist |
 |  **Stream** | Stream audio directly without downloading the full video |
-|  **Offline Playback** | Download tracks (`.opus`) for offline listening |
+|  **Offline Playback** | Download tracks (`.opus`/`.mp3`/`.mp4`) for offline listening |
 |  **Playlists** | Create, manage, and play custom playlists (TUI) |
 |  **Synced Lyrics** | Real-time synced lyrics via LRCLib + YouTube subtitles fallback, with language selection and millisecond-precise pre-roll seeking |
 |  **Audio Presets** | Quick audio filtering via command menu: Normal, Bass Boost, Nightcore, Daycore, and Lo-Fi |
@@ -75,6 +75,11 @@ SOM/
 │   │   ├── ytdlp.go     # yt-dlp wrapper
 │   │   ├── lrclib.go    # LRCLib lyrics API
 │   │   └── ...          # VTT parser, fallback scrapers
+│   ├── storage/         # SQLite persistence (WAL, FTS5, pure Go)
+│   │   ├── db.go        # Schema, migrations, DB connection
+│   │   ├── playlists.go # Playlist CRUD
+│   │   ├── downloads.go # Local file management, FTS search, filesystem import
+│   │   └── history.go   # Listen history
 │   ├── tui/
 │   │   ├── api/               # HTTP client for remote mode (--server)
 │   │   ├── audio/             # System audio capture + FFT for the visualizer
@@ -101,7 +106,6 @@ SOM/
 │   │       ├── msgs.go          # Message types
 │   │       ├── cache.go         # Lyrics/search caching
 │   │       └── lyrics.go        # Lyric line parsing
-│   ├── playlist/         # Playlist persistence (store.go)
 │   └── cleaner/          # Audio stream processing
 ├── app/                 # React Native (Expo) mobile app
 │   ├── src/
@@ -225,11 +229,11 @@ go build -o som .
 **Features:**
 
 - YouTube search and stream via embedded backend (Go server runs in-process, no separate process needed)
-- Download tracks for offline playback in `.opus` format
+- Download tracks for offline playback in `.opus`/`.mp3`/`.mp4` format
 - Playlist management — create, add tracks, play, and delete playlists
-- Command popup (`:`) — rename a track's title, delete a track (removes the `.opus` + metadata), move a track to another playlist, show file info (size/duration/bitrate), and remove from the current playlist
+- Command popup (`:`) — rename a track's title, delete a track, move a track to another playlist, show file info (size/duration/bitrate), and remove from the current playlist
 - LRCLib synced lyrics with multi-language selection and auto-fallback to YouTube subtitles
-- Local `.opus` file scanning with `ffprobe` duration detection
+- Local `.opus`/`.mp3`/`.mp4` file scanning with `ffprobe` duration detection, persisted in SQLite with FTS5 full-text search
 - Live audio visualizer (`\`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
 - Resilient YouTube streaming via client fallback chain (see *YouTube Stability & Cookies*)
@@ -336,6 +340,7 @@ If a 403 still slips through, SOM prints a hint to run `som --update-ytdlp`, whi
 - **LRCLib** — Synced lyrics database
 - **Bubble Tea** — TUI framework powering the terminal app
 - **oto** — Cross-platform Go audio playback (decodes via `ffmpeg`)
+- **SQLite** — Local persistence via `modernc.org/sqlite` (pure Go, no CGO) with WAL mode and FTS5 full-text search
 
 ### Frontend
 - **React Native** — Cross-platform mobile framework

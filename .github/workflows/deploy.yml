@@ -10,7 +10,7 @@ on:
       - 'internal/scraper/**'
       - 'internal/cleaner/**'
       - 'internal/backend/**'
-      - 'internal/playlist/**'
+      - 'internal/storage/**'
       - 'go.mod'
       - 'go.sum'
       - 'Dockerfile'
