@@ -28,6 +28,7 @@ var Version = "dev"
 
 func main() {
 	var serverURL string
+	var apiKey string
 	var downloadDir string
 	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag bool
 
@@ -100,7 +101,13 @@ func main() {
 				sc := scraper.NewYtdlpScraper(ytdlpPath)
 				provider = &local.DirectProvider{Scraper: sc}
 			} else {
-				provider = api.NewHTTPProvider(serverURL)
+				if apiKey == "" {
+					apiKey = os.Getenv("SOM_API_KEY")
+				}
+				if apiKey == "" {
+					fmt.Fprintln(os.Stderr, "warning: --server set without --api-key or SOM_API_KEY env; the backend will reject every request with 401")
+				}
+				provider = api.NewHTTPProvider(serverURL, apiKey)
 			}
 
 			if downloadDir == "" {
@@ -157,6 +164,7 @@ func main() {
 
 	// Đăng ký toàn bộ cờ vào Cobra (tự động ăn khớp completion)
 	rootCmd.Flags().StringVar(&serverURL, "server", "", "URL of Google Cloud backend (leave empty to run locally)")
+	rootCmd.Flags().StringVar(&apiKey, "api-key", "", "API key for --server remote mode (or set SOM_API_KEY env var)")
 	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Directory to store downloaded tracks (default: ~/.local/share/som)")
 	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "download and install the latest SOM release from GitHub")
 	rootCmd.Flags().BoolVar(&installFlag, "install", false, "copy this binary to /usr/local/bin (or platform equivalent)")

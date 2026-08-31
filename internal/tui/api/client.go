@@ -18,13 +18,16 @@ import (
 
 type HTTPProvider struct {
 	base   string
+	apiKey string
 	short  *http.Client
 	stream *http.Client
 }
 
-func NewHTTPProvider(baseURL string) *HTTPProvider {
+// NewHTTPProvider tạo client cho remote mode (--server). apiKey được gắn vào header X-API-Key trên mọi request — backend (AuthMiddleware) 
+func NewHTTPProvider(baseURL, apiKey string) *HTTPProvider {
 	return &HTTPProvider{
 		base:   strings.TrimRight(baseURL, "/"),
+		apiKey: apiKey,
 		short:  &http.Client{Timeout: 30 * time.Second},
 		stream: &http.Client{Timeout: 0},
 	}
@@ -46,6 +49,9 @@ func (c *HTTPProvider) doGet(ctx context.Context, hc *http.Client, path string, 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, err
+	}
+	if c.apiKey != "" {
+		req.Header.Set("X-API-Key", c.apiKey)
 	}
 	return hc.Do(req)
 }

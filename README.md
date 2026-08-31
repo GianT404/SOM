@@ -261,7 +261,8 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 
 | Flag | Description |
 |------|-------------|
-| `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one |
+| `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one. Requires `--api-key` (or `SOM_API_KEY`) since the backend rejects unauthenticated requests |
+| `--api-key <KEY>` | API key sent as `X-API-Key` when using `--server`. Falls back to the `SOM_API_KEY` env var |
 | `--download-dir <DIR>` | Directory to store downloaded tracks (default: `~/.local/share/som`) |
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
 | `--upgrade` | Download and install the latest SOM release from GitHub |

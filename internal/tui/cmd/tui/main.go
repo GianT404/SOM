@@ -33,7 +33,7 @@ func main() {
 				sc := scraper.NewYtdlpScraper(ytdlpPath)
 				provider = &local.DirectProvider{Scraper: sc}
 			} else {
-				provider = api.NewHTTPProvider(serverURL)
+				provider = api.NewHTTPProvider(serverURL, os.Getenv("SOM_API_KEY"))
 			}
 
 			if downloadDir == "" {
