@@ -653,8 +653,8 @@ func (a *App) mainContentHeight() int {
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		statusH = 1
 	}
-	// somRow(6) + sep(1) + progressBar(4) + help(1) + status
-	overhead := 6 + 1 + 4 + 1 + statusH
+	// somRow(6) + sep(1) + progressBar(3) + help(1) + status
+	overhead := 6 + 1 + 3 + 1 + statusH
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -903,24 +903,19 @@ func (a *App) renderProgressBar(w int) string {
 
 	bottomBorder := borderChar.Render("╰" + strings.Repeat("─", w-2) + "╯")
 
-	controlsPad := innerW - lipgloss.Width(controls)
-	if controlsPad < 0 {
-		controlsPad = 0
-	}
-	controlsLine := borderChar.Render("│ ") +
-		lipgloss.NewStyle().
-			Width(innerW).
-			Align(lipgloss.Center).
-			Render(controls) +
-		borderChar.Render(" │")
-
 	barPad := innerW - lipgloss.Width(progress)
 	if barPad < 0 {
 		barPad = 0
 	}
-	barLine := borderChar.Render("│ ") + progress + strings.Repeat(" ", barPad) + borderChar.Render(" │")
 
-	return topBorder + "\n" + controlsLine + "\n" + barLine + "\n" + bottomBorder
+	// Merge controls (left) + progress bar (right) into one line.
+	combinedLine := borderChar.Render("│ ") +
+		controls +
+		progress +
+		strings.Repeat(" ", barPad) +
+		borderChar.Render(" │")
+
+	return topBorder + "\n" + combinedLine + "\n" + bottomBorder
 }
 
 func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
