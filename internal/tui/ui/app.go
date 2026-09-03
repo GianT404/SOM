@@ -98,6 +98,7 @@ type App struct {
 	sortActive    bool
 	activeSort    string // "name", "date", "duration"
 	nextPlay      *domain.Track
+	playHistory   []domain.Track
 }
 
 const maxPendingKeys = 64
@@ -261,6 +262,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PlayPlaylistMsg:
 		a.playlist = msg.Tracks
 		a.shuffleHist = nil
+		a.playHistory = nil
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
@@ -395,6 +397,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.random = !a.random
 			a.shuffleHist = nil
+			a.playHistory = nil
 			a.syncPlaylistState()
 
 		case "up":
@@ -448,6 +451,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t := msg.Track
 		a.playlist = a.left.tracks
 		a.shuffleHist = nil
+		a.playHistory = nil
 		a.activeContext = SideSearch
 
 		idx := -1
@@ -482,6 +486,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.playlist = make([]domain.Track, len(locals))
 		a.shuffleHist = nil
+		a.playHistory = nil
 		idx := -1
 		for i, lf := range locals {
 			a.playlist[i] = domain.Track{
@@ -919,6 +924,9 @@ func (a *App) renderProgressBar(w int) string {
 }
 
 func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
+	if a.nowPlay != nil && a.random {
+		a.playHistory = append(a.playHistory, *a.nowPlay)
+	}
 	a.currentIdx = idx
 	a.nowPlay = &t
 	a.songStarted = false
@@ -1118,10 +1126,18 @@ func (a *App) playPrev() tea.Cmd {
 	if len(a.playlist) == 0 {
 		return nil
 	}
-	prev := a.currentIdx - 1
-	if a.random {
-		prev = a.pickAntiClumpIndex()
+	if a.random && len(a.playHistory) > 0 {
+		prev := a.playHistory[len(a.playHistory)-1]
+		a.playHistory = a.playHistory[:len(a.playHistory)-1]
+		for i, tr := range a.playlist {
+			if tr.ID == prev.ID {
+				a.highlightTrackInSidebar(tr)
+				return a.playTrackAt(i, tr)
+			}
+		}
+		return a.playTrackAt(-1, prev)
 	}
+	prev := a.currentIdx - 1
 	if prev < 0 {
 		return nil
 	}
