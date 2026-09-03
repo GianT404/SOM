@@ -158,7 +158,7 @@ func (db *DB) ListAllLocalFilesSorted(sort string) ([]LocalFile, error) {
 		orderBy = "name COLLATE NOCASE"
 	}
 	rows, err := db.conn.Query(
-		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime, created_at FROM local_files ORDER BY "+orderBy,
+		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime, created_at FROM local_files ORDER BY " + orderBy,
 	)
 	if err != nil {
 		return nil, err
@@ -295,7 +295,16 @@ func isSupportedAudio(name string) bool {
 	lower := strings.ToLower(name)
 	return strings.HasSuffix(lower, ".opus") ||
 		strings.HasSuffix(lower, ".mp3") ||
-		strings.HasSuffix(lower, ".mp4")
+		strings.HasSuffix(lower, ".mp4") ||
+		strings.HasSuffix(lower, ".m4a") ||
+		strings.HasSuffix(lower, ".flac") ||
+		strings.HasSuffix(lower, ".wav") ||
+		strings.HasSuffix(lower, ".ogg") ||
+		strings.HasSuffix(lower, ".webm") ||
+		strings.HasSuffix(lower, ".aac") ||
+		strings.HasSuffix(lower, ".wma") ||
+		strings.HasSuffix(lower, ".aiff") ||
+		strings.HasSuffix(lower, ".alac")
 }
 
 func localFileSidecar(path string) string {
