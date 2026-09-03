@@ -79,7 +79,6 @@ SOM/
 │   │   ├── db.go        # Schema, migrations, DB connection
 │   │   ├── playlists.go # Playlist CRUD
 │   │   ├── downloads.go # Local file management, FTS search, filesystem import
-│   │   └── history.go   # Listen history
 │   ├── tui/
 │   │   ├── api/               # HTTP client for remote mode (--server)
 │   │   ├── audio/             # System audio capture + FFT for the visualizer
@@ -233,7 +232,7 @@ go build -o som .
 - Playlist management — create, add tracks, play, and delete playlists
 - Command popup (`:`) — rename a track's title, delete a track, move a track to another playlist, show file info (size/duration/bitrate), and remove from the current playlist
 - LRCLib synced lyrics with multi-language selection and auto-fallback to YouTube subtitles
-- Local `.opus`/`.mp3`/`.mp4` file scanning with `ffprobe` duration detection, persisted in SQLite with FTS5 full-text search
+- Local `.opus`/`.mp3`/`.mp4`/`.flac`/`.m4a`/`.wav`/`.ogg`/`.webm`/`.aac`/`.wma`/`.aiff`/`.alac` file scanning with `ffprobe` duration detection, persisted in SQLite with FTS5 full-text search
 - Live audio visualizer (`\`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
 - Resilient YouTube streaming via client fallback chain (see *YouTube Stability & Cookies*)
