@@ -16,6 +16,7 @@ import (
 	"som/internal/tui/avrcp"
 	"som/internal/tui/player"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -99,6 +100,7 @@ type App struct {
 	activeSort    string // "name", "date", "duration"
 	nextPlay      *domain.Track
 	playHistory   []domain.Track
+	importPanel   ImportPanel
 }
 
 const maxPendingKeys = 64
@@ -115,6 +117,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		renameInput:   ri,
 		booting:       true,
 		activeSpeed:   3,
+		importPanel:   NewImportPanel(),
 	}
 }
 
@@ -197,6 +200,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if playErr != nil {
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
+			} else if a.sidebarActive == SideImport {
 			} else if a.player.PlayFromBuffer() {
 				if a.nextPlay != nil {
 					a.nowPlay = a.nextPlay
@@ -244,7 +248,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Gapless: pre-decode next track when current has < 3s remaining.
-		if a.songStarted && a.player.State() == player.Playing && a.nowPlay != nil {
+		if a.songStarted && a.player.State() == player.Playing && a.nowPlay != nil && a.sidebarActive != SideImport {
 			pos := a.player.Position()
 			dur := time.Duration(a.nowPlay.Duration) * time.Second
 			remaining := dur - pos
@@ -313,7 +317,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.palette.Visible() {
 				a.palette.Close()
 			}
-		case "1", "2", "3", "4", "5", "6":
+		case "1", "2", "3", "4", "5", "6", "7":
 			if a.left.input.Focused() {
 				break
 			}
@@ -582,6 +586,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusOKStyle.Render("Saved " + msg.Path))
 		}
 
+	case ImportDoneMsg:
+		a.handleImportDone(msg)
+
+	case spinner.TickMsg:
+		if a.importPanel.importing {
+			var cmd tea.Cmd
+			a.importPanel.spinner, cmd = a.importPanel.spinner.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+
 	case avrcp.AVRCPCmdMsg:
 		switch msg.Cmd {
 		case "next":
@@ -637,10 +651,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	}
 
-	focusedContent := a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists
+	focusedContent := a.sidebarActive != SideImport && (a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists)
 	var leftCmd tea.Cmd
 	a.left, leftCmd = a.left.Update(msg, focusedContent, a.nowPlay)
 	cmds = append(cmds, leftCmd)
+
+	if a.sidebarActive == SideImport {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			cmds = append(cmds, a.handleImportKeys(km)...)
+		}
+	}
 
 	var rightCmd tea.Cmd
 	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
@@ -696,6 +716,9 @@ func (a *App) View() tea.View {
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
 		mainView = a.left.ViewDownloadsContent(mainW, contentH)
+	case SideImport:
+		a.importPanel.SetSize(mainW, contentH)
+		mainView = a.importPanel.ViewImportContent(mainW, contentH)
 	case SideQueue:
 		mainView = a.left.ViewQueueContent(mainW, contentH, a.trackQueue)
 	case SidePlaylists:
@@ -766,13 +789,24 @@ func (a *App) View() tea.View {
 	return v
 }
 
-// renderSomRow ghép logo SOM với hint lyrics
+// renderSomRow ghép logo SOM với hint lyrics hoặc import
 func (a *App) renderSomRow(somLogo string) string {
-	if a.sidebarActive != SideLyrics || a.nowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+	var hint string
+	switch a.sidebarActive {
+	case SideLyrics:
+		if a.nowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+			return somLogo
+		}
+		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
+	case SideImport:
+		if a.importPanel.importing {
+			return somLogo
+		}
+		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
+	default:
 		return somLogo
 	}
 
-	hint := DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
 	lines := strings.Split(somLogo, "\n")
 	if len(lines) == 0 {
 		return somLogo
@@ -1301,6 +1335,12 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 
 	if item == SideDownloads && oldTab != SideDownloads {
 		cmds = append(cmds, animTick())
+	}
+
+	if item == SideImport && oldTab != SideImport {
+		a.importPanel.ScanImportDirs(a.downloadDir, a.left.plStore)
+		a.importPanel.cursor = 0
+		a.importPanel.offset = 0
 	}
 
 	if item != oldTab {

@@ -291,7 +291,7 @@ func (db *DB) searchLocalFilesLike(query string) ([]LocalFile, error) {
 
 // ── Filesystem import (one-time migration) ───────────────────────
 
-func isSupportedAudio(name string) bool {
+func IsSupportedAudio(name string) bool {
 	lower := strings.ToLower(name)
 	return strings.HasSuffix(lower, ".opus") ||
 		strings.HasSuffix(lower, ".mp3") ||
@@ -312,7 +312,8 @@ func localFileSidecar(path string) string {
 	return strings.TrimSuffix(path, ext) + ".json"
 }
 
-func getFileDuration(path string) int {
+// GetFileDuration trả về duration (giây) của file audio bằng ffprobe.
+func GetFileDuration(path string) int {
 	cmd := exec.Command("ffprobe", "-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",
@@ -354,7 +355,7 @@ func (db *DB) ImportFromFilesystem(dir string) (int, error) {
 
 	imported := 0
 	for _, e := range entries {
-		if e.IsDir() || !isSupportedAudio(e.Name()) {
+		if e.IsDir() || !IsSupportedAudio(e.Name()) {
 			continue
 		}
 		localPath := filepath.Join(dir, e.Name())
@@ -402,7 +403,7 @@ func (db *DB) ImportFromFilesystem(dir string) (int, error) {
 		fileSize := info.Size()
 		fileMTime := info.ModTime().Format(time.RFC3339)
 
-		duration := getFileDuration(localPath)
+		duration := GetFileDuration(localPath)
 
 		f := LocalFile{
 			Path:      localPath,
