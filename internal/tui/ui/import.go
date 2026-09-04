@@ -11,7 +11,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/mattn/go-runewidth"
 )
 
 type ImportFile struct {
@@ -107,34 +106,21 @@ func (ip ImportPanel) ViewImportContent(w, h int) string {
 	if end > count {
 		end = count
 	}
-	idxW := 3
-	extW := 6
-	nameW := innerW - idxW - extW - 8
-	if nameW < 15 {
-		nameW = 15
-	}
-	header := fmt.Sprintf("  %*s  %-*s  %*s", idxW, "#", nameW, "Name", extW-1, "Format")
 
 	var b strings.Builder
-	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	for i := ip.offset; i < end; i++ {
 		f := ip.files[i]
-		mark := "  "
-		if i == ip.cursor {
-			mark = " "
-		}
+		tick := " "
 		if f.Selected {
-			mark = "+"
+			tick = "+"
 		}
-		idx := fmt.Sprintf("%*d", idxW, i+1)
-		name := runewidth.FillRight(truncate(f.Name, nameW), nameW)
-		ext := strings.TrimPrefix(filepath.Ext(f.Path), ".")
-		extCol := fmt.Sprintf("%*s", extW, ext)
-		line := mark + idx + "  " + name + "  " + extCol
-		b.WriteString("\n")
 		if i == ip.cursor {
+			line := fmt.Sprintf("   [%s] %s", tick, f.Name)
+			b.WriteString("\n")
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
 		} else {
+			line := fmt.Sprintf("   [%s] %s", tick, f.Name)
+			b.WriteString("\n")
 			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
 		}
 	}
