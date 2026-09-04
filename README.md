@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 |  **Audio Settings** | Configurable buffer size and sample rate |
 |  **CLI & Completion** | Powered by Cobra with built-in auto-completion scripts for Zsh, Bash, and Fish (`som completion [shell]`) |
 |  **Self Install/Update** | `som --install`, `som --upgrade`, `--check-update`, and `--uninstall` for one-command setup and updates |
-|  **Resilient YouTube Access** | Automatic yt-dlp client fallback against YouTube/CDN 403s, optional cookies & extra args via env vars
+|  **Resilient YouTube Access** | Automatic yt-dlp client fallback against YouTube/CDN 403s, optional cookies & extra args via env vars |
 
 ---
 
@@ -76,28 +76,32 @@ SOM/
 │   │   ├── lrclib.go    # LRCLib lyrics API
 │   │   └── ...          # VTT parser, fallback scrapers
 │   ├── storage/         # SQLite persistence (WAL, FTS5, pure Go)
-│   │   ├── db.go        # Schema, migrations, DB connection
+│   │   ├── db.go        # Schema, migrations, DB connection, legacy migration
 │   │   ├── playlists.go # Playlist CRUD
 │   │   ├── downloads.go # Local file management, FTS search, filesystem import
 │   ├── tui/
 │   │   ├── api/               # HTTP client for remote mode (--server)
 │   │   ├── audio/             # System audio capture + FFT for the visualizer
 │   │   ├── player/            # ffmpeg-based decode + oto playback (opus_player.go)
+│   │   │   └── opus_player.go # Gapless playback: PreDecodeNext, gaplessReader
+│   │   ├── avrcp/             # AVRCP/MPRIS2 Bluetooth media controls
 │   │   ├── bindeps/           # Bundled binary dependency helpers
 │   │   ├── logbuf/            # Thread-safe in-memory ring-buffer logger (crash dump support)
 │   │   ├── cmd/tui/           # Standalone TUI entry point
-│   │   └── ui/                # TUI components (Bubble Tea)
-│   │       ├── app.go           # Main app loop, sidebar, progress bar, key handling
+│   │   └── ui/                # TUI components (Bubble Tea v2)
+│   │       ├── app.go           # Main app loop, sidebar, progress bar, gapless, AVRCP
 │   │       ├── bocchi_frame.go  # (My wifu XD)
 │   │       ├── browse.go        # Left panel (search/downloads/local)
 │   │       ├── nowplaying.go    # Right panel (lyrics, track info)
 │   │       ├── search.go        # Search input view
-│   │       ├── downloads.go     # Local file scanning
+│   │       ├── downloads.go     # Local file scanning & file info popup
+│   │       ├── import.go        # Import tab: scan dirs, select, async import with spinner
 │   │       ├── playlists.go     # Playlist create/add/play/delete UI
+│   │       ├── queue.go         # Play queue with history stack
 │   │       ├── palette.go       # Live 2D audio visualizer (opened with \)
 │   │       ├── visualizer_3d.go # 3D wireframe visualizer mode
 │   │       ├── help.go          # Keyboard shortcuts popup (?)
-│   │       ├── sidebar.go       # Sidebar definition
+│   │       ├── sidebar.go       # Sidebar definition (7 tabs)
 │   │       ├── logs.go          # Ring-buffer logger
 │   │       ├── styles.go        # Styles & nerd-font icons
 │   │       ├── commands.go      # Bubble Tea commands
@@ -201,7 +205,7 @@ go build -o som .
 ./som
 ```
 
-**Sidebar tabs (`1`-`6` or `Tab`):** Search, Downloads, Playlists, Lyrics, Logs.
+**Sidebar tabs (`1`-`7` or `Tab`):** Search, Downloads, Import, Queue, Playlists, Lyrics, Logs.
 
 **Controls:**
 
@@ -209,9 +213,9 @@ go build -o som .
 |-----|--------|
 | `?` | Toggle help popup (full shortcut list) |
 | `Tab` | Cycle through sidebar tabs |
-| `1`-`6` | Jump directly to a tab |
+| `1`-`7` | Jump directly to a tab |
 | `/` | Focus search input (Playlists tab: create a new playlist) |
-| `:` | Command popup — Rename title, Delete track, Move to playlist, Show file info |
+| `:` | Command popup — Rename title, Delete track, Move to playlist, Show file info, Sort |
 | `\` | Open live audio visualizer |
 | `Enter` | Play selected track |
 | `Space` | Play / pause |
@@ -222,7 +226,7 @@ go build -o som .
 | `Delete` | Remove selected playlist / track |
 | `d` | Download selected track |
 | `l` | Choose lyrics language |
-| `pgup` / `pgdown` | scroll lyric page|
+| `pgup` / `pgdown` | Scroll lyrics page |
 | `alt + q` | Quit from anywhere (also during startup) |
 
 **Features:**
@@ -230,15 +234,18 @@ go build -o som .
 - YouTube search and stream via embedded backend (Go server runs in-process, no separate process needed)
 - Download tracks for offline playback in `.opus`/`.mp3`/`.mp4` format
 - Playlist management — create, add tracks, play, and delete playlists
-- Command popup (`:`) — rename a track's title, delete a track, move a track to another playlist, show file info (size/duration/bitrate), and remove from the current playlist
+- Command popup (`:`) — rename a track's title, delete a track, move a track to another playlist, show file info (size/duration/bitrate/created/modified), sort by name/date/duration, and remove from the current playlist
 - LRCLib synced lyrics with multi-language selection and auto-fallback to YouTube subtitles
 - Local `.opus`/`.mp3`/`.mp4`/`.flac`/`.m4a`/`.wav`/`.ogg`/`.webm`/`.aac`/`.wma`/`.aiff`/`.alac` file scanning with `ffprobe` duration detection, persisted in SQLite with FTS5 full-text search
+- Import tab — scan multiple directories for audio files not yet in DB, select files, and import with progress spinner
+- Gapless playback — pre-decodes next track when current has <3s remaining for seamless transitions
 - Live audio visualizer (`\`) with 2D bar mode and a 3D wireframe mode (toggle with `l` while open), driven by real-time system audio capture
 - Progress bar with control buttons (prev / play-pause / next / shuffle)
+- AVRCP/MPRIS2 Bluetooth media controls for Linux desktop environments
 - Resilient YouTube streaming via client fallback chain (see *YouTube Stability & Cookies*)
 - Built-in self-installer and self-updater (see below)
 
-**Logging (`6` / Logs tab):**
+**Logging (`7` / Logs tab):**
 
 - Captures **all** `log` output in-process (TUI + backend) into a thread-safe in-memory ring buffer (last 2000 lines) — search, stream, download, and lyrics actions are logged on the happy path in local mode.
 - Logs live **only in RAM** — quitting normally (`q`/`Ctrl+C`) never touches the disk; the old `~/som_debug.log` file was removed.
@@ -262,7 +269,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 |------|-------------|
 | `--server <URL>` | Run in remote mode, pointing to a SOM backend instead of the in-process one. Requires `--api-key` (or `SOM_API_KEY`) since the backend rejects unauthenticated requests |
 | `--api-key <KEY>` | API key sent as `X-API-Key` when using `--server`. Falls back to the `SOM_API_KEY` env var |
-| `--download-dir <DIR>` | Directory to store downloaded tracks (default: `~/.local/share/som`) |
+| `--download-dir <DIR>` | Directory to store downloaded tracks (default: `~/.local/share/som`).
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
 | `--upgrade` | Download and install the latest SOM release from GitHub |
 | `--check-update` | Check whether a newer SOM release exists without installing |
@@ -275,6 +282,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 > Requires `yt-dlp` and `ffmpeg` in `PATH` (audio is decoded via `ffmpeg` and played back with `oto`. `ffprobe` is also used for local file duration detection.
 
 ---
+
 ## Installation
 
 You can automatically install SOM and its dependencies (yt-dlp, ffmpeg) using the following commands:
@@ -342,6 +350,7 @@ If a 403 still slips through, SOM prints a hint to run `som --update-ytdlp`, whi
 - **Bubble Tea** — TUI framework powering the terminal app
 - **oto** — Cross-platform Go audio playback (decodes via `ffmpeg`)
 - **SQLite** — Local persistence via `modernc.org/sqlite` (pure Go, no CGO) with WAL mode and FTS5 full-text search
+- **godbus/dbus** — MPRIS2/AVRCP Bluetooth media controls
 
 ### Frontend
 - **React Native** — Cross-platform mobile framework

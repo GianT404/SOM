@@ -803,6 +803,11 @@ func (a *App) renderSomRow(somLogo string) string {
 			return somLogo
 		}
 		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
+	case SidePlaylists:
+		if a.left.showPlInput {
+			return somLogo
+		}
+		hint = DimItemStyle.Render("enter: open  /: new playlist   delete: Deletes things. As intended. :)")
 	default:
 		return somLogo
 	}
