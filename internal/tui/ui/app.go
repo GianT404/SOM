@@ -318,13 +318,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.palette.Close()
 			}
 		case "1", "2", "3", "4", "5", "6", "7":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			targetTab := SidebarItem(msg.String()[0] - '1')
 			return a, a.switchSidebar(targetTab)
 		case "\\":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			if a.palette.Visible() {
@@ -334,7 +334,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case ":":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			if a.showCmdPopup {
@@ -351,13 +351,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			if a.left.input.Focused() {
 				a.left.input.Blur()
+			} else if a.left.plInput.Focused() {
+				a.left.plInput.Blur()
+				a.left.showPlInput = false
 			} else {
 				next := (a.sidebarActive + 1) % sideCount
 				cmds = append(cmds, a.switchSidebar(next))
 			}
 
 		case "space":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			a.player.TogglePause()
@@ -370,33 +373,33 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "right":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			a.player.SeekBy(5)
 			a.right.TickAt()
 
 		case "left":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			a.player.SeekBy(-5)
 			a.right.TickAt()
 
 		case "]", "}":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			cmds = append(cmds, a.playNext())
 
 		case "[", "{":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			cmds = append(cmds, a.playPrev())
 
 		case "r", "R":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			a.random = !a.random
@@ -417,7 +420,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "+", "=":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			v := a.player.Volume() + 0.05
@@ -425,7 +428,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
 
 		case "-", "_":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			v := a.player.Volume() - 0.05
@@ -436,7 +439,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
 			}
 		case "?":
-			if a.left.input.Focused() {
+			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
 			a.showHelpPopup = true

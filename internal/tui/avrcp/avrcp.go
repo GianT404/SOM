@@ -47,7 +47,7 @@ func New() *Server {
 				"CanRaise":            dbus.MakeVariant(false),
 				"HasTrackList":        dbus.MakeVariant(false),
 				"Identity":            dbus.MakeVariant("SOM"),
-				"DesktopEntry":        dbus.MakeVariant(""),
+				"DesktopEntry":        dbus.MakeVariant("som"),
 				"SupportedUriSchemes": dbus.MakeVariant([]string{}),
 				"SupportedMimeTypes":  dbus.MakeVariant([]string{}),
 			},
