@@ -233,11 +233,12 @@ func (a *App) handleImportKeys(msg tea.KeyMsg) []tea.Cmd {
 				a.songStarted = false
 				a.right.SetTrack(nil)
 			} else {
+				a.cancelResolve()
+				a.left.loadingStream = false
 				if err := a.player.Play(f.Path); err != nil {
 					a.setStatus(StatusErrStyle.Render("X " + err.Error()))
 				} else {
 					ip.previewPath = f.Path
-					// Probe duration nếu chưa có.
 					if f.Duration == 0 {
 						f.Duration = storage.GetFileDuration(f.Path)
 						ip.files[ip.cursor] = f

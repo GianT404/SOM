@@ -93,8 +93,6 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 	}
 	b.WriteString("\n")
 	written++
-	b.WriteString(DimItemStyle.Render("  up/down: choose   enter: select   l/esc: cancel"))
-	written++
 
 	for written < lyrH {
 		b.WriteString("\n")

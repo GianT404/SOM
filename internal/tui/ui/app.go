@@ -533,6 +533,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Ignore stale goroutine: a newer playTrackAt has been called since.
 		if msg.Gen != a.playerGen {
+			// Vẫn phải tắt spinner: request resolve cũ (đã bị thay thế) không
+			// còn ai gửi tin nhắn hợp lệ để tắt nó.
+			a.left.loadingStream = false
 			break
 		}
 		a.left.loadingStream = false
@@ -965,6 +968,13 @@ func (a *App) renderProgressBar(w int) string {
 	return topBorder + "\n" + combinedLine + "\n" + bottomBorder
 }
 
+func (a *App) cancelResolve() {
+	if a.resolveCancel != nil {
+		a.resolveCancel()
+		a.resolveCancel = nil
+	}
+}
+
 func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	if a.nowPlay != nil && a.random {
 		a.playHistory = append(a.playHistory, *a.nowPlay)
@@ -1008,6 +1018,9 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	}
 
 	if strings.HasPrefix(t.ID, "local:") {
+		// Huỷ resolve stream (nếu có) đang chạy dở để nó không phát đè lên bài local vừa chọn
+		a.cancelResolve()
+		a.left.loadingStream = false
 		path := strings.TrimPrefix(t.ID, "local:")
 		if err := a.player.Play(path); err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
@@ -1034,16 +1047,17 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 		return nil
 	}
-	if a.resolveCancel != nil {
-		a.resolveCancel()
-	}
+	a.cancelResolve()
 	ctx, cancel := context.WithCancel(context.Background())
 	a.resolveCancel = cancel
 	gen := a.player.Generation()
 	a.playerGen = gen
 	return func() tea.Msg {
 		streamInfo, err := a.provider.ResolveStream(ctx, t.ID)
-		if ctx.Err() != nil {
+		// Nếu resolve này không còn là request mới nhất (một bài khác đã được
+		// phát — local/remote — trong lúc chờ yt-dlp) thì bỏ qua, tuyệt đối
+		// không PlayWithHeaders đè lên bài đang phát.
+		if ctx.Err() != nil || gen != a.player.Generation() {
 			return nil
 		}
 
