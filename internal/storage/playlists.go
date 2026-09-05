@@ -8,8 +8,8 @@ import (
 )
 
 type Playlist struct {
-	ID     string        `json:"id"`
-	Name   string        `json:"name"`
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
 	Tracks []PlaylistTrack `json:"tracks"`
 }
 
@@ -104,36 +104,29 @@ func (db *DB) GetPlaylistTracks(playlistID string) ([]PlaylistTrack, error) {
 }
 
 func (db *DB) AddTrackToPlaylist(playlistID string, track PlaylistTrack) error {
-	// Check duplicate.
-	var count int
-	err := db.conn.QueryRow(
-		"SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
-		playlistID, track.ID,
-	).Scan(&count)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return fmt.Errorf("bài hát đã có trong playlist")
-	}
-
-	// Get next position.
-	var maxPos sql.NullInt64
-	_ = db.conn.QueryRow("SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?", playlistID).Scan(&maxPos)
-	pos := 0
-	if maxPos.Valid {
-		pos = int(maxPos.Int64) + 1
-	}
-
 	isLocal := 0
 	if track.IsLocal {
 		isLocal = 1
 	}
-	_, err = db.conn.Exec(
-		"INSERT INTO playlist_tracks (playlist_id, track_id, title, artist, duration, is_local, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		playlistID, track.ID, track.Title, track.Artist, track.Duration, isLocal, pos,
+
+	res, err := db.conn.Exec(`
+		INSERT INTO playlist_tracks (playlist_id, track_id, title, artist, duration, is_local, position)
+		VALUES (?, ?, ?, ?, ?, ?,
+			COALESCE((SELECT MAX(position) + 1 FROM playlist_tracks WHERE playlist_id = ?), 0))
+		ON CONFLICT(playlist_id, track_id) DO NOTHING`,
+		playlistID, track.ID, track.Title, track.Artist, track.Duration, isLocal, playlistID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("bài hát đã có trong playlist")
+	}
+	return nil
 }
 
 func (db *DB) RemoveTrackFromPlaylist(playlistID, trackID string) error {

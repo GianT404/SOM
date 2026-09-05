@@ -194,11 +194,14 @@ func (db *DB) IsDownloaded(videoID, title string, duration int) bool {
 		return false
 	}
 	normalized := normalizeTitle(title)
+	query := "SELECT COUNT(*) FROM local_files WHERE REPLACE(REPLACE(REPLACE(LOWER(name),' ',''),'.',''),'-','') = ?"
+	args := []any{normalized}
+	if duration > 0 {
+		query += " AND ABS(duration - ?) <= 2"
+		args = append(args, duration)
+	}
 	var n int
-	_ = db.conn.QueryRow(
-		"SELECT COUNT(*) FROM local_files WHERE REPLACE(REPLACE(REPLACE(LOWER(name),' ',''),'.',''),'-','') = ? AND ABS(duration - ?) <= 2",
-		normalized, duration,
-	).Scan(&n)
+	_ = db.conn.QueryRow(query, args...).Scan(&n)
 	return n > 0
 }
 
@@ -207,6 +210,15 @@ func normalizeTitle(s string) string {
 	s = strings.ReplaceAll(s, " ", "")
 	s = strings.ReplaceAll(s, ".", "")
 	s = strings.ReplaceAll(s, "-", "")
+	return s
+}
+
+// likeEscape escape các ký tự wildcard LIKE (% và _) cùng ký tự escape trong
+// input của user trước khi nhét vào pattern LIKE ... ESCAPE '\'.
+func likeEscape(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
 	return s
 }
 
@@ -259,8 +271,8 @@ func (db *DB) searchLocalFilesLike(query string) ([]LocalFile, error) {
 	var conditions []string
 	var args []any
 	for _, tok := range tokens {
-		conditions = append(conditions, "(LOWER(name) LIKE ? OR LOWER(artist) LIKE ?)")
-		like := "%" + tok + "%"
+		conditions = append(conditions, "(LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(artist) LIKE ? ESCAPE '\\')")
+		like := "%" + likeEscape(tok) + "%"
 		args = append(args, like, like)
 	}
 
