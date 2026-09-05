@@ -81,6 +81,11 @@ func alreadyInstalled() bool {
 }
 
 func installUnix() error {
+	if alreadyInstalled() {
+		fmt.Println("som is already installed at /usr/local/bin/som.")
+		return nil
+	}
+
 	const destDir = "/usr/local/bin"
 	dest := filepath.Join(destDir, "som")
 
@@ -96,6 +101,11 @@ func installUnix() error {
 }
 
 func installWindows() error {
+	if alreadyInstalled() {
+		fmt.Println("som is already installed.")
+		return nil
+	}
+
 	localAppData := os.Getenv("LocalAppData")
 	if localAppData == "" {
 		return fmt.Errorf("no LocalAppData environment variable found")
@@ -125,6 +135,14 @@ func copyExecutableTo(dest string) error {
 	src, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to determine the location of the running binary: %w", err)
+	}
+
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if destInfo, err := os.Stat(dest); err == nil && os.SameFile(srcInfo, destInfo) {
+		return nil
 	}
 
 	in, err := os.Open(src)
