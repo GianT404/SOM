@@ -66,11 +66,13 @@ func GetDirectSubtitles(ctx context.Context, videoID string, preferredLang strin
 		req.Header.Set("Accept-Language", "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7")
 
 		resp, err := httpClient.Do(req)
-		if err != nil || resp.StatusCode != 200 {
-			if resp != nil {
-				resp.Body.Close()
-			}
-			log.Printf("direct_subs: %s fetch failed (code=%v)", langCode, resp.StatusCode)
+		if err != nil {
+			log.Printf("direct_subs: %s fetch error: %v", langCode, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			log.Printf("direct_subs: %s fetch failed (code=%d)", langCode, resp.StatusCode)
 			continue
 		}
 
