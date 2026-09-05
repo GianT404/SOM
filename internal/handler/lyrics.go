@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"som/internal/cache"
@@ -17,7 +18,14 @@ type LyricsHandler struct {
 	// cache lưu kết quả lyrics đã merge (LRCLib + YouTube) theo key video.
 	// Lời gắn với video hiếm khi đổi nên cache 7 ngày, tránh spawn yt-dlp
 	// mỗi lần chơi lại bài cũ.
-	cache *cache.TTLCache[[]scraper.LyricsData]
+	cache     *cache.TTLCache[[]scraper.LyricsData]
+	cacheOnce sync.Once
+}
+
+func (h *LyricsHandler) initCache() {
+	h.cacheOnce.Do(func() {
+		h.cache = cache.NewTTL[[]scraper.LyricsData](500, 7*24*time.Hour)
+	})
 }
 
 func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,10 +59,8 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Cache key kèm hint từ client để tránh phục vụ nhầm lyrics khi metadata
 	// truyền lên khác nhau.
+	h.initCache()
 	cacheKey := id + "|" + title + "|" + artist + "|" + durationStr + "|" + source
-	if h.cache == nil {
-		h.cache = cache.NewTTL[[]scraper.LyricsData](500, 7*24*time.Hour)
-	}
 	if v, ok := h.cache.Get(cacheKey); ok {
 		log.Printf("lyrics: cache hit for %s", id)
 		writeJSON(w, http.StatusOK, v)

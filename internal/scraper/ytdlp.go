@@ -49,31 +49,29 @@ func (y *YtdlpScraper) isFastpathMiss(videoID string) bool {
 const defaultUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 var (
-	configLoaded    bool
 	clientsList     []string
 	cookiesPath     string
 	extraYtArgs     []string
 	clientChainMu   sync.Mutex
 	preferredClient string
+	ytConfigOnce    sync.Once
 )
 
 func loadYtConfig() {
-	if configLoaded {
-		return
-	}
-	configLoaded = true
-	extraYtArgs = strings.Fields(os.Getenv("SOM_YTDLP_ARGS"))
-	cookiesPath = strings.TrimSpace(os.Getenv("SOM_YTDLP_COOKIES"))
-	if v := strings.TrimSpace(os.Getenv("SOM_YTDLP_CLIENTS")); v != "" {
-		for _, c := range strings.Split(v, ",") {
-			if c = strings.TrimSpace(c); c != "" {
-				clientsList = append(clientsList, c)
+	ytConfigOnce.Do(func() {
+		extraYtArgs = strings.Fields(os.Getenv("SOM_YTDLP_ARGS"))
+		cookiesPath = strings.TrimSpace(os.Getenv("SOM_YTDLP_COOKIES"))
+		if v := strings.TrimSpace(os.Getenv("SOM_YTDLP_CLIENTS")); v != "" {
+			for _, c := range strings.Split(v, ",") {
+				if c = strings.TrimSpace(c); c != "" {
+					clientsList = append(clientsList, c)
+				}
 			}
 		}
-	}
-	if len(clientsList) == 0 {
-		clientsList = []string{"web_embedded", "web", "tv_embedded", "android", "mweb", "ios"}
-	}
+		if len(clientsList) == 0 {
+			clientsList = []string{"web_embedded", "web", "tv_embedded", "android", "mweb", "ios"}
+		}
+	})
 }
 
 func nextClient(attempt int) string {
