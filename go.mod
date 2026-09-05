@@ -3,6 +3,7 @@ module som
 go 1.26
 
 require (
+	aead.dev/minisign v0.2.0
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/lipgloss/v2 v2.0.6
@@ -14,10 +15,10 @@ require (
 	github.com/mattn/go-runewidth v0.0.27
 	github.com/minio/selfupdate v0.6.0
 	github.com/spf13/cobra v1.10.2
+	modernc.org/sqlite v1.57.0
 )
 
 require (
-	aead.dev/minisign v0.2.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/bitly/go-simplejson v0.5.1 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
@@ -51,5 +52,4 @@ require (
 	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.57.0 // indirect
 )

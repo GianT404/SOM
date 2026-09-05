@@ -271,7 +271,7 @@ GOOS=windows GOARCH=amd64 go build -o som-windows-amd64.exe ./cmd/som
 | `--api-key <KEY>` | API key sent as `X-API-Key` when using `--server`. Falls back to the `SOM_API_KEY` env var |
 | `--download-dir <DIR>` | Directory to store downloaded tracks (default: `~/.local/share/som`).
 | `--install` | Copy this binary to `/usr/local/bin` (or the Windows equivalent) so `som` runs from anywhere |
-| `--upgrade` | Download and install the latest SOM release from GitHub |
+| `--upgrade` | Download and install the latest SOM release from GitHub and verifies the downloaded binary against a [minisign] (https://minisign.org) (Ed25519) signature before applying it; the public key is embedded in the binary and each release ships `<binary>.minisig` files. If a release lacks a valid signature the update is refused — set `SOM_ALLOW_UNVERIFIED=1` to bypass at your own risk.|
 | `--check-update` | Check whether a newer SOM release exists without installing |
 | `--uninstall` | Remove the installed `som` binary |
 | `--update-ytdlp` | Update the bundled yt-dlp binary to the latest version |

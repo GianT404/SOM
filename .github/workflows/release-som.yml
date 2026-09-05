@@ -33,12 +33,20 @@ jobs:
             -ldflags "-X main.Version=${{ github.ref_name }}" \
             -o som-windows-amd64.exe ./cmd/som
 
+      - name: Sign release binaries (minisign)
+        env:
+          SOM_MINISIGN_KEY: ${{ secrets.SOM_MINISIGN_KEY }}
+        run: |
+          go run ./cmd/som-sign sign som-linux-amd64 som-windows-amd64.exe
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             som-linux-amd64
+            som-linux-amd64.minisig
             som-windows-amd64.exe
+            som-windows-amd64.exe.minisig
           generate_release_notes: true
 
       - name: Delete tag on failure

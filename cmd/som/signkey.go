@@ -1,0 +1,3 @@
+package main
+
+var somMinisignPublicKey = "94B14B11A60C8E01RWQBjgymEUuxlK0CoT35veUlfx1H4EJDkuLuZYZzhXhNa7q4YlGPS2MY"

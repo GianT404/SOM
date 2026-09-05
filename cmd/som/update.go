@@ -92,6 +92,16 @@ func runSelfUpdate(current string) error {
 
 	fmt.Printf("Updating %s → %s...\n", current, target.TagName)
 
+	// Xác thực chữ ký minisign của bản phát hành trước khi tải/ghi đè.
+	// File ký được publish kèm asset dạng <asset>.minisig.
+	verifier, verr := newUpgradeVerifier(downloadURL + ".minisig")
+	if verr != nil {
+		if !allowUnverified() {
+			return fmt.Errorf("refusing to update: %v\nset SOM_ALLOW_UNVERIFIED=1 to skip verification (not recommended)", verr)
+		}
+		fmt.Println("warning: SOM_ALLOW_UNVERIFIED=1 — skipping signature verification")
+	}
+
 	downloadClient := &http.Client{Timeout: 5 * time.Minute}
 
 	dlResp, err := downloadClient.Get(downloadURL)
@@ -111,7 +121,11 @@ func runSelfUpdate(current string) error {
 		reader = pr.Wrap(dlResp.Body)
 	}
 
-	if err := selfupdate.Apply(reader, selfupdate.Options{}); err != nil {
+	opts := selfupdate.Options{}
+	if verifier != nil {
+		opts.Verifier = verifier
+	}
+	if err := selfupdate.Apply(reader, opts); err != nil {
 		if rerr := selfupdate.RollbackError(err); rerr != nil {
 			return fmt.Errorf("update failed AND rollback also failed (reinstall manually): %w", rerr)
 		}
@@ -125,10 +139,27 @@ func runSelfUpdate(current string) error {
 	return nil
 }
 
+// newUpgradeVerifier tải chữ ký minisign của bản phát hành và dựng bộ xác thực bằng public key nhúng trong binary.
+func newUpgradeVerifier(sigURL string) (*selfupdate.Verifier, error) {
+	if somMinisignPublicKey == "" {
+		return nil, fmt.Errorf("this binary was built without an embedded signing key")
+	}
+	v := selfupdate.NewVerifier()
+	if err := v.LoadFromURL(sigURL, somMinisignPublicKey, nil); err != nil {
+		return nil, fmt.Errorf("failed to fetch or parse signature %s: %w", sigURL, err)
+	}
+	return v, nil
+}
+
+func allowUnverified() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SOM_ALLOW_UNVERIFIED"))) {
+	case "1", "true", "yes", "y":
+		return true
+	}
+	return false
+}
+
 // findUpdate tìm release mới nhất thực sự chứa binary của platform hiện tại.
-// Ưu tiên gọi API (cho biết chính xác draft/prerelease/assets); nếu API lỗi
-// (thường là rate-limit 403 khi không có GITHUB_TOKEN) thì fallback sang atom
-// feed + thử URL tải trực tiếp — không bị giới hạn, không cần token.
 func findUpdate(assetName string) (*ghRelease, string, error) {
 	if rels, err := fetchReleases(); err == nil {
 		if t := latestReleaseWithAsset(rels, assetName); t != nil {
