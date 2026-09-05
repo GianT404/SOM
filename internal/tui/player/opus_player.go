@@ -561,7 +561,8 @@ func (p *Player) PlayFromBuffer() bool {
 
 func (p *Player) buildFFmpegArgs(filePath string, headers map[string]string, startSec float64, speed float64) []string {
 	var args []string
-	if strings.HasPrefix(filePath, "http://") {
+	// ffmpeg chỉ tự reconnect khi đọc từ mạng áp dụng http và https
+	if strings.HasPrefix(filePath, "http://") || strings.HasPrefix(filePath, "https://") {
 		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5")
 	}
 	if len(headers) > 0 {

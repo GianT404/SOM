@@ -26,6 +26,7 @@ type LeftPanel struct {
 	plOffset        int
 	qCursor         int
 	qOffset         int
+	queue           []domain.Track
 
 	loading         bool
 	searched        bool
@@ -600,6 +601,8 @@ func (p LeftPanel) itemCount() int {
 		return len(p.tracks)
 	} else if p.activeTab == SideDownloads {
 		return len(p.getFilteredLocals())
+	} else if p.activeTab == SideQueue {
+		return len(p.queue)
 	} else if p.activeTab == SidePlaylists {
 		if p.activePlaylist != nil {
 			return len(p.activePlaylist.Tracks)
