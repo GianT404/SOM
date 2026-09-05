@@ -128,7 +128,28 @@ func ytPreferredFlag() []string {
 }
 
 func ytRetryable(errMsg string) bool {
-	return strings.Contains(errMsg, "403") || strings.Contains(errMsg, "Requested format is not available")
+	lower := strings.ToLower(errMsg)
+	markers := []string{
+		"403",
+		"requested format is not available",
+		"sign in to confirm",
+		"sign in to view",
+		"not a bot",
+		"not available on this app",
+		"isn't available on this app",
+		"only available to",
+		"music premium",
+		"premium members",
+		"age-restricted",
+		"age restricted",
+		"in your country",
+	}
+	for _, m := range markers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
 }
 
 const ytOutdatedHint = "yt-dlp có thể đã cũ — chạy `som --update-ytdlp` để cập nhật"
@@ -218,6 +239,8 @@ func (k *keyedLock) Lock(key string) func() {
 }
 
 var downloadLocks = newKeyedLock()
+
+var lyricsLocks = newKeyedLock()
 
 // ytdlpSem giới hạn số process yt-dlp "nhẹ" (resolve/search/metadata/lyrics)
 // chạy đồng thời. Tách riêng khỏi download nặng để một phiên chơi nhạc đang
@@ -828,6 +851,9 @@ func cleanYtdlpNA(s string) string {
 }
 
 func (y *YtdlpScraper) Lyrics(ctx context.Context, videoID string) ([]LyricsData, error) {
+	unlock := lyricsLocks.Lock(videoID)
+	defer unlock()
+
 	origLang := detectVideoLanguage(ctx, y.BinPath, videoID)
 
 	directCtx, directCancel := context.WithTimeout(ctx, 4*time.Second)
