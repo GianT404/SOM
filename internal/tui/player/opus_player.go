@@ -442,8 +442,14 @@ func (p *Player) PreDecodeNext(filePath string, headers map[string]string) {
 		defer p.mu.Unlock()
 
 		if p.nextCmd != cmd || p.generation != p.nextGen {
-			pipe.Close()
-			cmd.Process.Kill()
+			_ = pipe.Close()
+			if p.nextCmd == cmd {
+				// tự kill và Wait để không để lại zombie.
+				if cmd.Process != nil {
+					_ = cmd.Process.Kill()
+					go func() { _ = cmd.Wait() }()
+				}
+			}
 			return
 		}
 
@@ -461,10 +467,14 @@ func (p *Player) CancelPreDecode() {
 func (p *Player) cancelPreDecodeLocked() {
 	if p.nextCmd != nil {
 		if p.nextPipe != nil {
-			p.nextPipe.Close()
+			_ = p.nextPipe.Close()
 		}
-		if p.nextCmd.Process != nil {
-			p.nextCmd.Process.Kill()
+		cmd := p.nextCmd
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+			// Wait nền để thu hồi process đã kill, tránh zombie; không giữ
+			// mutex trong lúc chờ ffmpeg tắt.
+			go func() { _ = cmd.Wait() }()
 		}
 		p.nextCmd = nil
 		p.nextPipe = nil
@@ -496,8 +506,11 @@ func (p *Player) PlayFromBuffer() bool {
 	p.stopLocked()
 
 	if p.otoCtx == nil {
-		pipe.Close()
-		cmd.Process.Kill()
+		_ = pipe.Close()
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+			go func() { _ = cmd.Wait() }()
+		}
 		return false
 	}
 
