@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/kkdai/youtube/v2"
+
+	"som/internal/cache"
 )
 
 type YtdlpScraper struct {
@@ -25,21 +27,21 @@ type YtdlpScraper struct {
 	BinPath string
 	// fastPath dùng lib youtube/v2 resolve URL (nhanh hơn) thay vì spawn
 	// yt-dlp. An toàn cho server vì URL đó không được dùng để phát trực tiếp.
-	fastPath         bool
-	fastpathMisses   map[string]struct{}
-	fastpathMissesMu sync.Mutex
+	fastPath       bool
+	fastpathMisses *cache.TTLCache[struct{}]
 }
 
+const (
+	fastpathMissTTL   = 6 * time.Hour
+	maxFastpathMisses = 5000
+)
+
 func (y *YtdlpScraper) markFastpathMiss(videoID string) {
-	y.fastpathMissesMu.Lock()
-	y.fastpathMisses[videoID] = struct{}{}
-	y.fastpathMissesMu.Unlock()
+	y.fastpathMisses.Put(videoID, struct{}{})
 }
 
 func (y *YtdlpScraper) isFastpathMiss(videoID string) bool {
-	y.fastpathMissesMu.Lock()
-	_, ok := y.fastpathMisses[videoID]
-	y.fastpathMissesMu.Unlock()
+	_, ok := y.fastpathMisses.Get(videoID)
 	return ok
 }
 
@@ -432,7 +434,10 @@ func NewYtdlpScraper(binPath string) *YtdlpScraper {
 		}
 	}
 
-	return &YtdlpScraper{BinPath: binPath, fastpathMisses: make(map[string]struct{})}
+	return &YtdlpScraper{
+		BinPath:        binPath,
+		fastpathMisses: cache.NewTTL[struct{}](maxFastpathMisses, fastpathMissTTL),
+	}
 }
 
 type ytdlpSearchItem struct {

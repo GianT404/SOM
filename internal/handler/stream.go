@@ -158,12 +158,23 @@ func serveAudioFile(w http.ResponseWriter, r *http.Request, path, filename strin
 	http.ServeContent(w, r, filename, fi.ModTime(), f)
 }
 
-// proxyClean transcode file opus cục bộ qua ffmpeg silenceremove rồi serve
-// bản đã cache. Cache tại /tmp/dopus-clean-<id>.ogg; lần sau serve thẳng.
-// Dùng context tách khỏi timeout 3 phút của router vì transcode dài, nhưng
-// vẫn bị hủy khi client ngắt kết nối.
+// cleanWorkTimeout chặn trên cho cả pipeline clean (download + transcode) để
+// yt-dlp/ffmpeg treo không chiếm slot download/keyed lock vô hạn.
+const cleanWorkTimeout = 15 * time.Minute
+
 func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, videoID, filename string) {
-	ctx := context.WithoutCancel(r.Context())
+	ctx, cancel := context.WithTimeout(context.Background(), cleanWorkTimeout)
+	defer cancel()
+	go func() {
+		select {
+		case <-r.Context().Done():
+			if r.Context().Err() == context.Canceled {
+				cancel()
+			}
+		case <-ctx.Done():
+		}
+	}()
+
 	cleanPath := filepath.Join(os.TempDir(), fmt.Sprintf("dopus-clean-%s.ogg", videoID))
 
 	if h.serveCachedClean(w, r, filename, cleanPath) {
