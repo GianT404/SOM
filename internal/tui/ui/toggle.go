@@ -7,13 +7,19 @@ import (
 )
 
 type Switch struct {
-	label string
-	desc  string
-	value bool
+	label   string
+	desc    string
+	value   bool
+	textOn  string
+	textOff string
 }
 
 func NewSwitch(label, desc string, value bool) Switch {
-	return Switch{label: label, desc: desc, value: value}
+	return Switch{label: label, desc: desc, value: value, textOn: "ON", textOff: "OFF"}
+}
+
+func NewSwitchChoice(label, desc string, value bool, textOff, textOn string) Switch {
+	return Switch{label: label, desc: desc, value: value, textOn: textOn, textOff: textOff}
 }
 
 func (s Switch) Label() string { return s.label }
@@ -35,9 +41,9 @@ func (s *Switch) ToggleRight() {
 
 func (s Switch) valueText() string {
 	if s.value {
-		return "ON"
+		return s.textOn
 	}
-	return "OFF"
+	return s.textOff
 }
 
 func segment(st lipgloss.Style, text string) string {

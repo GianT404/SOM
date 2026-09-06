@@ -906,7 +906,7 @@ func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
 			Render(DimItemStyle.Render(" Play a track to see lyrics..."))
 	}
 
-	borderColor := lipgloss.Color("#7c7986")
+	borderColor := themeCol("#7c7986")
 	lyricsBox := a.right.renderLyricsBox(focused, borderColor, frame)
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
@@ -984,7 +984,7 @@ func (a *App) renderProgressBar(w int) string {
 	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", rightFill)))
 
 	progress := bar.String()
-	borderColor := lipgloss.Color("#7c7986")
+	borderColor := themeCol("#7c7986")
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 
 	title := ""

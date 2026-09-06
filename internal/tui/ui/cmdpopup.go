@@ -12,7 +12,6 @@ import (
 	"som/internal/storage"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -616,7 +615,7 @@ func (a *App) renderCmdPopup() string {
 		}
 		b.WriteString("\n ")
 		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
-		return renderBox(56, "Remove from Playlist", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(56, "Remove from Playlist", b.String(), themeCol("#e8593c"))
 	}
 	if a.speedActive {
 		const boxW = 35
@@ -642,7 +641,7 @@ func (a *App) renderCmdPopup() string {
 		}
 		b.WriteString("\n")
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
-		return renderBox(boxW, "Playback speed", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(boxW, "Playback speed", b.String(), themeCol("#e8593c"))
 	}
 	if a.sortActive {
 		const boxW = 35
@@ -667,7 +666,7 @@ func (a *App) renderCmdPopup() string {
 		}
 		b.WriteString("\n")
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
-		return renderBox(boxW, "Sort by", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(boxW, "Sort by", b.String(), themeCol("#e8593c"))
 	}
 	if a.presetActive {
 		const boxW = 55
@@ -700,7 +699,7 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString("\n")
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 
-		return renderBox(boxW, "Audio settings", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(boxW, "Audio settings", b.String(), themeCol("#e8593c"))
 	}
 
 	if a.plMoveActive {
@@ -723,7 +722,7 @@ func (a *App) renderCmdPopup() string {
 		}
 		b.WriteString("\n ")
 		b.WriteString(DimItemStyle.Render(" (enter: select  | esc: back)"))
-		return renderBox(56, "Move to Playlist", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(56, "Move to Playlist", b.String(), themeCol("#e8593c"))
 	}
 
 	if a.infoActive {
@@ -762,7 +761,7 @@ func (a *App) renderCmdPopup() string {
 			b.WriteString("\n " + DimItemStyle.Render(" Path: ") + LocalFileStyle.Render(pathStr))
 			b.WriteString("\n\n")
 			b.WriteString(DimItemStyle.Render(" (esc: close)"))
-			return renderBox(64, "File Info", b.String(), lipgloss.Color("#E8593C"))
+			return renderBox(64, "File Info", b.String(), themeCol("#E8593C"))
 		}
 	}
 
@@ -786,7 +785,7 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Delete ]")))
 		b.WriteString("\n\n")
 		b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: back)"))
-		return renderBox(60, "Delete Track", b.String(), lipgloss.Color("#E24B4A"))
+		return renderBox(60, "Delete Track", b.String(), themeCol("#E24B4A"))
 	}
 
 	if a.renameActive {
@@ -801,7 +800,7 @@ func (a *App) renderCmdPopup() string {
 		if a.width > 0 && w > a.width-2 {
 			w = a.width - 2
 		}
-		return renderBox(w, "Rename Title", b.String(), lipgloss.Color("#e8593c"))
+		return renderBox(w, "Rename Title", b.String(), themeCol("#e8593c"))
 	}
 
 	b.WriteString("\n")
@@ -820,5 +819,5 @@ func (a *App) renderCmdPopup() string {
 	}
 	b.WriteString("\n")
 	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: close)"))
-	return renderBox(40, "Commands", b.String(), lipgloss.Color("#e8593c"))
+	return renderBox(40, "Commands", b.String(), themeCol("#e8593c"))
 }

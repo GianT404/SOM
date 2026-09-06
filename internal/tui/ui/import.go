@@ -10,7 +10,6 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type ImportFile struct {
@@ -94,11 +93,11 @@ func (ip ImportPanel) ViewImportContent(w, h int) string {
 	if ip.importing {
 		progress := fmt.Sprintf("Imported %d / %d files...", ip.importDone, ip.importTotal)
 		content := ip.spinner.View() + " " + progress
-		return renderBox(w, "Importing", content, lipgloss.Color("#e8593c"))
+		return renderBox(w, "Importing", content, themeCol("#e8593c"))
 	}
 
 	if count == 0 {
-		return renderBox(w, fmt.Sprintf("Import (%d)", count), DimItemStyle.Render(" No new audio files found."), lipgloss.Color("#7c7986"))
+		return renderBox(w, fmt.Sprintf("Import (%d)", count), DimItemStyle.Render(" No new audio files found."), themeCol("#7c7986"))
 	}
 
 	vis := ip.visibleRows()
@@ -126,7 +125,7 @@ func (ip ImportPanel) ViewImportContent(w, h int) string {
 	}
 
 	selCount := ip.selectedCount()
-	listBox := renderBox(w, fmt.Sprintf("Import (%d/%d)", selCount, count), b.String(), lipgloss.Color("#7c7986"))
+	listBox := renderBox(w, fmt.Sprintf("Import (%d/%d)", selCount, count), b.String(), themeCol("#7c7986"))
 
 	return listBox
 }

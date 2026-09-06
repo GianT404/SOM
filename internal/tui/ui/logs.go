@@ -12,9 +12,9 @@ import (
 var LogBuf = logbuf.New(logbuf.DefaultCapacity)
 
 func renderLogsView(logOffset int, w, h int, focused bool) string {
-	borderColor := lipgloss.Color("#7c7986")
+	borderColor := themeCol("#7c7986")
 	if focused {
-		borderColor = lipgloss.Color("#e8593c")
+		borderColor = themeCol("#e8593c")
 	}
 	innerW := w - 4
 	innerH := h - 2

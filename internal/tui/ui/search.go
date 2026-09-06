@@ -12,12 +12,12 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	innerW := w - 4
 
 	inputFocused := p.input.Focused()
-	searchBorder := lipgloss.Color("#7c7986")
-	contentBorder := lipgloss.Color("#7c7986")
+	searchBorder := themeCol("#7c7986")
+	contentBorder := themeCol("#7c7986")
 	if inputFocused {
-		searchBorder = lipgloss.Color("#e8593c")
+		searchBorder = themeCol("#e8593c")
 	} else {
-		contentBorder = lipgloss.Color("#e8593c")
+		contentBorder = themeCol("#e8593c")
 	}
 
 	inputRow := " " + p.input.View()
@@ -30,7 +30,7 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 
 	var suggestionBox string
 	if inputFocused && len(p.suggestions) > 0 {
-		suggestionBox = renderBox(w, "Suggestions", p.renderSuggestions(innerW), lipgloss.Color("#7c7986"))
+		suggestionBox = renderBox(w, "Suggestions", p.renderSuggestions(innerW), themeCol("#7c7986"))
 	}
 
 	var resultContent string

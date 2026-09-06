@@ -11,7 +11,7 @@ import (
 
 func (r RightPanel) renderLyricsBox(focused bool, borderColor color.Color, frame int) string {
 	if focused {
-		borderColor = lipgloss.Color("#e8593c")
+		borderColor = themeCol("#e8593c")
 	}
 	innerW := r.width - 4
 	if innerW < 10 {

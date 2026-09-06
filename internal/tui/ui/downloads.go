@@ -39,12 +39,12 @@ func (p LeftPanel) ViewDownloadsContent(w, h int) string {
 	innerW := w - 4
 
 	inputFocused := p.input.Focused()
-	searchBorder := lipgloss.Color("#7c7986")
-	contentBorder := lipgloss.Color("#7c7986")
+	searchBorder := themeCol("#7c7986")
+	contentBorder := themeCol("#7c7986")
 	if inputFocused {
-		searchBorder = lipgloss.Color("#e8593c")
+		searchBorder = themeCol("#e8593c")
 	} else {
-		contentBorder = lipgloss.Color("#e8593c")
+		contentBorder = themeCol("#e8593c")
 	}
 
 	// ─── Search box ───────────────────────────
@@ -75,7 +75,7 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
 			return DimItemStyle.Render(" No matching downloaded files found.") + "\n"
 		}
-		return DimItemStyle.Render(" No downloaded files in " + p.downloadDir + "/") + "\n"
+		return DimItemStyle.Render(" No downloaded files in "+p.downloadDir+"/") + "\n"
 	}
 	var b strings.Builder
 	// +1: reclaim the row previously wasted by the trailing blank line below

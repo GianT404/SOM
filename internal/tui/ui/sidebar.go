@@ -164,13 +164,25 @@ func ghostStyle(gi float64) lipgloss.Style {
 }
 
 func renderSOMLogo() string {
-	purples := []color.Color{
-		lipgloss.Color("#FFE8DF"),
-		lipgloss.Color("#FFB9A7"),
-		lipgloss.Color("#E8593C"),
-		lipgloss.Color("#C84328"),
-		lipgloss.Color("#9D311A"),
-		lipgloss.Color("#6B1F0E"),
+	var palette []color.Color
+	if isMono() {
+		palette = []color.Color{
+			lipgloss.Color("#ffffff"),
+			lipgloss.Color("#ffffff"),
+			lipgloss.Color("#ffffff"),
+			lipgloss.Color("#ffffff"),
+			lipgloss.Color("#ffffff"),
+			lipgloss.Color("#ffffff"),
+		}
+	} else {
+		palette = []color.Color{
+			lipgloss.Color("#FFE8DF"),
+			lipgloss.Color("#FFB9A7"),
+			lipgloss.Color("#E8593C"),
+			lipgloss.Color("#C84328"),
+			lipgloss.Color("#9D311A"),
+			lipgloss.Color("#6B1F0E"),
+		}
 	}
 	art := []string{
 		"     ███████╗   ██████╗   ███╗   ███╗",
@@ -182,7 +194,7 @@ func renderSOMLogo() string {
 	}
 	var b strings.Builder
 	for i, line := range art {
-		style := lipgloss.NewStyle().Foreground(purples[i]).Bold(true)
+		style := lipgloss.NewStyle().Foreground(palette[i]).Bold(true)
 		if i > 0 {
 			b.WriteString("\n")
 		}

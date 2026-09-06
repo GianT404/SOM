@@ -11,18 +11,23 @@ type settingOpt struct {
 	desc  string
 	on    func(a *App) bool
 	apply func(a *App, on bool)
+	// offText/onText hiển thị ở button (mặc định OFF/ON nếu để trống).
+	offText string
+	onText  string
 }
 
 func (a *App) settingOptions() []settingOpt {
 	return []settingOpt{
 		hintBarOption(),
 		logoOption(),
+		themeOption(),
 	}
 }
 
 func (a *App) loadSettings() {
 	loadHintBarSetting(a)
 	loadHideLogoSetting(a)
+	loadThemeSetting(a)
 }
 
 func (a *App) settingSwitches() []Switch {
@@ -30,6 +35,18 @@ func (a *App) settingSwitches() []Switch {
 	if len(a.settingsItems) != len(opts) {
 		a.settingsItems = nil
 		for _, o := range opts {
+			if o.offText != "" || o.onText != "" {
+				on := o.onText
+				if on == "" {
+					on = "ON"
+				}
+				off := o.offText
+				if off == "" {
+					off = "OFF"
+				}
+				a.settingsItems = append(a.settingsItems, NewSwitchChoice(o.title, o.desc, o.on(a), off, on))
+				continue
+			}
 			a.settingsItems = append(a.settingsItems, NewSwitch(o.title, o.desc, o.on(a)))
 		}
 	}

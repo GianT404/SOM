@@ -6,14 +6,13 @@ import (
 
 	"som/internal/domain"
 
-	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 )
 
 func (p LeftPanel) ViewQueueContent(w, h int, queue []domain.Track) string {
 	innerW := w - 4
 
-	contentBorder := lipgloss.Color("#7c7986")
+	contentBorder := themeCol("#7c7986")
 
 	count := len(queue)
 	listContent := p.renderQueueList(innerW, queue)

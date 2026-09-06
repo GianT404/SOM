@@ -234,5 +234,5 @@ func (a *App) renderHelpPopup() string {
 
 	content := "\n" + body + "\n\n" + footer
 
-	return renderBox(bodyW+6, "Keyboard Shortcuts", content, lipgloss.Color("#e8593c"))
+	return renderBox(bodyW+6, "Keyboard Shortcuts", content, themeCol("#e8593c"))
 }

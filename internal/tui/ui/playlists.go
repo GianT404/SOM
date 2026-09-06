@@ -9,9 +9,9 @@ import (
 
 func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 	innerW := w - 4
-	contentBorder := lipgloss.Color("#7c7986")
+	contentBorder := themeCol("#7c7986")
 	if p.input.Focused() {
-		contentBorder = lipgloss.Color("#e8593c")
+		contentBorder = themeCol("#e8593c")
 	}
 
 	var listContent string
@@ -127,7 +127,7 @@ func (p LeftPanel) renderPlInputPopup() string {
 	b.WriteString(p.plInput.View())
 	b.WriteString("\n\n")
 	b.WriteString(DimItemStyle.Render(" (enter: create  | esc: cancel)"))
-	return renderBox(40, "New Playlist", b.String(), lipgloss.Color("#e8593c"))
+	return renderBox(40, "New Playlist", b.String(), themeCol("#e8593c"))
 }
 
 func (p LeftPanel) renderDeletePopup() string {
@@ -145,5 +145,5 @@ func (p LeftPanel) renderDeletePopup() string {
 
 	b.WriteString(fmt.Sprintf("  %s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Delete ]")))
 
-	return renderBox(45, "Confirm", b.String(), lipgloss.Color("#E24B4A"))
+	return renderBox(45, "Confirm", b.String(), themeCol("#E24B4A"))
 }
