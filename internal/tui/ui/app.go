@@ -79,28 +79,32 @@ type App struct {
 	splashFrame   int
 	pendingKeys   []tea.KeyPressMsg
 
-	showCmdPopup  bool
-	cmdCursor     int
-	cmdMenuCursor int
-	renameActive  bool
-	renameInput   textinput.Model
-	delActive     bool
-	infoActive    bool
-	plMoveActive  bool
-	plRmActive    bool
-	trackQueue    []domain.Track
-	avrcp         *avrcp.Server
-	playerGen     uint64
-	resolveCancel context.CancelFunc
-	presetActive  bool
-	activePreset  int
-	speedActive   bool
-	activeSpeed   int
-	sortActive    bool
-	activeSort    string // "name", "date", "duration"
-	nextPlay      *domain.Track
-	playHistory   []domain.Track
-	importPanel   ImportPanel
+	showCmdPopup   bool
+	cmdCursor      int
+	cmdMenuCursor  int
+	renameActive   bool
+	renameInput    textinput.Model
+	delActive      bool
+	infoActive     bool
+	plMoveActive   bool
+	plRmActive     bool
+	showSettings   bool
+	settingsCursor int
+	settingsItems  []Switch
+	hideHint       bool
+	trackQueue     []domain.Track
+	avrcp          *avrcp.Server
+	playerGen      uint64
+	resolveCancel  context.CancelFunc
+	presetActive   bool
+	activePreset   int
+	speedActive    bool
+	activeSpeed    int
+	sortActive     bool
+	activeSort     string
+	nextPlay       *domain.Track
+	playHistory    []domain.Track
+	importPanel    ImportPanel
 }
 
 const maxPendingKeys = 64
@@ -146,6 +150,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.left = msg.left
 			a.left.input.Blur()
 			a.booting = false
+			a.loadSettings()
 			a.resizePanels()
 
 			// Start AVRCP (Bluetooth media control).
@@ -307,6 +312,32 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		}
+		if a.showSettings {
+			items := a.settingSwitches()
+			switch msg.String() {
+			case "esc", "q":
+				a.showSettings = false
+			case "up":
+				if a.settingsCursor > 0 {
+					a.settingsCursor--
+				}
+			case "down":
+				if a.settingsCursor < len(items)-1 {
+					a.settingsCursor++
+				}
+			case "left":
+				if a.settingsCursor >= 0 && a.settingsCursor < len(items) {
+					items[a.settingsCursor].ToggleLeft()
+					a.applySetting(a.settingsCursor, items[a.settingsCursor].Value())
+				}
+			case "right":
+				if a.settingsCursor >= 0 && a.settingsCursor < len(items) {
+					items[a.settingsCursor].ToggleRight()
+					a.applySetting(a.settingsCursor, items[a.settingsCursor].Value())
+				}
+			}
+			return a, nil
+		}
 		if a.showCmdPopup {
 			return a, a.updateCmdPopup(msg)
 		}
@@ -316,6 +347,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			if a.palette.Visible() {
 				a.palette.Close()
+			} else if !a.left.input.Focused() && !a.left.plInput.Focused() &&
+				!a.left.showDeletePopup && !a.left.showPlInput {
+				a.showSettings = true
+				a.settingsCursor = 0
+				return a, nil
 			}
 		case "1", "2", "3", "4", "5", "6", "7":
 			if a.left.input.Focused() || a.left.plInput.Focused() {
@@ -685,8 +721,12 @@ func (a *App) mainContentHeight() int {
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
 		statusH = 1
 	}
-	// somRow(6) + sep(1) + progressBar(3) + help(1) + status
-	overhead := 6 + 1 + 3 + 1 + statusH
+	helpH := 0
+	if !a.hideHint {
+		helpH = 1
+	}
+	// somRow(6) + sep(1) + progressBar(3) + help(helpH) + status
+	overhead := 6 + 1 + 3 + helpH + statusH
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -748,7 +788,7 @@ func (a *App) View() tea.View {
 	}
 	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev ") +
 		rStyle.Render("r") +
-		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help alt + q:quit")
+		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help  esc:settings  alt + q:quit")
 
 	progressBar := a.renderProgressBar(a.width)
 
@@ -760,7 +800,9 @@ func (a *App) View() tea.View {
 		b.WriteString(status + "\n")
 	}
 	b.WriteString(progressBar + "\n")
-	b.WriteString(help)
+	if !a.hideHint {
+		b.WriteString(help)
+	}
 
 	view := b.String()
 
@@ -775,6 +817,9 @@ func (a *App) View() tea.View {
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showCmdPopup {
 		popup := a.renderCmdPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.showSettings {
+		popup := a.renderSettingsPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.palette.Visible() {
 		popup := a.palette.View()
