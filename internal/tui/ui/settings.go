@@ -95,5 +95,5 @@ func (a *App) renderSettingsPopup() string {
 	right := lipgloss.NewStyle().Width(rightW).Render(strings.Join(rightLines, "\n"))
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, lipgloss.NewStyle().Width(3).Render("   "), right)
 
-	return renderBox(boxW, "Settings", body, colorBorder)
+	return renderBox(boxW, "Settings", body, colorAccent)
 }
