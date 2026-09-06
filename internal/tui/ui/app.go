@@ -92,6 +92,7 @@ type App struct {
 	settingsCursor int
 	settingsItems  []Switch
 	hideHint       bool
+	hideLogo       bool
 	trackQueue     []domain.Track
 	avrcp          *avrcp.Server
 	playerGen      uint64
@@ -716,6 +717,14 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, tea.Batch(cmds...)
 }
 
+// somRowHeight trả số dòng banner SOM cần dành chỗ (0 khi đã ẩn logo).
+func (a *App) somRowHeight() int {
+	if a.hideLogo {
+		return 0
+	}
+	return somLogoRows
+}
+
 func (a *App) mainContentHeight() int {
 	statusH := 0
 	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
@@ -725,8 +734,8 @@ func (a *App) mainContentHeight() int {
 	if !a.hideHint {
 		helpH = 1
 	}
-	// somRow(6) + sep(1) + progressBar(3) + help(helpH) + status
-	overhead := 6 + 1 + 3 + helpH + statusH
+	// somRow(somRowHeight) + sep(1) + progressBar(3) + help(helpH) + status
+	overhead := a.somRowHeight() + 1 + 3 + helpH + statusH
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
@@ -753,6 +762,9 @@ func (a *App) View() tea.View {
 	somRow := a.renderSomRow(somLogo)
 
 	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
+
+	// Hàng content bắt đầu (đã cộng logo + đường phân cách) — dùng cho con trỏ.
+	contentTop := a.somRowHeight() + 1
 
 	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH)
 
@@ -793,7 +805,9 @@ func (a *App) View() tea.View {
 	progressBar := a.renderProgressBar(a.width)
 
 	var b strings.Builder
-	b.WriteString(somRow + "\n")
+	if !a.hideLogo {
+		b.WriteString(somRow + "\n")
+	}
 	b.WriteString(sep + "\n")
 	b.WriteString(contentRow + "\n")
 	if status != "" {
@@ -833,7 +847,7 @@ func (a *App) View() tea.View {
 	if a.left.input.Focused() {
 		if c := a.left.input.Cursor(); c != nil {
 			c.Position.X += sidebarWidth + 2 + 1
-			c.Position.Y = 8
+			c.Position.Y = contentTop + 1
 			v.Cursor = c
 		}
 	}
@@ -959,7 +973,7 @@ func (a *App) renderProgressBar(w int) string {
 	}
 
 	var bar strings.Builder
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", leftFill)))
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("▇", leftFill)))
 	bar.WriteString(strings.Repeat(" ", leftW-leftFill))
 	if labelFill > 0 {
 		bar.WriteString(ProgressTimeOnFillStyle.Render(string([]rune(timeStr)[:labelFill])))
@@ -967,7 +981,7 @@ func (a *App) renderProgressBar(w int) string {
 	if labelFill < timeW {
 		bar.WriteString(ProgressTimeStyle.Render(string([]rune(timeStr)[labelFill:])))
 	}
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", rightFill)))
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("▇", rightFill)))
 
 	progress := bar.String()
 	borderColor := lipgloss.Color("#7c7986")
@@ -1013,7 +1027,6 @@ func (a *App) renderProgressBar(w int) string {
 
 	return topBorder + "\n" + combinedLine + "\n" + bottomBorder
 }
-
 func (a *App) cancelResolve() {
 	if a.resolveCancel != nil {
 		a.resolveCancel()

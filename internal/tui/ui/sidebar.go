@@ -190,3 +190,6 @@ func renderSOMLogo() string {
 	}
 	return b.String()
 }
+
+// somLogoRows là số dòng banner SOM
+var somLogoRows = len(strings.Split(renderSOMLogo(), "\n"))

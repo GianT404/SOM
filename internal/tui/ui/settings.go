@@ -16,11 +16,13 @@ type settingOpt struct {
 func (a *App) settingOptions() []settingOpt {
 	return []settingOpt{
 		hintBarOption(),
+		logoOption(),
 	}
 }
 
 func (a *App) loadSettings() {
 	loadHintBarSetting(a)
+	loadHideLogoSetting(a)
 }
 
 func (a *App) settingSwitches() []Switch {
