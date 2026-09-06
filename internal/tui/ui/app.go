@@ -973,7 +973,7 @@ func (a *App) renderProgressBar(w int) string {
 	}
 
 	var bar strings.Builder
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("▇", leftFill)))
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", leftFill)))
 	bar.WriteString(strings.Repeat(" ", leftW-leftFill))
 	if labelFill > 0 {
 		bar.WriteString(ProgressTimeOnFillStyle.Render(string([]rune(timeStr)[:labelFill])))
@@ -981,7 +981,7 @@ func (a *App) renderProgressBar(w int) string {
 	if labelFill < timeW {
 		bar.WriteString(ProgressTimeStyle.Render(string([]rune(timeStr)[labelFill:])))
 	}
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("▇", rightFill)))
+	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", rightFill)))
 
 	progress := bar.String()
 	borderColor := lipgloss.Color("#7c7986")
