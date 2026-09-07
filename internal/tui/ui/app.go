@@ -93,19 +93,24 @@ type App struct {
 	settingsItems  []Switch
 	hideHint       bool
 	hideLogo       bool
-	trackQueue     []domain.Track
-	avrcp          *avrcp.Server
-	playerGen      uint64
-	resolveCancel  context.CancelFunc
-	presetActive   bool
-	activePreset   int
-	speedActive    bool
-	activeSpeed    int
-	sortActive     bool
-	activeSort     string
-	nextPlay       *domain.Track
-	playHistory    []domain.Track
-	importPanel    ImportPanel
+	mouseEnabled   bool
+
+	mouseLastClickAt  time.Time
+	mouseLastClickY   int
+	mouseLastClickTab SidebarItem
+	trackQueue        []domain.Track
+	avrcp             *avrcp.Server
+	playerGen         uint64
+	resolveCancel     context.CancelFunc
+	presetActive      bool
+	activePreset      int
+	speedActive       bool
+	activeSpeed       int
+	sortActive        bool
+	activeSort        string
+	nextPlay          *domain.Track
+	playHistory       []domain.Track
+	importPanel       ImportPanel
 }
 
 const maxPendingKeys = 64
@@ -122,6 +127,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		renameInput:   ri,
 		booting:       true,
 		activeSpeed:   3,
+		mouseEnabled:  false,
 		importPanel:   NewImportPanel(),
 	}
 }
@@ -296,6 +302,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
 		}
+	case tea.MouseClickMsg:
+		if !a.mouseEnabled {
+			return a, nil
+		}
+		if cmd := a.handleMouseClick(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case tea.MouseWheelMsg:
+		if !a.mouseEnabled {
+			return a, nil
+		}
+		a.handleMouseWheel(msg.Button == tea.MouseWheelUp)
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "alt+q":
@@ -842,7 +860,11 @@ func (a *App) View() tea.View {
 
 	v := tea.NewView(view)
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	if a.mouseEnabled {
+		v.MouseMode = tea.MouseModeCellMotion
+	} else {
+		v.MouseMode = tea.MouseModeNone
+	}
 
 	if a.left.input.Focused() {
 		if c := a.left.input.Cursor(); c != nil {

@@ -21,6 +21,7 @@ func (a *App) settingOptions() []settingOpt {
 		hintBarOption(),
 		logoOption(),
 		themeOption(),
+		mouseOption(),
 	}
 }
 
@@ -28,6 +29,7 @@ func (a *App) loadSettings() {
 	loadHintBarSetting(a)
 	loadHideLogoSetting(a)
 	loadThemeSetting(a)
+	loadMouseSetting(a)
 }
 
 func (a *App) settingSwitches() []Switch {

@@ -34,7 +34,7 @@ func TestRenderSettingsPopup(t *testing.T) {
 	if out == "" {
 		t.Fatal("settings popup should not be empty")
 	}
-	for _, want := range []string{"Hide hint bar", "Hide SOM logo", "Theme", "Default", "ON"} {
+	for _, want := range []string{"Hide hint bar", "Hide SOM logo", "Theme", "Mouse support", "Default", "ON"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("popup missing %q", want)
 		}
@@ -126,5 +126,36 @@ func TestThemeMonoTurnsWhite(t *testing.T) {
 	}
 	if !strings.Contains(renderSOMLogo(), "255;255;255") {
 		t.Errorf("logo should be white in mono")
+	}
+}
+
+func TestMouseSettingToggleAndPersist(t *testing.T) {
+	setTheme(themeDefault)
+	db, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// Mặc định  tắt.
+	b := &App{width: 100, height: 30, left: LeftPanel{plStore: db}}
+	b.loadSettings()
+	if b.mouseEnabled {
+		t.Fatal("mouse support should default to disabled")
+	}
+
+	a := &App{width: 100, height: 30, left: LeftPanel{plStore: db}, mouseEnabled: false}
+	a.applySetting(3, true)
+	if !a.mouseEnabled {
+		t.Fatal("applySetting(true) should enable mouse")
+	}
+	if got := db.GetSetting("mouse"); got != "1" {
+		t.Fatalf("expected mouse=1, got %q", got)
+	}
+
+	c := &App{width: 100, height: 30, left: LeftPanel{plStore: db}}
+	c.loadSettings()
+	if !c.mouseEnabled {
+		t.Fatal("mouse support should be restored as enabled")
 	}
 }
