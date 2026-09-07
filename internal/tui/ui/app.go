@@ -84,6 +84,7 @@ type App struct {
 	cmdMenuCursor  int
 	renameActive   bool
 	renameInput    textinput.Model
+	renameErr      string
 	delActive      bool
 	infoActive     bool
 	plMoveActive   bool

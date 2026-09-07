@@ -258,17 +258,21 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		switch k.String() {
 		case "enter":
 			a.applyRenameTitle(strings.TrimSpace(a.renameInput.Value()))
-			a.renameActive = false
+			if a.renameActive {
+				return nil
+			}
 			a.renameInput.Blur()
 			a.renameInput.SetValue("")
 			a.showCmdPopup = false
 			return nil
 		case "esc":
 			a.renameActive = false
+			a.renameErr = ""
 			a.renameInput.Blur()
 			a.renameInput.SetValue("")
 			return nil
 		}
+		a.renameErr = ""
 		var cmd tea.Cmd
 		a.renameInput, cmd = a.renameInput.Update(k)
 		return cmd
@@ -367,6 +371,7 @@ func (a *App) runCmdOption(idx int) {
 		a.showCmdPopup = false
 	case "Rename title":
 		a.renameActive = true
+		a.renameErr = ""
 		iw := 60
 		if a.width > 0 && a.width-12 < iw {
 			iw = a.width - 12
@@ -430,6 +435,13 @@ func (a *App) applyRenameTitle(newTitle string) {
 	}
 	newPath := filepath.Join(filepath.Dir(oldPath), newBase+filepath.Ext(oldPath))
 	if newPath != oldPath {
+		// Không cho rename đè lên track/file
+		if a.localPathTaken(newPath) {
+			errMsg := "Đã có track/file tên này: " + filepath.Base(newPath)
+			a.renameErr = StatusErrStyle.Render(errMsg)
+			a.setStatus(StatusErrStyle.Render("X " + errMsg))
+			return
+		}
 		if err := os.Rename(oldPath, newPath); err != nil {
 			a.setStatus(StatusErrStyle.Render("X Rename file failed: " + err.Error()))
 			return
@@ -524,6 +536,18 @@ func (a *App) selectedTrackForPlaylist() (storage.PlaylistTrack, bool) {
 		return storage.PlaylistTrack{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, IsLocal: true}, true
 	}
 	return storage.PlaylistTrack{}, false
+}
+
+func (a *App) localPathTaken(path string) bool {
+	if a.left.plStore != nil {
+		if lf, err := a.left.plStore.GetLocalFile(path); err == nil && lf != nil {
+			return true
+		}
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
 }
 
 func sanitizeLocalName(s string) string {
@@ -791,6 +815,9 @@ func (a *App) renderCmdPopup() string {
 	if a.renameActive {
 		b.WriteString("\n  ")
 		b.WriteString(a.renameInput.View())
+		if a.renameErr != "" {
+			b.WriteString("\n  " + a.renameErr)
+		}
 		b.WriteString("\n\n")
 		b.WriteString(DimItemStyle.Render(" (enter: rename  | esc: back)"))
 		w := a.renameInput.Width() + 8
