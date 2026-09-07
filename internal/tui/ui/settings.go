@@ -94,7 +94,6 @@ func (a *App) renderSettingsPopup() string {
 	}
 
 	// Mỗi Switch chiếm 3 dòng cột trái: 2 dòng của View + 1 dòng trống.
-	const rowsPerOpt = 3
 	var leftLines []string
 	for i, sw := range items {
 		block := sw.View(leftW, i == a.settingsCursor)
@@ -102,13 +101,11 @@ func (a *App) renderSettingsPopup() string {
 		leftLines = append(leftLines, "")
 	}
 
-	// Cột phải: mô tả tuỳ chọn đang chọn, căn ngang với block của nó.
 	rightLines := make([]string, len(leftLines))
 	descWrap := wordWrap(items[a.settingsCursor].Desc(), rightW-2)
-	start := a.settingsCursor * rowsPerOpt
 	for j, l := range descWrap {
-		if start+j < len(rightLines) {
-			rightLines[start+j] = l
+		if j < len(rightLines) {
+			rightLines[j] = l
 		}
 	}
 
