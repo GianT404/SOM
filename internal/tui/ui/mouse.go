@@ -199,6 +199,46 @@ func (a *App) tryFocusSearchInput(m tea.MouseClickMsg) bool {
 	return false
 }
 
+func (a *App) statusRowVisible() bool {
+	return a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second
+}
+
+func (a *App) progressBarTop() int {
+	statusH := 0
+	if a.statusRowVisible() {
+		statusH = 1
+	}
+	return a.somRowHeight() + 1 + a.mainContentHeight() + statusH
+}
+
+func (a *App) seekFromProgressClick(m tea.MouseClickMsg) bool {
+	if a.player == nil || a.nowPlay == nil || a.nowPlay.Duration <= 0 {
+		return false
+	}
+	if m.Button != tea.MouseLeft {
+		return false
+	}
+	top := a.progressBarTop()
+	if m.Y < top || m.Y > top+2 {
+		return false
+	}
+	innerW := a.width - 4
+	if m.X < 2 || m.X > 2+innerW-1 {
+		return false
+	}
+	frac := float64(m.X-1) / float64(innerW)
+	if frac < 0 {
+		frac = 0
+	}
+	if frac > 1 {
+		frac = 1
+	}
+	target := frac * float64(a.nowPlay.Duration)
+	a.player.SeekBy(target - a.player.Position().Seconds())
+	a.right.TickAt()
+	return true
+}
+
 func (a *App) handleMouseWheel(up bool) {
 	if !a.mouseEnabled {
 		return
@@ -225,6 +265,11 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 		return nil
 	}
 	if a.showSettings || a.showHelpPopup || a.showCmdPopup || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
+		return nil
+	}
+
+	// Click lên thanh progress → tua.
+	if a.seekFromProgressClick(m) {
 		return nil
 	}
 
