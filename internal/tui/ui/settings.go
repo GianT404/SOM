@@ -22,6 +22,7 @@ func (a *App) settingOptions() []settingOpt {
 		logoOption(),
 		themeOption(),
 		mouseOption(),
+		skipSilenceOption(),
 	}
 }
 
@@ -30,6 +31,7 @@ func (a *App) loadSettings() {
 	loadHideLogoSetting(a)
 	loadThemeSetting(a)
 	loadMouseSetting(a)
+	loadSkipSilenceSetting(a)
 }
 
 func (a *App) settingSwitches() []Switch {

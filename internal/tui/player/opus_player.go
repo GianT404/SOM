@@ -84,6 +84,7 @@ type Player struct {
 	generation  uint64
 	audioFilter string
 	speed       float64
+	skipSilence bool
 
 	// Gapless playback: pre-decoded next track.
 	nextCmd   *exec.Cmd
@@ -133,6 +134,12 @@ func (p *Player) SetAudioFilter(filter string) {
 		filter = "dynaudnorm=f=250:g=11:p=0.9:m=10"
 	}
 	p.audioFilter = filter
+}
+
+func (p *Player) SetSkipSilence(on bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.skipSilence = on
 }
 func (p *Player) State() State {
 	p.mu.Lock()
@@ -577,6 +584,9 @@ func (p *Player) buildFFmpegArgs(filePath string, headers map[string]string, sta
 	}
 
 	af := p.audioFilter
+	if p.skipSilence {
+		af += ",silenceremove=start_periods=1:start_duration=0.05:start_threshold=-50dB:stop_periods=-1:stop_duration=0.5:stop_threshold=-50dB"
+	}
 	if speed != 1.0 {
 		if speed == 0.25 {
 			af += ",atempo=0.5,atempo=0.5"

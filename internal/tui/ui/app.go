@@ -95,6 +95,7 @@ type App struct {
 	hideHint       bool
 	hideLogo       bool
 	mouseEnabled   bool
+	skipSilence    bool
 
 	mouseLastClickAt  time.Time
 	mouseLastClickY   int
