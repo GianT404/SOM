@@ -79,11 +79,9 @@ func (s Switch) buttonRow(width int, focused bool) string {
 		width = 5
 	}
 
-	var st lipgloss.Style
+	st := lipgloss.NewStyle().Foreground(lipgloss.Color("#ccc"))
 	if focused {
 		st = SelectedItemStyle
-	} else {
-		st = lipgloss.NewStyle()
 	}
 
 	// '<' và '>' cố định ở 2 rìa
@@ -108,12 +106,11 @@ func (s Switch) View(width int, focused bool) string {
 		width = 3
 	}
 
-	var title string
+	labelSt := lipgloss.NewStyle().Foreground(lipgloss.Color("#eee"))
 	if focused {
-		title = fillToWidth(SelectedItemStyle, s.label, width)
-	} else {
-		title = fillToWidth(lipgloss.NewStyle(), s.label, width)
+		labelSt = SelectedItemStyle
 	}
+	title := fillToWidth(labelSt, s.label, width)
 
 	return strings.Join([]string{title, s.buttonRow(width, focused)}, "\n")
 }

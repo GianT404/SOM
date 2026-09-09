@@ -7,11 +7,10 @@ import (
 )
 
 type settingOpt struct {
-	title string
-	desc  string
-	on    func(a *App) bool
-	apply func(a *App, on bool)
-	// offText/onText hiển thị ở button (mặc định OFF/ON nếu để trống).
+	title   string
+	desc    string
+	on      func(a *App) bool
+	apply   func(a *App, on bool)
 	offText string
 	onText  string
 }
@@ -42,11 +41,11 @@ func (a *App) settingSwitches() []Switch {
 			if o.offText != "" || o.onText != "" {
 				on := o.onText
 				if on == "" {
-					on = "ON"
+					on = "On"
 				}
 				off := o.offText
 				if off == "" {
-					off = "OFF"
+					off = "Off"
 				}
 				a.settingsItems = append(a.settingsItems, NewSwitchChoice(o.title, o.desc, o.on(a), off, on))
 				continue
@@ -65,7 +64,7 @@ func (a *App) applySetting(i int, on bool) {
 	opts[i].apply(a, on)
 }
 
-// popup 2 cột: trái 30% danh sách Switch  phải 70% mô tả
+// popup 2 cột: trái 40% danh sách Switch  phải 60% mô tả
 func (a *App) renderSettingsPopup() string {
 	items := a.settingSwitches()
 	if len(items) == 0 {
@@ -79,14 +78,14 @@ func (a *App) renderSettingsPopup() string {
 	}
 
 	boxW := a.width - 2
-	if boxW > 87 {
-		boxW = 87
+	if boxW > 85 {
+		boxW = 85
 	}
 	if boxW < 40 {
 		boxW = 40
 	}
 	innerW := boxW - 4
-	leftW := innerW * 30 / 100
+	leftW := innerW * 40 / 100
 	if leftW < 16 {
 		leftW = 16
 	}
