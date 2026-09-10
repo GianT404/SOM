@@ -92,6 +92,8 @@ type App struct {
 	showSettings   bool
 	settingsCursor int
 	settingsItems  []Switch
+	showEscMenu    bool
+	escMenuCursor  int
 	hideHint       bool
 	hideLogo       bool
 	mouseEnabled   bool
@@ -333,6 +335,34 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		}
+		if a.showEscMenu {
+			switch msg.String() {
+			case "esc", "q":
+				a.showEscMenu = false
+			case "up":
+				if a.escMenuCursor > 0 {
+					a.escMenuCursor--
+				}
+			case "down":
+				if a.escMenuCursor < len(escMenuItems)-1 {
+					a.escMenuCursor++
+				}
+			case "enter":
+				switch a.escMenuCursor {
+				case 0: // Settings
+					a.showEscMenu = false
+					a.showSettings = true
+					a.settingsCursor = 0
+				case 1: // Help
+					a.showEscMenu = false
+					a.showHelpPopup = true
+				case 2: // Quit
+					a.showEscMenu = false
+					return a, tea.Quit
+				}
+			}
+			return a, nil
+		}
 		if a.showSettings {
 			items := a.settingSwitches()
 			switch msg.String() {
@@ -370,8 +400,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.palette.Close()
 			} else if !a.left.input.Focused() && !a.left.plInput.Focused() &&
 				!a.left.showDeletePopup && !a.left.showPlInput {
-				a.showSettings = true
-				a.settingsCursor = 0
+				a.showEscMenu = true
+				a.escMenuCursor = 0
 				return a, nil
 			}
 		case "1", "2", "3", "4", "5", "6", "7":
@@ -842,6 +872,9 @@ func (a *App) View() tea.View {
 
 	if a.showHelpPopup {
 		popup := a.renderHelpPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.showEscMenu {
+		popup := a.renderEscMenu()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()

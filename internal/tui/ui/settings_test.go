@@ -46,8 +46,12 @@ func TestSettingsToggleViaKeys(t *testing.T) {
 	defer setTheme(themeDefault)
 	a := &App{width: 100, height: 30}
 
-	if _, cmd := a.Update(kp(tea.KeyEsc)); cmd != nil || !a.showSettings {
-		t.Fatal("esc should open the settings popup")
+	// Esc mở esc menu
+	if _, cmd := a.Update(kp(tea.KeyEsc)); cmd != nil || !a.showEscMenu {
+		t.Fatal("esc should open the esc menu")
+	}
+	if _, cmd := a.Update(kp(tea.KeyEnter)); cmd != nil || !a.showSettings {
+		t.Fatal("enter on Settings should open settings popup")
 	}
 	a.Update(kp(tea.KeyRight)) // hide hint: ON
 	if !a.hideHint {
