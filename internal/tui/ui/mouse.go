@@ -190,7 +190,7 @@ func (a *App) tryFocusSearchInput(m tea.MouseClickMsg) bool {
 		return false
 	}
 	switch a.sidebarActive {
-	case SideSearch, SideDownloads:
+	case SideSearch, SideDownloads, SidePlaylists:
 		if m.X < sidebarWidth {
 			return false
 		}
@@ -335,7 +335,7 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if !a.moveListCursorTo(idx) {
 		return nil
 	}
-	if a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads {
+	if a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
 		if a.left.input.Focused() {
 			a.left.input.Blur()
 		}
