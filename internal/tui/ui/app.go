@@ -933,11 +933,7 @@ func (a *App) View() tea.View {
 
 	v := tea.NewView(view)
 	v.AltScreen = true
-	if a.mouseEnabled {
-		v.MouseMode = tea.MouseModeCellMotion
-	} else {
-		v.MouseMode = tea.MouseModeNone
-	}
+	v.MouseMode = tea.MouseModeCellMotion
 
 	if a.left.input.Focused() {
 		if c := a.left.input.Cursor(); c != nil {
