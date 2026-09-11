@@ -53,6 +53,15 @@ var sortOptions = []struct {
 }
 
 func (a *App) cmdOptionList() []string {
+	if a.sidebarActive == SidePlaylists {
+		return []string{
+			"Audio settings",
+			"Playback speed",
+			"Show file info",
+			"Remove from playlist",
+		}
+	}
+
 	opts := cmdOptions
 	if _, ok := a.selectedTrackForPlaylist(); ok && len(a.playlistsContainingSelected()) > 0 {
 		opts = append(append([]string{}, cmdOptions...), "Remove from playlist")
