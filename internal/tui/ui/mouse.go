@@ -78,6 +78,11 @@ func (a *App) listRowOrigin() (int, bool) {
 			return 0, false
 		}
 		return ct + 5, true
+	case SideLyrics:
+		if a.right.showLangPopup || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+			return 0, false
+		}
+		return ct + 1, true
 	default:
 		return 0, false
 	}
@@ -88,7 +93,7 @@ func (a *App) moveListCursorTo(idx int) bool {
 		return false
 	}
 	vis := a.left.visibleRows()
-	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
+	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists || a.sidebarActive == SideImport {
 		vis += 1
 	}
 	clamp := func(offset *int) {
@@ -126,6 +131,7 @@ func (a *App) moveListCursorTo(idx int) bool {
 		a.left.qCursor = idx
 		clamp(&a.left.qOffset)
 		return true
+
 	case SidePlaylists:
 		if a.left.activePlaylist != nil {
 			if idx >= len(a.left.activePlaylist.Tracks) {
@@ -141,7 +147,14 @@ func (a *App) moveListCursorTo(idx int) bool {
 		a.left.plCursor = idx
 		clamp(&a.left.plOffset)
 		return true
+
+	case SideLyrics:
+		if !a.right.loaded || len(a.right.lyrics.Synced) == 0 || a.right.showLangPopup {
+			return false
+		}
+		return true
 	}
+
 	return false
 }
 
@@ -256,6 +269,26 @@ func (a *App) handleMouseWheel(up bool) {
 		}
 		return
 	}
+
+	if a.sidebarActive == SideLyrics && a.right.loaded && len(a.right.lyrics.Synced) > 0 {
+		if !a.right.manualSelect {
+			a.right.highlightLine = a.right.curLine
+			a.right.manualSelect = true
+		}
+		if up {
+			if a.right.highlightLine > 0 {
+				a.right.highlightLine--
+				a.right.scrollToHighlight()
+			}
+		} else {
+			if a.right.highlightLine < len(a.right.lyrics.Synced)-1 {
+				a.right.highlightLine++
+				a.right.scrollToHighlight()
+			}
+		}
+		return
+	}
+
 	if up {
 		a.stepListCursor(-1)
 	} else {
@@ -296,6 +329,59 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 		return nil
 	}
 	local := m.Y - origin
+
+	if a.sidebarActive == SideLyrics {
+		// Bỏ qua các sự kiện không phải click chuột trái
+		if m.Button != tea.MouseLeft {
+			return nil
+		}
+
+		innerW := a.right.width - 4
+		idx := a.right.GetLyricIndexAt(innerW, local)
+		if idx >= 0 {
+			a.right.highlightLine = idx
+			a.right.manualSelect = true
+
+			// Đoạn này lấy mốc thời gian để tính Double-Click
+			now := time.Now()
+			dl := now.Sub(a.mouseLastClickAt)
+			a.mouseLastClickAt = now
+
+			yDiff := m.Y - a.mouseLastClickY
+			if yDiff < 0 {
+				yDiff = -yDiff
+			}
+
+			// Lưu lại trạng thái click
+			lastTab := a.mouseLastClickTab
+			a.mouseLastClickY = m.Y
+			a.mouseLastClickTab = a.sidebarActive
+
+			if dl < 400*time.Millisecond && yDiff <= 1 && lastTab == a.sidebarActive {
+				targetSec := a.right.lyrics.Synced[idx].Time
+				preRoll := 0.05
+				if idx > 0 {
+					prevEnd := a.right.lyrics.Synced[idx-1].End
+					if targetSec-preRoll < prevEnd {
+						preRoll = targetSec - prevEnd
+						if preRoll < 0 {
+							preRoll = 0
+						}
+					}
+				}
+				targetSec -= preRoll
+				if targetSec < 0 {
+					targetSec = 0
+				}
+
+				a.right.elapsed = time.Duration(targetSec * float64(time.Second))
+				a.right.manualSelect = false
+
+				return seekToCmd(a.player, targetSec)
+			}
+		}
+		return nil
+	}
 
 	cur := -1
 	switch a.sidebarActive {

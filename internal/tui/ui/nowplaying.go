@@ -248,3 +248,43 @@ func seekToCmd(p *player.Player, seconds float64) tea.Cmd {
 		return nil
 	}
 }
+
+// Lấy index của câu lyrics dựa trên toạ độ Y của chuột
+func (r *RightPanel) GetLyricIndexAt(innerW, targetY int) int {
+	if !r.loaded || len(r.lyrics.Synced) == 0 {
+		return -1
+	}
+	lyrH := r.lyricsHeight()
+	if targetY < 0 || targetY >= lyrH {
+		return -1
+	}
+
+	written := 0
+	for i := r.offset; i < len(r.lyrics.Synced) && written < lyrH; i++ {
+		text := r.lyrics.Synced[i].Text
+		if text == "" {
+			if written == targetY {
+				return i
+			}
+			written++
+			continue
+		}
+
+		maxTextW := innerW - 4
+		if maxTextW < 10 {
+			maxTextW = 10
+		}
+
+		segments := wordWrap(text, maxTextW)
+		for range segments {
+			if written >= lyrH {
+				break
+			}
+			if written == targetY {
+				return i
+			}
+			written++
+		}
+	}
+	return -1
+}
