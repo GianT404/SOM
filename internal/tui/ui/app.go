@@ -87,7 +87,6 @@ type App struct {
 	renameErr      string
 	delActive      bool
 	infoActive     bool
-	plMoveActive   bool
 	plRmActive     bool
 	showSettings   bool
 	settingsCursor int
@@ -115,6 +114,13 @@ type App struct {
 	nextPlay          *domain.Track
 	playHistory       []domain.Track
 	importPanel       ImportPanel
+	moveSelectActive  bool
+	moveSelected      map[string]bool
+	movePickActive    bool
+	moveCreateActive  bool
+	moveCreateInput   textinput.Model
+	moveConfirmActive bool
+	moveConfirmPlIdx  int
 }
 
 const maxPendingKeys = 64
@@ -122,17 +128,21 @@ const maxPendingKeys = 64
 func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 	ri := textinput.New()
 	ri.CharLimit = 200
+	mi := textinput.New()
+	mi.CharLimit = 50
+	mi.Prompt = ""
 	return &App{
-		provider:      provider,
-		downloadDir:   downloadDir,
-		sidebarActive: SideDownloads,
-		activeContext: SideDownloads,
-		palette:       NewCommandPalette(),
-		renameInput:   ri,
-		booting:       true,
-		activeSpeed:   3,
-		mouseEnabled:  false,
-		importPanel:   NewImportPanel(),
+		provider:        provider,
+		downloadDir:     downloadDir,
+		sidebarActive:   SideDownloads,
+		activeContext:   SideDownloads,
+		palette:         NewCommandPalette(),
+		renameInput:     ri,
+		booting:         true,
+		activeSpeed:     3,
+		mouseEnabled:    false,
+		importPanel:     NewImportPanel(),
+		moveCreateInput: mi,
 	}
 }
 
@@ -392,17 +402,34 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.showCmdPopup {
 			return a, a.updateCmdPopup(msg)
 		}
+		if a.movePickActive || a.moveCreateActive || a.moveConfirmActive {
+			return a, a.updateMovePopup(msg)
+		}
 
 		switch msg.String() {
 
 		case "esc":
-			if a.palette.Visible() {
+			if a.moveSelectActive {
+				a.moveSelectActive = false
+				a.moveSelected = nil
+				a.setStatus(StatusMsgStyle.Render(">No changes to playlist"))
+			} else if a.palette.Visible() {
 				a.palette.Close()
 			} else if !a.left.input.Focused() && !a.left.plInput.Focused() &&
 				!a.left.showDeletePopup && !a.left.showPlInput {
 				a.showEscMenu = true
 				a.escMenuCursor = 0
 				return a, nil
+			}
+
+		case ".":
+			if a.moveSelectActive && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
+				a.toggleMoveSelection()
+			}
+
+		case "i":
+			if a.moveSelectActive && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
+				a.finishMoveSelection()
 			}
 		case "1", "2", "3", "4", "5", "6", "7":
 			if a.left.input.Focused() || a.left.plInput.Focused() {
@@ -824,7 +851,7 @@ func (a *App) View() tea.View {
 	case SideSearch:
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
-		mainView = a.left.ViewDownloadsContent(mainW, contentH)
+		mainView = a.left.ViewDownloadsContent(mainW, contentH, a.moveSelected, a.moveSelectActive)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -882,6 +909,15 @@ func (a *App) View() tea.View {
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.moveCreateActive {
+		popup := a.renderMoveCreatePopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.movePickActive {
+		popup := a.renderMovePickPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.moveConfirmActive {
+		popup := a.renderMoveConfirmPopup()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showCmdPopup {
 		popup := a.renderCmdPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
@@ -926,6 +962,11 @@ func (a *App) renderSomRow(somLogo string) string {
 			return somLogo
 		}
 		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
+	case SideDownloads:
+		if !a.moveSelectActive {
+			return somLogo
+		}
+		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to playlist (%d)  esc: cancel", a.selectedMoveCount()))
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return somLogo

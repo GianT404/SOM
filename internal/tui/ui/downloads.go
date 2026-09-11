@@ -35,7 +35,7 @@ func (p *LeftPanel) scanLocalFiles() {
 	}
 }
 
-func (p LeftPanel) ViewDownloadsContent(w, h int) string {
+func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool) string {
 	innerW := w - 4
 
 	inputFocused := p.input.Focused()
@@ -63,13 +63,27 @@ func (p LeftPanel) ViewDownloadsContent(w, h int) string {
 
 	// ─── Playlist box ─────────────────────────
 	count := len(p.getFilteredLocals())
-	listContent := p.renderLocalList(innerW)
-	playlistBox := renderBox(w, fmt.Sprintf("Playlist (%d)", count), listContent, contentBorder)
+	listContent := p.renderLocalList(innerW, selected, selectMode)
+	title := fmt.Sprintf("Playlist (%d)", count)
+	if selectMode {
+		title = fmt.Sprintf("Move to playlist (%d) -  %d", count, countSelected(selected))
+	}
+	playlistBox := renderBox(w, title, listContent, contentBorder)
 
 	return searchBox + "\n" + playlistBox
 }
 
-func (p LeftPanel) renderLocalList(innerW int) string {
+func countSelected(m map[string]bool) int {
+	n := 0
+	for _, v := range m {
+		if v {
+			n++
+		}
+	}
+	return n
+}
+
+func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool) string {
 	locals := p.getFilteredLocals()
 	if len(locals) == 0 {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
@@ -90,15 +104,24 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 	}
 	durW := 6
 	artistW := 27
-	titleW := innerW - idxW - artistW - durW - 8
+	// selectMode
+	tickW := 0
+	if selectMode {
+		tickW = 4
+	}
+	titleW := innerW - tickW - idxW - artistW - durW - 8
 	if titleW < 10 {
 		titleW = 10
-		artistW = innerW - idxW - titleW - durW - 8
+		artistW = innerW - tickW - idxW - titleW - durW - 8
 		if artistW < 0 {
 			artistW = 0
 		}
 	}
-	header := fmt.Sprintf("  %*s  %-*s  %-*s  %*s", idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
+	headerTick := ""
+	if selectMode {
+		headerTick = "    "
+	}
+	header := fmt.Sprintf("%s  %*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 	for i := p.dlOffset; i < end; i++ {
 		f := locals[i]
@@ -106,12 +129,20 @@ func (p LeftPanel) renderLocalList(innerW int) string {
 		if i == p.dlCursor {
 			mark = " "
 		}
+		tick := ""
+		if selectMode {
+			if selected[f.Path] {
+				tick = "[+] "
+			} else {
+				tick = "[ ] "
+			}
+		}
 		idx := fmt.Sprintf("%*d", idxW, i+1)
 		title := runewidth.FillRight(truncate(f.Name, titleW), titleW)
 		safeArtist := truncate(f.Artist, artistW)
 		artistPlain := runewidth.FillRight(safeArtist, artistW)
 		dur := fmt.Sprintf("%*s", durW, FormatDuration(f.Duration))
-		line := mark + idx + "  " + title + "  " + artistPlain + "  " + dur
+		line := mark + tick + idx + "  " + title + "  " + artistPlain + "  " + dur
 		b.WriteString("\n")
 		if i == p.dlCursor {
 			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))

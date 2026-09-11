@@ -149,50 +149,6 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if a.plMoveActive {
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(a.left.playlists) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(a.left.playlists)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
-		case "enter":
-			track, ok := a.selectedTrackForPlaylist()
-			if ok && a.left.plStore != nil && a.cmdCursor < len(a.left.playlists) {
-				pl := a.left.playlists[a.cmdCursor]
-				if err := a.left.plStore.AddTrackToPlaylist(pl.ID, storage.PlaylistTrack{
-					ID:       track.ID,
-					Title:    track.Title,
-					Artist:   track.Artist,
-					Duration: track.Duration,
-					IsLocal:  track.IsLocal,
-				}); err == nil {
-					a.left.playlists[a.cmdCursor].Tracks = append(a.left.playlists[a.cmdCursor].Tracks, storage.PlaylistTrack{
-						ID:       track.ID,
-						Title:    track.Title,
-						Artist:   track.Artist,
-						Duration: track.Duration,
-						IsLocal:  track.IsLocal,
-					})
-					a.setStatus(StatusOKStyle.Render("> Added to \"" + pl.Name + "\""))
-				}
-			}
-			a.plMoveActive = false
-			return nil
-		case "esc", ":":
-			a.plMoveActive = false
-			return nil
-		}
-		return nil
-	}
-
 	if a.infoActive {
 		switch k.String() {
 		case "esc", "enter", ":", "q":
@@ -332,15 +288,15 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			a.cmdMenuCursor = 0
 		}
 	case "enter":
-		a.runCmdOption(a.cmdMenuCursor)
+		return a.runCmdOption(a.cmdMenuCursor)
 	}
 	return nil
 }
 
-func (a *App) runCmdOption(idx int) {
+func (a *App) runCmdOption(idx int) tea.Cmd {
 	opts := a.cmdOptionList()
 	if idx < 0 || idx >= len(opts) {
-		return
+		return nil
 	}
 	switch opts[idx] {
 	case "Audio settings":
@@ -405,16 +361,13 @@ func (a *App) runCmdOption(idx int) {
 			a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		}
 	case "Move to playlist":
-		if len(a.left.playlists) == 0 {
-			a.setStatus(StatusErrStyle.Render("X No playlists available. Press '/' to create one."))
-		} else {
-			a.plMoveActive = true
-			a.cmdCursor = 0
-		}
+		a.showCmdPopup = false
+		return a.startMoveToPlaylist()
 	case "Remove from playlist":
 		a.plRmActive = true
 		a.cmdCursor = 0
 	}
+	return nil
 }
 
 func (a *App) applyRenameTitle(newTitle string) {
@@ -724,29 +677,6 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 
 		return renderBox(boxW, "Audio settings", b.String(), themeCol("#e8593c"))
-	}
-
-	if a.plMoveActive {
-		track, _ := a.selectedTrackForPlaylist()
-		b.WriteString("\n ")
-		b.WriteString(NormalItemStyle.Render("Add \"" + track.Title + "\" to:"))
-		b.WriteString("\n\n ")
-		for i, pl := range a.left.playlists {
-			line := "  " + pl.Name
-			if i == a.cmdCursor {
-				pad := 51 - runewidth.StringWidth(line)
-				if pad < 0 {
-					pad = 0
-				}
-				b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
-			} else {
-				b.WriteString(NormalItemStyle.Render(line))
-			}
-			b.WriteString("\n ")
-		}
-		b.WriteString("\n ")
-		b.WriteString(DimItemStyle.Render(" (enter: select  | esc: back)"))
-		return renderBox(56, "Move to Playlist", b.String(), themeCol("#e8593c"))
 	}
 
 	if a.infoActive {
