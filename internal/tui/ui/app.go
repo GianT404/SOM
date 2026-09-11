@@ -973,7 +973,7 @@ func (a *App) renderSomRow(somLogo string) string {
 		if a.left.showPlInput {
 			return somLogo
 		}
-		hint = DimItemStyle.Render("enter: open  /: new playlist   delete: Deletes things. As intended. :)")
+		hint = DimItemStyle.Render("enter: open  ,: new playlist   delete: Deletes things. As intended. :)")
 	default:
 		return somLogo
 	}

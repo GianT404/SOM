@@ -314,6 +314,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				p.suggestOffset = 0
 				break
 			}
+
+			if p.input.Focused() {
+				if msg.String() == "esc" {
+					p.input.Blur()
+				}
+				break
+			}
 			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 				p.activePlaylist = nil
 				p.plCursor = 0
@@ -461,14 +468,17 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, p.downloadDir))
 			}
 
-		case "/":
+		case ",":
 			if p.activeTab == SidePlaylists {
 				if !p.input.Focused() && p.activePlaylist == nil {
 					p.showPlInput = true
 					p.plInput.SetValue("")
 					return p, p.plInput.Focus()
 				}
-			} else if !p.input.Focused() {
+			}
+
+		case "/":
+			if !p.input.Focused() {
 				return p, p.input.Focus()
 			}
 			return p, nil
