@@ -415,11 +415,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.setStatus(StatusMsgStyle.Render(">No changes to playlist"))
 			} else if a.palette.Visible() {
 				a.palette.Close()
-			} else if !a.left.input.Focused() && !a.left.plInput.Focused() &&
-				!a.left.showDeletePopup && !a.left.showPlInput {
-				a.showEscMenu = true
-				a.escMenuCursor = 0
-				return a, nil
+			} else if !a.left.input.Focused() && !a.left.plInput.Focused() && !a.left.showDeletePopup && !a.left.showPlInput {
+				if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
+				} else {
+					a.showEscMenu = true
+					a.escMenuCursor = 0
+					return a, nil
+				}
 			}
 
 		case ".":

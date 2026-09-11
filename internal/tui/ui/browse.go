@@ -125,45 +125,57 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 			case "enter":
 				if p.deletePopupCursor == 1 {
-					if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-						trackID := p.activePlaylist.Tracks[p.plCursor].ID
-						p.plStore.RemoveTrackFromPlaylist(p.activePlaylist.ID, trackID)
-						var filtered []storage.PlaylistTrack
-						for _, t := range p.activePlaylist.Tracks {
-							if t.ID != trackID {
-								filtered = append(filtered, t)
+					if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 {
+						filtered := p.getFilteredPlaylistTracks()
+						if p.plCursor < len(filtered) {
+							trackID := filtered[p.plCursor].ID
+							p.plStore.RemoveTrackFromPlaylist(p.activePlaylist.ID, trackID)
+
+							var filteredTracks []storage.PlaylistTrack
+							for _, t := range p.activePlaylist.Tracks {
+								if t.ID != trackID {
+									filteredTracks = append(filteredTracks, t)
+								}
+							}
+							p.activePlaylist.Tracks = filteredTracks
+							for i, pl := range p.playlists {
+								if pl.ID == p.activePlaylist.ID {
+									p.playlists[i] = *p.activePlaylist
+								}
+							}
+
+							if p.plCursor >= len(p.getFilteredPlaylistTracks()) {
+								p.plCursor = len(p.getFilteredPlaylistTracks()) - 1
+								if p.plCursor < 0 {
+									p.plCursor = 0
+								}
+							}
+							if p.plOffset > p.plCursor {
+								p.plOffset = p.plCursor
 							}
 						}
-						p.activePlaylist.Tracks = filtered
-						for i, pl := range p.playlists {
-							if pl.ID == p.activePlaylist.ID {
-								p.playlists[i] = *p.activePlaylist
+					} else if p.activePlaylist == nil && len(p.playlists) > 0 {
+						filtered := p.getFilteredPlaylists()
+						if p.plCursor < len(filtered) {
+							plID := filtered[p.plCursor].ID
+							p.plStore.DeletePlaylist(plID)
+
+							for i, pl := range p.playlists {
+								if pl.ID == plID {
+									p.playlists = append(p.playlists[:i], p.playlists[i+1:]...)
+									break
+								}
 							}
-						}
 
-						if p.plCursor >= len(p.activePlaylist.Tracks) {
-							p.plCursor = len(p.activePlaylist.Tracks) - 1
-						}
-						if p.plCursor < 0 {
-							p.plCursor = 0
-						}
-						if p.plOffset > p.plCursor {
-							p.plOffset = p.plCursor
-						}
-
-					} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
-						plID := p.playlists[p.plCursor].ID
-						p.plStore.DeletePlaylist(plID)
-						p.playlists = append(p.playlists[:p.plCursor], p.playlists[p.plCursor+1:]...)
-
-						if p.plCursor >= len(p.playlists) {
-							p.plCursor = len(p.playlists) - 1
-						}
-						if p.plCursor < 0 {
-							p.plCursor = 0
-						}
-						if p.plOffset > p.plCursor {
-							p.plOffset = p.plCursor
+							if p.plCursor >= len(p.getFilteredPlaylists()) {
+								p.plCursor = len(p.getFilteredPlaylists()) - 1
+								if p.plCursor < 0 {
+									p.plCursor = 0
+								}
+							}
+							if p.plOffset > p.plCursor {
+								p.plOffset = p.plCursor
+							}
 						}
 					}
 				}
@@ -260,16 +272,31 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			} else if p.activeTab == SideQueue {
 				return p, func() tea.Msg { return PlayQueueMsg{Index: p.qCursor} }
 			} else if p.activeTab == SidePlaylists {
-				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
-					plTracks := make([]domain.Track, len(p.activePlaylist.Tracks))
-					for i, pt := range p.activePlaylist.Tracks {
-						plTracks[i] = domain.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+				if p.activePlaylist != nil {
+					filtered := p.getFilteredPlaylistTracks()
+					if len(filtered) > 0 && p.plCursor < len(filtered) {
+						plTracks := make([]domain.Track, len(filtered))
+						for i, pt := range filtered {
+							plTracks[i] = domain.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+						}
+						return p, func() tea.Msg {
+							return PlayPlaylistMsg{Tracks: plTracks, Index: p.plCursor}
+						}
 					}
-					return p, func() tea.Msg { return PlayPlaylistMsg{Tracks: plTracks, Index: p.plCursor} }
-				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
-					p.activePlaylist = &p.playlists[p.plCursor]
-					p.plCursor = 0
-					p.plOffset = 0
+				} else {
+					filtered := p.getFilteredPlaylists()
+					if len(filtered) > 0 && p.plCursor < len(filtered) {
+						selectedPl := filtered[p.plCursor]
+						for i := range p.playlists {
+							if p.playlists[i].ID == selectedPl.ID {
+								p.activePlaylist = &p.playlists[i]
+								break
+							}
+						}
+						p.plCursor = 0
+						p.plOffset = 0
+						p.input.SetValue("")
+					}
 				}
 			}
 
@@ -413,11 +440,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 
 		case "delete":
 			if focused && !p.input.Focused() && p.activeTab == SidePlaylists && p.plStore != nil {
-				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.activePlaylist.Tracks) {
+				if p.activePlaylist != nil && len(p.activePlaylist.Tracks) > 0 && p.plCursor < len(p.getFilteredPlaylistTracks()) {
 					p.deleteMsg = "Delete track from playlist?"
 					p.showDeletePopup = true
 					p.deletePopupCursor = 0
-				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.playlists) {
+				} else if p.activePlaylist == nil && len(p.playlists) > 0 && p.plCursor < len(p.getFilteredPlaylists()) {
 					p.deleteMsg = "Delete playlist?"
 					p.showDeletePopup = true
 					p.deletePopupCursor = 0
@@ -605,9 +632,9 @@ func (p LeftPanel) itemCount() int {
 		return len(p.queue)
 	} else if p.activeTab == SidePlaylists {
 		if p.activePlaylist != nil {
-			return len(p.activePlaylist.Tracks)
+			return len(p.getFilteredPlaylistTracks())
 		}
-		return len(p.playlists)
+		return len(p.getFilteredPlaylists())
 	}
 	return 0
 }
