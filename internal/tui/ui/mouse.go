@@ -72,12 +72,12 @@ func (a *App) listRowOrigin() (int, bool) {
 			if len(a.left.activePlaylist.Tracks) == 0 {
 				return 0, false
 			}
-			return ct + 3, true
+			return ct + 5, true
 		}
 		if len(a.left.playlists) == 0 {
 			return 0, false
 		}
-		return ct + 2, true
+		return ct + 5, true
 	default:
 		return 0, false
 	}
@@ -88,6 +88,9 @@ func (a *App) moveListCursorTo(idx int) bool {
 		return false
 	}
 	vis := a.left.visibleRows()
+	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
+		vis += 1
+	}
 	clamp := func(offset *int) {
 		if idx < *offset {
 			*offset = idx
@@ -309,6 +312,10 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 		cur = 0
 	}
 	vis := a.left.visibleRows()
+	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
+		vis += 1
+	}
+
 	if local >= vis {
 		return nil
 	}
