@@ -110,8 +110,7 @@ func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist) s
 	}
 
 	var b strings.Builder
-	// Đổi thành visibleRows() thay vì + 1 để nội dung vừa khít khung hình sau khi thêm thanh search
-	vis := p.visibleRows()
+	vis := p.visibleRows() + 1
 	end := p.plOffset + vis
 	if end > len(filtered) {
 		end = len(filtered)
@@ -162,7 +161,7 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 	}
 
 	var b strings.Builder
-	vis := p.visibleRows()
+	vis := p.visibleRows() + 1
 	end := p.plOffset + vis
 	if end > len(filtered) {
 		end = len(filtered)

@@ -438,9 +438,12 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				} else if p.activeTab == SidePlaylists {
 					if p.plCursor < items-1 {
 						p.plCursor++
-						if p.plCursor >= p.plOffset+p.visibleRows() {
+						if p.plCursor >= p.plOffset+p.visibleRows()+1 {
 							p.plOffset++
 						}
+					} else if items > 0 {
+						p.plCursor = 0
+						p.plOffset = 0
 					}
 				}
 			}
