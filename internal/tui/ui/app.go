@@ -154,10 +154,69 @@ func (a *App) Init() tea.Cmd {
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if a.booting {
 		switch msg := msg.(type) {
+		case RenameDoneMsg:
+			if msg.Err != nil {
+				a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+				break
+			}
+			for i := range a.playlist {
+				if a.playlist[i].ID == "local:"+msg.OldPath {
+					a.playlist[i].ID = "local:" + msg.NewPath
+					a.playlist[i].Title = msg.NewTitle
+				}
+			}
+			if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == msg.OldPath {
+				a.nowPlay.ID = "local:" + msg.NewPath
+				a.nowPlay.Title = msg.NewTitle
+			}
+
+			a.left.scanLocalFiles()
+			if a.left.plStore != nil {
+				if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
+					a.left.playlists = pls
+					if a.left.activePlaylist != nil {
+						for i := range a.left.playlists {
+							if a.left.playlists[i].ID == a.left.activePlaylist.ID {
+								a.left.activePlaylist = &a.left.playlists[i]
+								break
+							}
+						}
+					}
+				}
+			}
+			a.setStatus(StatusOKStyle.Render("> Renamed to " + msg.NewTitle))
+
+		case DeleteDoneMsg:
+			if msg.Err != nil {
+				a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+				break
+			}
+
+			for i := range a.left.locals {
+				if a.left.locals[i].Path == msg.Path {
+					a.left.locals = append(a.left.locals[:i], a.left.locals[i+1:]...)
+					break
+				}
+			}
+			if a.left.dlCursor >= len(a.left.locals) {
+				a.left.dlCursor = len(a.left.locals) - 1
+				if a.left.dlCursor < 0 {
+					a.left.dlCursor = 0
+				}
+			}
+
+			newPlaylist := a.playlist[:0]
+			for _, t := range a.playlist {
+				if t.ID != "local:"+msg.Path {
+					newPlaylist = append(newPlaylist, t)
+				}
+			}
+			a.playlist = newPlaylist
+
+			a.setStatus(StatusOKStyle.Render("> Deleted " + msg.Name))
 		case tea.WindowSizeMsg:
 			a.width = msg.Width
 			a.height = msg.Height
-			// Truyền size xuống palette (visualizer) ngay cả khi đang boot,
 			a.palette.width = msg.Width
 			a.palette.height = msg.Height
 			return a, nil
@@ -755,6 +814,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.avrcp.UpdatePlaybackStatus("Playing")
 				}
 			}
+
 		case "stop":
 			a.player.Stop()
 			if a.avrcp != nil {
