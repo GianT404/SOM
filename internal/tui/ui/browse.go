@@ -24,6 +24,7 @@ type LeftPanel struct {
 	dlPreFilterPath string
 	plCursor        int
 	plOffset        int
+	plPreFilterID   string
 	qCursor         int
 	qOffset         int
 	queue           []domain.Track
@@ -275,12 +276,18 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				if p.activePlaylist != nil {
 					filtered := p.getFilteredPlaylistTracks()
 					if len(filtered) > 0 && p.plCursor < len(filtered) {
-						plTracks := make([]domain.Track, len(filtered))
-						for i, pt := range filtered {
+						picked := filtered[p.plCursor]
+						full := p.activePlaylist.Tracks
+						plTracks := make([]domain.Track, len(full))
+						startIdx := 0
+						for i, pt := range full {
 							plTracks[i] = domain.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+							if pt.ID == picked.ID {
+								startIdx = i
+							}
 						}
 						return p, func() tea.Msg {
-							return PlayPlaylistMsg{Tracks: plTracks, Index: p.plCursor}
+							return PlayPlaylistMsg{Tracks: plTracks, Index: startIdx}
 						}
 					}
 				} else {
@@ -631,6 +638,61 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 		}
 	}
+
+	if p.activeTab == SidePlaylists && p.activePlaylist != nil {
+		if p.input.Focused() && newVal != oldVal {
+			switch {
+			case oldVal == "" && newVal != "":
+				// Bắt đầu gõ filter — lưu lại track đang highlight
+				if tracks := p.getFilteredPlaylistTracks(); p.plCursor >= 0 && p.plCursor < len(tracks) {
+					p.plPreFilterID = tracks[p.plCursor].ID
+				}
+				p.plCursor = 0
+				p.plOffset = 0
+
+			case newVal == "":
+				restored := false
+				if nowPlay != nil {
+					for i, t := range p.getFilteredPlaylistTracks() {
+						if t.ID == nowPlay.ID {
+							p.plCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored && p.plPreFilterID != "" {
+					for i, t := range p.getFilteredPlaylistTracks() {
+						if t.ID == p.plPreFilterID {
+							p.plCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored {
+					p.plCursor = 0
+				}
+				p.scrollPlIntoView()
+				p.plPreFilterID = ""
+
+			default:
+				p.plCursor = 0
+				p.plOffset = 0
+			}
+		} else {
+			tracksCount := len(p.getFilteredPlaylistTracks())
+			if p.plOffset > 0 && p.plOffset >= tracksCount {
+				p.plOffset = maxInt(tracksCount-1, 0)
+			}
+			if p.plCursor >= tracksCount && tracksCount > 0 {
+				p.plCursor = tracksCount - 1
+			}
+			if p.plCursor < 0 {
+				p.plCursor = 0
+			}
+		}
+	}
 	return p, tea.Batch(cmds...)
 }
 
@@ -669,6 +731,18 @@ func (p *LeftPanel) scrollDlIntoView() {
 	}
 	if p.dlOffset < 0 {
 		p.dlOffset = 0
+	}
+}
+
+func (p *LeftPanel) scrollPlIntoView() {
+	vis := p.visibleRows() + 1
+	if p.plCursor < p.plOffset {
+		p.plOffset = p.plCursor
+	} else if p.plCursor >= p.plOffset+vis {
+		p.plOffset = p.plCursor - vis + 1
+	}
+	if p.plOffset < 0 {
+		p.plOffset = 0
 	}
 }
 

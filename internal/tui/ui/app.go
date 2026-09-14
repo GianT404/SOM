@@ -1161,12 +1161,18 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			}
 		case SidePlaylists:
 			if a.left.activePlaylist != nil {
-				a.left.plCursor = idx
-				if a.left.plCursor < a.left.plOffset {
-					a.left.plOffset = a.left.plCursor
-				}
-				if a.left.plCursor >= a.left.plOffset+vis {
-					a.left.plOffset = a.left.plCursor - vis + 1
+				tracks := a.left.getFilteredPlaylistTracks()
+				for i, pt := range tracks {
+					if pt.ID == t.ID {
+						a.left.plCursor = i
+						if a.left.plCursor < a.left.plOffset {
+							a.left.plOffset = a.left.plCursor
+						}
+						if a.left.plCursor >= a.left.plOffset+vis {
+							a.left.plOffset = a.left.plCursor - vis + 1
+						}
+						break
+					}
 				}
 			}
 		}
@@ -1278,13 +1284,6 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 				if i >= vis {
 					a.left.dlOffset = i - vis + 1
 				}
-				if a.activeContext == SidePlaylists {
-					a.left.plCursor = i
-					a.left.plOffset = 0
-					if i >= vis {
-						a.left.plOffset = i - vis + 1
-					}
-				}
 				break
 			}
 		}
@@ -1296,12 +1295,18 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 				if i >= vis {
 					a.left.searchOffset = i - vis + 1
 				}
-				if a.activeContext == SidePlaylists {
-					a.left.plCursor = i
-					a.left.plOffset = 0
-					if i >= vis {
-						a.left.plOffset = i - vis + 1
-					}
+				break
+			}
+		}
+	}
+	if a.activeContext == SidePlaylists && a.left.activePlaylist != nil {
+		tracks := a.left.getFilteredPlaylistTracks()
+		for i, pt := range tracks {
+			if pt.ID == t.ID {
+				a.left.plCursor = i
+				a.left.plOffset = 0
+				if i >= vis {
+					a.left.plOffset = i - vis + 1
 				}
 				break
 			}
