@@ -705,6 +705,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			a.left.loadingStream = false
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+			// Tự động bỏ qua track online bị lỗi
+			cmds = append(cmds, a.playNext())
 			break
 		}
 		// Ignore stale goroutine: a newer playTrackAt has been called since.
@@ -1268,7 +1270,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		path := strings.TrimPrefix(t.ID, "local:")
 		if err := a.player.Play(path); err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
-			return nil
+			return a.playNext()
 		}
 		a.playerGen = a.player.Generation()
 		a.songStarted = true
