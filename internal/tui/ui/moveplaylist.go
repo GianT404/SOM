@@ -10,14 +10,24 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+// startMoveToPlaylist mo popup chon playlist dich ngay (hoac popup tao moi
+// neu chua co playlist nao), truoc khi vao buoc chon track o tab Download.
 func (a *App) startMoveToPlaylist() tea.Cmd {
 	cmd := a.switchSidebar(SideDownloads)
 	a.left.input.Blur()
-	a.moveSelectActive = true
-	a.moveSelected = map[string]bool{}
+	if len(a.left.playlists) == 0 {
+		a.moveCreateActive = true
+		a.moveCreateInput.SetValue("")
+		a.moveCreateInput.Focus()
+		a.moveCreateInput.CursorEnd()
+	} else {
+		a.movePickActive = true
+		a.cmdCursor = 0
+	}
 	return cmd
 }
 
+// toggleMoveSelection bat/tat chon track dang highlight trong tab Download.
 func (a *App) toggleMoveSelection() {
 	locals := a.left.getFilteredLocals()
 	if a.left.dlCursor < 0 || a.left.dlCursor >= len(locals) {
@@ -30,6 +40,7 @@ func (a *App) toggleMoveSelection() {
 	a.moveSelected[path] = !a.moveSelected[path]
 }
 
+// selectedMoveCount dem so track dang duoc chon de move.
 func (a *App) selectedMoveCount() int {
 	n := 0
 	for _, v := range a.moveSelected {
@@ -40,25 +51,20 @@ func (a *App) selectedMoveCount() int {
 	return n
 }
 
+// finishMoveSelection duoc goi khi bam 'i': playlist dich da chon tu truoc
+// (moveTargetPlIdx), chi can validate selection roi qua thang buoc confirm.
 func (a *App) finishMoveSelection() {
 	if a.selectedMoveCount() == 0 {
-		a.setStatus(StatusErrStyle.Render("X No tracks selected (press . to select)"))
+		a.setStatus(StatusErrStyle.Render("X Chua chon track nao (phim . de chon)"))
 		return
 	}
 	a.moveSelectActive = false
-
-	if len(a.left.playlists) == 0 {
-		a.moveCreateActive = true
-		a.moveCreateInput.SetValue("")
-		a.moveCreateInput.Focus()
-		a.moveCreateInput.CursorEnd()
-		return
-	}
-
-	a.movePickActive = true
+	a.moveConfirmActive = true
 	a.cmdCursor = 0
 }
 
+// updateMovePopup xu ly phim bam cho cac popup cua luong move: tao playlist
+// moi, chon playlist dich, va xac nhan cuoi cung.
 func (a *App) updateMovePopup(k tea.KeyMsg) tea.Cmd {
 	if a.moveCreateActive {
 		switch k.String() {
@@ -80,9 +86,9 @@ func (a *App) updateMovePopup(k tea.KeyMsg) tea.Cmd {
 			a.moveCreateActive = false
 			a.moveCreateInput.Blur()
 			a.moveCreateInput.SetValue("")
-			a.moveConfirmActive = true
-			a.moveConfirmPlIdx = len(a.left.playlists) - 1
-			a.cmdCursor = 0
+			a.moveTargetPlIdx = len(a.left.playlists) - 1
+			a.moveSelectActive = true
+			a.moveSelected = map[string]bool{}
 			return nil
 		case "esc":
 			a.moveCreateActive = false
@@ -113,9 +119,9 @@ func (a *App) updateMovePopup(k tea.KeyMsg) tea.Cmd {
 		case "enter":
 			if a.cmdCursor < len(a.left.playlists) {
 				a.movePickActive = false
-				a.moveConfirmActive = true
-				a.moveConfirmPlIdx = a.cmdCursor
-				a.cmdCursor = 0
+				a.moveTargetPlIdx = a.cmdCursor
+				a.moveSelectActive = true
+				a.moveSelected = map[string]bool{}
 			}
 		case "esc", ":":
 			a.movePickActive = false
@@ -143,53 +149,66 @@ func (a *App) updateMovePopup(k tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// applyMoveToPlaylist them cac track da chon vao playlist duoc xac nhan.
 func (a *App) applyMoveToPlaylist() {
-	if a.moveConfirmPlIdx < 0 || a.moveConfirmPlIdx >= len(a.left.playlists) {
+	if a.moveTargetPlIdx < 0 || a.moveTargetPlIdx >= len(a.left.playlists) {
 		return
 	}
 	if a.left.plStore == nil {
 		a.setStatus(StatusErrStyle.Render("X Database not initialized"))
 		return
 	}
-	pl := &a.left.playlists[a.moveConfirmPlIdx]
 
+	pl := &a.left.playlists[a.moveTargetPlIdx]
 	existing := make(map[string]bool, len(pl.Tracks))
 	for _, t := range pl.Tracks {
 		existing[t.ID] = true
 	}
 
-	moved := 0
+	added := 0
+	removed := 0
+
 	for _, lf := range a.left.locals {
 		if !a.moveSelected[lf.Path] {
 			continue
 		}
+
 		id := "local:" + lf.Path
+
 		if existing[id] {
-			continue
+			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, id); err == nil {
+				var newTracks []storage.PlaylistTrack
+				for _, t := range pl.Tracks {
+					if t.ID != id {
+						newTracks = append(newTracks, t)
+					}
+				}
+				pl.Tracks = newTracks
+				existing[id] = false
+				removed++
+			}
+		} else {
+			track := storage.PlaylistTrack{
+				ID:       id,
+				Title:    lf.Name,
+				Artist:   lf.Artist,
+				Duration: lf.Duration,
+				IsLocal:  true,
+			}
+			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, track); err == nil {
+				pl.Tracks = append(pl.Tracks, track)
+				existing[id] = true
+				added++
+			}
 		}
-		track := storage.PlaylistTrack{
-			ID:       id,
-			Title:    lf.Name,
-			Artist:   lf.Artist,
-			Duration: lf.Duration,
-			IsLocal:  true,
-		}
-		if err := a.left.plStore.AddTrackToPlaylist(pl.ID, track); err != nil {
-			continue
-		}
-		pl.Tracks = append(pl.Tracks, track)
-		existing[id] = true
-		moved++
 	}
 
-	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Moved %d track to \"%s\"", moved, pl.Name)))
+	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Changed: %d added, %d removed in \"%s\"", added, removed, pl.Name)))
 }
 
 func (a *App) renderMoveCreatePopup() string {
 	var b strings.Builder
 	b.WriteString("\n ")
-	b.WriteString(NormalItemStyle.Render(fmt.Sprintf("No playlist %d track:", a.selectedMoveCount())))
+	b.WriteString(NormalItemStyle.Render(fmt.Sprintf("No playlist yet. Enter name for %d track:", a.selectedMoveCount())))
 	b.WriteString("\n\n  ")
 	b.WriteString(a.moveCreateInput.View())
 	b.WriteString("\n\n ")
@@ -207,10 +226,10 @@ func (a *App) renderMoveCreatePopup() string {
 func (a *App) renderMovePickPopup() string {
 	var b strings.Builder
 	b.WriteString("\n ")
-	b.WriteString(NormalItemStyle.Render(fmt.Sprintf("Move %d track to:", a.selectedMoveCount())))
+	b.WriteString(NormalItemStyle.Render("Select target playlist:"))
 	b.WriteString("\n\n ")
 	for i, pl := range a.left.playlists {
-		line := "  " + pl.Name
+		line := fmt.Sprintf("  %s (%d)", pl.Name, len(pl.Tracks))
 		if i == a.cmdCursor {
 			pad := 51 - runewidth.StringWidth(line)
 			if pad < 0 {
@@ -230,11 +249,11 @@ func (a *App) renderMovePickPopup() string {
 func (a *App) renderMoveConfirmPopup() string {
 	var b strings.Builder
 	name := ""
-	if a.moveConfirmPlIdx >= 0 && a.moveConfirmPlIdx < len(a.left.playlists) {
-		name = a.left.playlists[a.moveConfirmPlIdx].Name
+	if a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
+		name = a.left.playlists[a.moveTargetPlIdx].Name
 	}
 	b.WriteString("\n ")
-	b.WriteString(DimItemStyle.Render(fmt.Sprintf("Move %d track in \"%s\"?", a.selectedMoveCount(), name)))
+	b.WriteString(DimItemStyle.Render(fmt.Sprintf("Move %d track to \"%s\"?", a.selectedMoveCount(), name)))
 	b.WriteString("\n\n ")
 
 	cancelStyle := NormalItemStyle

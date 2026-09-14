@@ -98,29 +98,30 @@ type App struct {
 	mouseEnabled   bool
 	skipSilence    bool
 
-	mouseLastClickAt  time.Time
-	mouseLastClickY   int
-	mouseLastClickTab SidebarItem
-	trackQueue        []domain.Track
-	avrcp             *avrcp.Server
-	playerGen         uint64
-	resolveCancel     context.CancelFunc
-	presetActive      bool
-	activePreset      int
-	speedActive       bool
-	activeSpeed       int
-	sortActive        bool
-	activeSort        string
-	nextPlay          *domain.Track
-	playHistory       []domain.Track
-	importPanel       ImportPanel
-	moveSelectActive  bool
-	moveSelected      map[string]bool
-	movePickActive    bool
-	moveCreateActive  bool
-	moveCreateInput   textinput.Model
-	moveConfirmActive bool
-	moveConfirmPlIdx  int
+	mouseLastClickAt     time.Time
+	mouseLastClickY      int
+	mouseLastClickTab    SidebarItem
+	trackQueue           []domain.Track
+	avrcp                *avrcp.Server
+	playerGen            uint64
+	resolveCancel        context.CancelFunc
+	presetActive         bool
+	activePreset         int
+	speedActive          bool
+	activeSpeed          int
+	sortActive           bool
+	activeSort           string
+	nextPlay             *domain.Track
+	playHistory          []domain.Track
+	importPanel          ImportPanel
+	moveSelectActive     bool
+	moveSelected         map[string]bool
+	movePickActive       bool
+	moveCreateActive     bool
+	moveCreateInput      textinput.Model
+	moveConfirmActive    bool
+	moveTargetPlIdx      int
+	moveShowTracksActive bool
 }
 
 const maxPendingKeys = 64
@@ -402,7 +403,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.showCmdPopup {
 			return a, a.updateCmdPopup(msg)
 		}
-		if a.movePickActive || a.moveCreateActive || a.moveConfirmActive {
+		if a.movePickActive || a.moveCreateActive || a.moveConfirmActive || a.moveShowTracksActive {
 			return a, a.updateMovePopup(msg)
 		}
 
@@ -853,7 +854,16 @@ func (a *App) View() tea.View {
 	case SideSearch:
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
-		mainView = a.left.ViewDownloadsContent(mainW, contentH, a.moveSelected, a.moveSelectActive)
+		var alreadyInMove map[string]bool
+		if a.moveSelectActive && a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
+			alreadyInMove = map[string]bool{}
+			for _, t := range a.left.playlists[a.moveTargetPlIdx].Tracks {
+				if strings.HasPrefix(t.ID, "local:") {
+					alreadyInMove[strings.TrimPrefix(t.ID, "local:")] = true
+				}
+			}
+		}
+		mainView = a.left.ViewDownloadsContent(mainW, contentH, a.moveSelected, a.moveSelectActive, alreadyInMove)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -964,7 +974,11 @@ func (a *App) renderSomRow(somLogo string) string {
 		if !a.moveSelectActive {
 			return somLogo
 		}
-		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to playlist (%d)  esc: cancel", a.selectedMoveCount()))
+		plName := ""
+		if a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
+			plName = a.left.playlists[a.moveTargetPlIdx].Name
+		}
+		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return somLogo

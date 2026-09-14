@@ -35,7 +35,7 @@ func (p *LeftPanel) scanLocalFiles() {
 	}
 }
 
-func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool) string {
+func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool) string {
 	innerW := w - 4
 
 	inputFocused := p.input.Focused()
@@ -63,7 +63,7 @@ func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, sele
 
 	// ─── Playlist box ─────────────────────────
 	count := len(p.getFilteredLocals())
-	listContent := p.renderLocalList(innerW, selected, selectMode)
+	listContent := p.renderLocalList(innerW, selected, selectMode, alreadyIn)
 	title := fmt.Sprintf("Playlist (%d)", count)
 	if selectMode {
 		title = fmt.Sprintf("Move to playlist (%d) -  %d", count, countSelected(selected))
@@ -83,7 +83,7 @@ func countSelected(m map[string]bool) int {
 	return n
 }
 
-func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool) string {
+func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool) string {
 	locals := p.getFilteredLocals()
 	if len(locals) == 0 {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
@@ -107,7 +107,7 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 	// selectMode
 	tickW := 0
 	if selectMode {
-		tickW = 4
+		tickW = 8
 	}
 	titleW := innerW - tickW - idxW - artistW - durW - 8
 	if titleW < 10 {
@@ -131,7 +131,12 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 		}
 		tick := ""
 		if selectMode {
-			if selected[f.Path] {
+			isAlreadyIn := alreadyIn[f.Path]
+			isToggled := selected[f.Path]
+
+			willBeIn := isAlreadyIn != isToggled
+
+			if willBeIn {
 				tick = "[+] "
 			} else {
 				tick = "[ ] "
