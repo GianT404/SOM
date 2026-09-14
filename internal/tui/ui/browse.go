@@ -282,23 +282,12 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						startIdx := 0
 
 						for i, pt := range full {
-							var thumb string
-							if strings.HasPrefix(pt.ID, "local:") {
-								path := strings.TrimPrefix(pt.ID, "local:")
-								for _, lf := range p.locals {
-									if lf.Path == path {
-										thumb = lf.Thumbnail
-										break
-									}
-								}
-							}
-
 							plTracks[i] = domain.Track{
-								ID:        pt.ID,
+								ID:        "local:" + pt.Path,
 								Title:     pt.Title,
 								Artist:    pt.Artist,
 								Duration:  pt.Duration,
-								Thumbnail: thumb,
+								Thumbnail: pt.Thumbnail,
 							}
 							if pt.ID == picked.ID {
 								startIdx = i

@@ -492,10 +492,10 @@ func (a *App) applyDeleteTrack() {
 func (a *App) selectedTrackForPlaylist() (storage.PlaylistTrack, bool) {
 	if a.sidebarActive == SideSearch && a.left.searchCursor < len(a.left.tracks) {
 		t := a.left.tracks[a.left.searchCursor]
-		return storage.PlaylistTrack{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration, IsLocal: a.left.isDownloaded(t)}, true
+		return storage.PlaylistTrack{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration}, true
 	}
 	if lf, ok := a.renameTarget(); ok {
-		return storage.PlaylistTrack{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, IsLocal: true}, true
+		return storage.PlaylistTrack{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration}, true
 	}
 	return storage.PlaylistTrack{}, false
 }

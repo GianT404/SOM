@@ -175,7 +175,7 @@ func (a *App) applyMoveToPlaylist() {
 		id := "local:" + lf.Path
 
 		if existing[id] {
-			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, id); err == nil {
+			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, lf.Path); err == nil {
 				var newTracks []storage.PlaylistTrack
 				for _, t := range pl.Tracks {
 					if t.ID != id {
@@ -187,16 +187,17 @@ func (a *App) applyMoveToPlaylist() {
 				removed++
 			}
 		} else {
-			track := storage.PlaylistTrack{
-				ID:       id,
-				Title:    lf.Name,
-				Artist:   lf.Artist,
-				Duration: lf.Duration,
-				IsLocal:  true,
-			}
-			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, track); err == nil {
+			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, lf.Path); err == nil {
+				track := storage.PlaylistTrack{
+					ID:        lf.Path,
+					Title:     lf.Name,
+					Artist:    lf.Artist,
+					Duration:  lf.Duration,
+					Thumbnail: lf.Thumbnail,
+					Path:      lf.Path,
+				}
 				pl.Tracks = append(pl.Tracks, track)
-				existing[id] = true
+				existing[lf.Path] = true
 				added++
 			}
 		}

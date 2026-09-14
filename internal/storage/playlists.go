@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
 	"time"
@@ -14,11 +13,12 @@ type Playlist struct {
 }
 
 type PlaylistTrack struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	Artist   string `json:"artist"`
-	Duration int    `json:"duration"`
-	IsLocal  bool   `json:"is_local"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Artist    string `json:"artist"`
+	Duration  int    `json:"duration"`
+	Thumbnail string `json:"thumbnail"`
+	Path      string `json:"path"`
 }
 
 // ── Playlist CRUD ────────────────────────────────────────────────
@@ -60,31 +60,23 @@ func (db *DB) ListPlaylists() ([]Playlist, error) {
 	return playlists, rows.Err()
 }
 
-func (db *DB) GetPlaylist(id string) (*Playlist, error) {
-	var p Playlist
-	err := db.conn.QueryRow("SELECT id, name FROM playlists WHERE id = ?", id).Scan(&p.ID, &p.Name)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	tracks, err := db.GetPlaylistTracks(id)
-	if err != nil {
-		return nil, err
-	}
-	p.Tracks = tracks
-	return &p, nil
-}
-
 // ── Playlist Tracks ──────────────────────────────────────────────
 
 func (db *DB) GetPlaylistTracks(playlistID string) ([]PlaylistTrack, error) {
-	rows, err := db.conn.Query(
-		"SELECT track_id, title, artist, duration, is_local FROM playlist_tracks WHERE playlist_id = ? ORDER BY position",
-		playlistID,
-	)
+	query := `
+		SELECT 
+			pt.track_id, 
+			lf.name, 
+			lf.artist, 
+			lf.duration, 
+			lf.thumbnail, 
+			lf.path 
+		FROM playlist_tracks pt
+		JOIN local_files lf ON pt.track_id = lf.path
+		WHERE pt.playlist_id = ? 
+		ORDER BY pt.position
+	`
+	rows, err := db.conn.Query(query, playlistID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,28 +85,20 @@ func (db *DB) GetPlaylistTracks(playlistID string) ([]PlaylistTrack, error) {
 	var tracks []PlaylistTrack
 	for rows.Next() {
 		var t PlaylistTrack
-		var isLocal int
-		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Duration, &isLocal); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Duration, &t.Thumbnail, &t.Path); err != nil {
 			return nil, err
 		}
-		t.IsLocal = isLocal == 1
 		tracks = append(tracks, t)
 	}
 	return tracks, rows.Err()
 }
 
-func (db *DB) AddTrackToPlaylist(playlistID string, track PlaylistTrack) error {
-	isLocal := 0
-	if track.IsLocal {
-		isLocal = 1
-	}
-
+func (db *DB) AddTrackToPlaylist(playlistID string, trackID string) error {
 	res, err := db.conn.Exec(`
-		INSERT INTO playlist_tracks (playlist_id, track_id, title, artist, duration, is_local, position)
-		VALUES (?, ?, ?, ?, ?, ?,
-			COALESCE((SELECT MAX(position) + 1 FROM playlist_tracks WHERE playlist_id = ?), 0))
+		INSERT INTO playlist_tracks (playlist_id, track_id, position)
+		VALUES (?, ?, COALESCE((SELECT MAX(position) + 1 FROM playlist_tracks WHERE playlist_id = ?), 0))
 		ON CONFLICT(playlist_id, track_id) DO NOTHING`,
-		playlistID, track.ID, track.Title, track.Artist, track.Duration, isLocal, playlistID,
+		playlistID, trackID, playlistID,
 	)
 	if err != nil {
 		return err
@@ -124,11 +108,10 @@ func (db *DB) AddTrackToPlaylist(playlistID string, track PlaylistTrack) error {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("bài hát đã có trong playlist")
+		return fmt.Errorf("track already in playlist")
 	}
 	return nil
 }
-
 func (db *DB) RemoveTrackFromPlaylist(playlistID, trackID string) error {
 	_, err := db.conn.Exec(
 		"DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",

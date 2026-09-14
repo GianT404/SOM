@@ -119,30 +119,6 @@ func (db *DB) GetLocalFileLyrics(path string) (string, error) {
 	return s, err
 }
 
-func (db *DB) RenameLocalFile(oldPath, newPath, newName string) error {
-	tx, err := db.conn.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec("UPDATE local_files SET path = ?, name = ? WHERE path = ?", newPath, newName, oldPath)
-	if err != nil {
-		return err
-	}
-
-	// Update playlist tracks that reference the old local path.
-	_, err = tx.Exec(
-		"UPDATE playlist_tracks SET track_id = ?, title = ? WHERE track_id = ?",
-		"local:"+newPath, newName, "local:"+oldPath,
-	)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
 func (db *DB) ListAllLocalFiles() ([]LocalFile, error) {
 	return db.ListAllLocalFilesSorted("name")
 }
