@@ -858,9 +858,11 @@ func (a *App) View() tea.View {
 		if a.moveSelectActive && a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
 			alreadyInMove = map[string]bool{}
 			for _, t := range a.left.playlists[a.moveTargetPlIdx].Tracks {
-				if strings.HasPrefix(t.ID, "local:") {
-					alreadyInMove[strings.TrimPrefix(t.ID, "local:")] = true
+				path := t.Path
+				if path == "" {
+					path = strings.TrimPrefix(t.ID, "local:")
 				}
+				alreadyInMove[path] = true
 			}
 		}
 		mainView = a.left.ViewDownloadsContent(mainW, contentH, a.moveSelected, a.moveSelectActive, alreadyInMove)
@@ -1186,7 +1188,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		if a.left.activePlaylist != nil {
 			tracks := a.left.getFilteredPlaylistTracks()
 			for i, pt := range tracks {
-				if pt.ID == t.ID {
+				if "local:"+pt.Path == t.ID || pt.ID == t.ID {
 					a.left.plCursor = i
 					if a.left.plCursor < a.left.plOffset {
 						a.left.plOffset = a.left.plCursor
@@ -1323,7 +1325,7 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 	if a.activeContext == SidePlaylists && a.left.activePlaylist != nil {
 		tracks := a.left.getFilteredPlaylistTracks()
 		for i, pt := range tracks {
-			if pt.ID == t.ID {
+			if "local:"+pt.Path == t.ID || pt.ID == t.ID {
 				a.left.plCursor = i
 				a.left.plOffset = 0
 				if i >= vis {

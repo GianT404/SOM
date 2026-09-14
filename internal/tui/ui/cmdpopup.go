@@ -77,7 +77,7 @@ func (a *App) playlistsContainingSelected() []int {
 	var idxs []int
 	for i, pl := range a.left.playlists {
 		for _, t := range pl.Tracks {
-			if t.ID == track.ID {
+			if t.Path == track.Path || "local:"+t.Path == track.ID || t.ID == track.ID {
 				idxs = append(idxs, i)
 				break
 			}
@@ -85,7 +85,6 @@ func (a *App) playlistsContainingSelected() []int {
 	}
 	return idxs
 }
-
 func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 	if a.plRmActive {
 		idxs := a.playlistsContainingSelected()
@@ -106,18 +105,20 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			if a.cmdCursor < len(idxs) && a.left.plStore != nil {
 				pl := a.left.playlists[idxs[a.cmdCursor]]
 				track, _ := a.selectedTrackForPlaylist()
-				if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, track.ID); err == nil {
+				if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, track.Path); err == nil {
 					for j := range pl.Tracks {
-						if pl.Tracks[j].ID == track.ID {
+						if pl.Tracks[j].Path == track.Path || pl.Tracks[j].ID == track.ID {
 							a.left.playlists[idxs[a.cmdCursor]].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
 							break
 						}
 					}
 					a.setStatus(StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""))
+				} else {
+					a.setStatus(StatusErrStyle.Render("X Failed: " + err.Error()))
 				}
+				a.plRmActive = false
+				return nil
 			}
-			a.plRmActive = false
-			return nil
 		case "esc", ":":
 			a.plRmActive = false
 			return nil
@@ -384,22 +385,23 @@ func (a *App) applyRenameTitle(newTitle string) {
 		a.setStatus(StatusErrStyle.Render("X Title cannot be empty"))
 		return
 	}
+
 	target, ok := a.renameTarget()
 	if !ok {
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		return
 	}
-	oldPath := target.Path
 
+	oldPath := target.Path
 	newBase := sanitizeLocalName(newTitle)
 	if newBase == "" {
 		newBase = target.VideoID
 	}
 	newPath := filepath.Join(filepath.Dir(oldPath), newBase+filepath.Ext(oldPath))
+
 	if newPath != oldPath {
-		// Không cho rename đè lên track/file
 		if a.localPathTaken(newPath) {
-			errMsg := "Đã có track/file tên này: " + filepath.Base(newPath)
+			errMsg := "  track/file t y: " + filepath.Base(newPath)
 			a.renameErr = StatusErrStyle.Render(errMsg)
 			a.setStatus(StatusErrStyle.Render("X " + errMsg))
 			return
@@ -417,7 +419,7 @@ func (a *App) applyRenameTitle(newTitle string) {
 		if json.Unmarshal(data, &meta) == nil {
 			meta["title"] = newTitle
 			if out, err := json.MarshalIndent(meta, "", "  "); err == nil {
-				if newJson != oldJson {
+				if newPath != oldPath && newJson != oldJson {
 					_ = os.Rename(oldJson, newJson)
 				}
 				_ = os.WriteFile(newJson, out, 0o644)
@@ -425,25 +427,42 @@ func (a *App) applyRenameTitle(newTitle string) {
 		}
 	}
 
-	// Update SQLite records.
 	if a.left.plStore != nil {
 		_ = a.left.plStore.RenameLocalFile(oldPath, newPath, newTitle)
-	}
 
-	target.Name = newTitle
-	target.Path = newPath
-
-	for i := range a.playlist {
-		if a.playlist[i].ID == "local:"+oldPath {
-			a.playlist[i].ID = "local:" + newPath
-			a.playlist[i].Title = newTitle
+		// Cập nhật hàng đợi và lịch sử phát nhạc
+		for i := range a.playlist {
+			if a.playlist[i].ID == "local:"+oldPath {
+				a.playlist[i].ID = "local:" + newPath
+				a.playlist[i].Title = newTitle
+			}
 		}
+		if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == oldPath {
+			a.nowPlay.ID = "local:" + newPath
+			a.nowPlay.Title = newTitle
+		}
+
+		// Làm mới tab Download
+		a.left.scanLocalFiles()
+
+		if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
+			a.left.playlists = pls
+
+			if a.left.activePlaylist != nil {
+				for i := range a.left.playlists {
+					if a.left.playlists[i].ID == a.left.activePlaylist.ID {
+						a.left.activePlaylist = &a.left.playlists[i]
+						break
+					}
+				}
+			}
+		}
+
+		a.setStatus(StatusOKStyle.Render("> Renamed to " + newTitle))
 	}
-	if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == oldPath {
-		a.nowPlay.ID = "local:" + newPath
-		a.nowPlay.Title = newTitle
-	}
-	a.setStatus(StatusOKStyle.Render("> Renamed to " + newTitle))
+
+	a.renameActive = false
+	a.renameErr = ""
 }
 
 func (a *App) applyDeleteTrack() {
