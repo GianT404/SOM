@@ -148,7 +148,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			a.setStatus(StatusOKStyle.Render("Applied: " + p.Name))
 
 			// Khởi động lại ffmpeg để ép ăn filter ngay lập tức
-			if a.nowPlay != nil {
+			if a.playback.NowPlay != nil {
 				pos := int(a.player.Position().Seconds())
 				a.player.SeekTo(float64(pos))
 			}
@@ -182,10 +182,10 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 
 				a.delActive = false
 				a.showCmdPopup = false
-				if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == target.Path {
+				if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == target.Path {
 					a.player.Stop()
-					a.nowPlay = nil
-					a.songStarted = false
+					a.playback.NowPlay = nil
+					a.playback.SongStarted = false
 				}
 
 				a.setStatus(StatusMsgStyle.Render("> Deleting..."))
@@ -291,7 +291,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			}
 		case "enter":
 			pos := 0.0
-			if a.nowPlay != nil {
+			if a.playback.NowPlay != nil {
 				pos = a.player.Position().Seconds()
 			}
 
@@ -302,7 +302,7 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 			a.showCmdPopup = false
 			a.setStatus(StatusOKStyle.Render("Speed set to: " + s.Label))
 
-			if a.nowPlay != nil {
+			if a.playback.NowPlay != nil {
 				a.player.SeekTo(pos)
 			}
 			return nil
@@ -355,7 +355,7 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
-			a.trackQueue = append(a.trackQueue, domain.Track{
+			a.playback.Queue = append(a.playback.Queue, domain.Track{
 				ID:       track.ID,
 				Title:    track.Title,
 				Artist:   track.Artist,
@@ -485,8 +485,8 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 			idx++
 		}
 	}
-	if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") {
-		path := strings.TrimPrefix(a.nowPlay.ID, "local:")
+	if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") {
+		path := strings.TrimPrefix(a.playback.NowPlay.ID, "local:")
 		for i := range a.left.locals {
 			if a.left.locals[i].Path == path {
 				return &a.left.locals[i], true

@@ -105,7 +105,7 @@ func TestProgressBarSeekGeometry(t *testing.T) {
 	}
 
 	// Không có player → click progress không crash, trả về không xử lý.
-	a.nowPlay = &domain.Track{Duration: 200}
+	a.playback.NowPlay = &domain.Track{Duration: 200}
 	if a.seekFromProgressClick(tea.MouseClickMsg{X: 30, Y: base + 1, Button: tea.MouseLeft}) {
 		t.Fatal("should not seek without a player")
 	}

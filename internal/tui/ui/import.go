@@ -228,8 +228,8 @@ func (a *App) handleImportKeys(msg tea.KeyMsg) []tea.Cmd {
 			if ip.previewPath == f.Path {
 				a.player.Stop()
 				ip.previewPath = ""
-				a.nowPlay = nil
-				a.songStarted = false
+				a.playback.NowPlay = nil
+				a.playback.SongStarted = false
 				a.right.SetTrack(nil)
 			} else {
 				a.cancelResolve()
@@ -247,9 +247,9 @@ func (a *App) handleImportKeys(msg tea.KeyMsg) []tea.Cmd {
 						Title:    f.Name,
 						Duration: f.Duration,
 					}
-					a.nowPlay = track
-					a.songStarted = true
-					a.playerGen = a.player.Generation()
+					a.playback.NowPlay = track
+					a.playback.SongStarted = true
+					a.playback.PlayerGen = a.player.Generation()
 					a.right.SetTrack(track)
 				}
 			}

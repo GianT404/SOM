@@ -63,7 +63,7 @@ func (a *App) listRowOrigin() (int, bool) {
 		}
 		return ct + 5, true
 	case SideQueue:
-		if len(a.trackQueue) == 0 {
+		if len(a.playback.Queue) == 0 {
 			return 0, false
 		}
 		return ct + 2, true
@@ -125,7 +125,7 @@ func (a *App) moveListCursorTo(idx int) bool {
 		clamp(&a.left.dlOffset)
 		return true
 	case SideQueue:
-		if idx >= len(a.trackQueue) {
+		if idx >= len(a.playback.Queue) {
 			return false
 		}
 		a.left.qCursor = idx
@@ -179,7 +179,7 @@ func (a *App) stepListCursor(delta int) {
 		cur = a.left.dlCursor
 	case SideQueue:
 		cur = a.left.qCursor
-		if len(a.trackQueue) == 0 {
+		if len(a.playback.Queue) == 0 {
 			return
 		}
 	case SidePlaylists:
@@ -228,7 +228,7 @@ func (a *App) progressBarTop() int {
 }
 
 func (a *App) seekFromProgressClick(m tea.MouseClickMsg) bool {
-	if a.player == nil || a.nowPlay == nil || a.nowPlay.Duration <= 0 {
+	if a.player == nil || a.playback.NowPlay == nil || a.playback.NowPlay.Duration <= 0 {
 		return false
 	}
 	if m.Button != tea.MouseLeft {
@@ -249,7 +249,7 @@ func (a *App) seekFromProgressClick(m tea.MouseClickMsg) bool {
 	if frac > 1 {
 		frac = 1
 	}
-	target := frac * float64(a.nowPlay.Duration)
+	target := frac * float64(a.playback.NowPlay.Duration)
 	a.player.SeekBy(target - a.player.Position().Seconds())
 	a.right.TickAt()
 	return true

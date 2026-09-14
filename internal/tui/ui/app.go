@@ -56,8 +56,7 @@ type App struct {
 	provider      domain.MusicProvider
 	downloadDir   string
 	player        *player.Player
-	nowPlay       *domain.Track
-	songStarted   bool
+	playback      *PlaybackManager
 	width         int
 	height        int
 	left          LeftPanel
@@ -65,10 +64,6 @@ type App struct {
 	statusMsg     string
 	statusAt      time.Time
 	showHelpPopup bool
-	playlist      []domain.Track
-	currentIdx    int
-	random        bool
-	shuffleHist   []int
 
 	sidebarActive SidebarItem
 	sidebarAnim   sidebarAnimState
@@ -101,18 +96,13 @@ type App struct {
 	mouseLastClickAt     time.Time
 	mouseLastClickY      int
 	mouseLastClickTab    SidebarItem
-	trackQueue           []domain.Track
 	avrcp                *avrcp.Server
-	playerGen            uint64
-	resolveCancel        context.CancelFunc
 	presetActive         bool
 	activePreset         int
 	speedActive          bool
 	activeSpeed          int
 	sortActive           bool
 	activeSort           string
-	nextPlay             *domain.Track
-	playHistory          []domain.Track
 	importPanel          ImportPanel
 	moveSelectActive     bool
 	moveSelected         map[string]bool
@@ -144,6 +134,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		mouseEnabled:    false,
 		importPanel:     NewImportPanel(),
 		moveCreateInput: mi,
+		playback:        NewPlaybackManager(),
 	}
 }
 
@@ -159,15 +150,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 				break
 			}
-			for i := range a.playlist {
-				if a.playlist[i].ID == "local:"+msg.OldPath {
-					a.playlist[i].ID = "local:" + msg.NewPath
-					a.playlist[i].Title = msg.NewTitle
+			for i := range a.playback.Playlist {
+				if a.playback.Playlist[i].ID == "local:"+msg.OldPath {
+					a.playback.Playlist[i].ID = "local:" + msg.NewPath
+					a.playback.Playlist[i].Title = msg.NewTitle
 				}
 			}
-			if a.nowPlay != nil && strings.HasPrefix(a.nowPlay.ID, "local:") && strings.TrimPrefix(a.nowPlay.ID, "local:") == msg.OldPath {
-				a.nowPlay.ID = "local:" + msg.NewPath
-				a.nowPlay.Title = msg.NewTitle
+			if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == msg.OldPath {
+				a.playback.NowPlay.ID = "local:" + msg.NewPath
+				a.playback.NowPlay.Title = msg.NewTitle
 			}
 
 			a.left.scanLocalFiles()
@@ -205,13 +196,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			newPlaylist := a.playlist[:0]
-			for _, t := range a.playlist {
+			newPlaylist := a.playback.Playlist[:0]
+			for _, t := range a.playback.Playlist {
 				if t.ID != "local:"+msg.Path {
 					newPlaylist = append(newPlaylist, t)
 				}
 			}
-			a.playlist = newPlaylist
+			a.playback.Playlist = newPlaylist
 
 			a.setStatus(StatusOKStyle.Render("> Deleted " + msg.Name))
 		case tea.WindowSizeMsg:
@@ -278,9 +269,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.left.animTick++
 		a.right.TickAt()
 		// resolve stream thất bại trước khi phát thì không tự trỏ qua bài khác.
-		if !a.left.loadingStream && a.songStarted && a.player.State() == player.Stopped && a.nowPlay != nil {
+		if !a.left.loadingStream && a.playback.SongStarted && a.player.State() == player.Stopped && a.playback.NowPlay != nil {
 			playErr := a.player.PlaybackError()
-			a.nowPlay = nil
+			a.playback.NowPlay = nil
 			if a.avrcp != nil {
 				a.avrcp.UpdatePlaybackStatus("Stopped")
 			}
@@ -288,42 +279,42 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
 			} else if a.sidebarActive == SideImport {
 			} else if a.player.PlayFromBuffer() {
-				if a.nextPlay != nil {
-					a.nowPlay = a.nextPlay
+				if a.playback.NextPlay != nil {
+					a.playback.NowPlay = a.playback.NextPlay
 
-					if len(a.trackQueue) > 0 && a.trackQueue[0].ID == a.nowPlay.ID {
-						a.trackQueue = a.trackQueue[1:]
-						if a.left.qCursor >= len(a.trackQueue) {
-							a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+					if len(a.playback.Queue) > 0 && a.playback.Queue[0].ID == a.playback.NowPlay.ID {
+						a.playback.Queue = a.playback.Queue[1:]
+						if a.left.qCursor >= len(a.playback.Queue) {
+							a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 						}
 					} else {
-						for i, tr := range a.playlist {
-							if tr.ID == a.nowPlay.ID {
-								a.currentIdx = i
+						for i, tr := range a.playback.Playlist {
+							if tr.ID == a.playback.NowPlay.ID {
+								a.playback.CurrentIdx = i
 								break
 							}
 						}
 					}
 
-					a.nextPlay = nil // Reset trạng thái
-					a.songStarted = true
-					a.playerGen = a.player.Generation()
+					a.playback.NextPlay = nil // Reset trạng thái
+					a.playback.SongStarted = true
+					a.playback.PlayerGen = a.player.Generation()
 
-					a.updateCursorForTrack(*a.nowPlay)
-					a.right.SetTrack(a.nowPlay)
-					a.setStatus(StatusOKStyle.Render(">  " + a.nowPlay.Title))
+					a.updateCursorForTrack(*a.playback.NowPlay)
+					a.right.SetTrack(a.playback.NowPlay)
+					a.setStatus(StatusOKStyle.Render(">  " + a.playback.NowPlay.Title))
 
 					if a.avrcp != nil {
-						a.avrcp.UpdateMetadata(a.nowPlay.ID, a.nowPlay.Title, a.nowPlay.Artist, "", a.nowPlay.Thumbnail, int64(a.nowPlay.Duration)*1_000_000)
+						a.avrcp.UpdateMetadata(a.playback.NowPlay.ID, a.playback.NowPlay.Title, a.playback.NowPlay.Artist, "", a.playback.NowPlay.Thumbnail, int64(a.playback.NowPlay.Duration)*1_000_000)
 						a.avrcp.UpdatePlaybackStatus("Playing")
 					}
-					a.loadLyricsForTrack(*a.nowPlay)
+					a.loadLyricsForTrack(*a.playback.NowPlay)
 				}
-			} else if len(a.trackQueue) > 0 {
-				t := a.trackQueue[0]
-				a.trackQueue = a.trackQueue[1:]
-				if a.left.qCursor >= len(a.trackQueue) {
-					a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+			} else if len(a.playback.Queue) > 0 {
+				t := a.playback.Queue[0]
+				a.playback.Queue = a.playback.Queue[1:]
+				if a.left.qCursor >= len(a.playback.Queue) {
+					a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 				}
 				a.highlightTrackInSidebar(t)
 				cmds = append(cmds, a.playTrackAt(-1, t))
@@ -334,9 +325,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Gapless: pre-decode next track when current has < 3s remaining.
-		if a.songStarted && a.player.State() == player.Playing && a.nowPlay != nil && a.sidebarActive != SideImport {
+		if a.playback.SongStarted && a.player.State() == player.Playing && a.playback.NowPlay != nil && a.sidebarActive != SideImport {
 			pos := a.player.Position()
-			dur := time.Duration(a.nowPlay.Duration) * time.Second
+			dur := time.Duration(a.playback.NowPlay.Duration) * time.Second
 			remaining := dur - pos
 			if remaining > 0 && remaining <= 3*time.Second {
 				a.triggerPreDecodeNext()
@@ -344,35 +335,35 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Update AVRCP position for Bluetooth devices.
-		if a.avrcp != nil && a.nowPlay != nil {
+		if a.avrcp != nil && a.playback.NowPlay != nil {
 			a.avrcp.UpdatePosition(a.player.Position().Microseconds())
 		}
 
 		cmds = append(cmds, tick())
 	case PlayPlaylistMsg:
-		a.playlist = msg.Tracks
-		a.shuffleHist = nil
-		a.playHistory = nil
+		a.playback.Playlist = msg.Tracks
+		a.playback.ShuffleHist = nil
+		a.playback.History = nil
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
 	case PlayQueueMsg:
-		if msg.Index >= 0 && msg.Index < len(a.trackQueue) {
-			t := a.trackQueue[msg.Index]
-			a.trackQueue = append(a.trackQueue[:msg.Index], a.trackQueue[msg.Index+1:]...)
-			if a.left.qCursor >= len(a.trackQueue) {
-				a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+		if msg.Index >= 0 && msg.Index < len(a.playback.Queue) {
+			t := a.playback.Queue[msg.Index]
+			a.playback.Queue = append(a.playback.Queue[:msg.Index], a.playback.Queue[msg.Index+1:]...)
+			if a.left.qCursor >= len(a.playback.Queue) {
+				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 			}
 			a.highlightTrackInSidebar(t)
 			cmds = append(cmds, a.playTrackAt(-1, t))
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 		}
 	case RemoveFromQueueMsg:
-		if msg.Index >= 0 && msg.Index < len(a.trackQueue) {
-			removed := a.trackQueue[msg.Index]
-			a.trackQueue = append(a.trackQueue[:msg.Index], a.trackQueue[msg.Index+1:]...)
-			if a.left.qCursor >= len(a.trackQueue) {
-				a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+		if msg.Index >= 0 && msg.Index < len(a.playback.Queue) {
+			removed := a.playback.Queue[msg.Index]
+			a.playback.Queue = append(a.playback.Queue[:msg.Index], a.playback.Queue[msg.Index+1:]...)
+			if a.left.qCursor >= len(a.playback.Queue) {
+				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 			}
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
 		}
@@ -578,9 +569,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.left.input.Focused() || a.left.plInput.Focused() {
 				break
 			}
-			a.random = !a.random
-			a.shuffleHist = nil
-			a.playHistory = nil
+			a.playback.Random = !a.playback.Random
+			a.playback.ShuffleHist = nil
+			a.playback.History = nil
 			a.syncPlaylistState()
 
 		case "up":
@@ -632,13 +623,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case PlayStartedMsg:
 		t := msg.Track
-		a.playlist = a.left.tracks
-		a.shuffleHist = nil
-		a.playHistory = nil
+		a.playback.Playlist = a.left.tracks
+		a.playback.ShuffleHist = nil
+		a.playback.History = nil
 		a.activeContext = SideSearch
 
 		idx := -1
-		for i, tr := range a.playlist {
+		for i, tr := range a.playback.Playlist {
 			if tr.ID == t.ID {
 				idx = i
 				break
@@ -667,12 +658,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
 		}
-		a.playlist = make([]domain.Track, len(locals))
-		a.shuffleHist = nil
-		a.playHistory = nil
+		a.playback.Playlist = make([]domain.Track, len(locals))
+		a.playback.ShuffleHist = nil
+		a.playback.History = nil
 		idx := -1
 		for i, lf := range locals {
-			a.playlist[i] = domain.Track{
+			a.playback.Playlist[i] = domain.Track{
 				ID:        "local:" + lf.Path,
 				Title:     lf.Name,
 				Artist:    lf.Artist,
@@ -687,7 +678,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			idx = 0
 		}
 		a.activeContext = SideDownloads
-		cmds = append(cmds, a.playTrackAt(idx, a.playlist[idx]))
+		cmds = append(cmds, a.playTrackAt(idx, a.playback.Playlist[idx]))
 
 		filtered := a.left.getFilteredLocals()
 		for fi, lf := range filtered {
@@ -710,15 +701,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		// Ignore stale goroutine: a newer playTrackAt has been called since.
-		if msg.Gen != a.playerGen {
+		if msg.Gen != a.playback.PlayerGen {
 			// Vẫn phải tắt spinner: request resolve cũ (đã bị thay thế) không
 			// còn ai gửi tin nhắn hợp lệ để tắt nó.
 			a.left.loadingStream = false
 			break
 		}
 		a.left.loadingStream = false
-		a.nowPlay = &msg.Track
-		a.songStarted = true
+		a.playback.NowPlay = &msg.Track
+		a.playback.SongStarted = true
 		a.right.SetTrack(&msg.Track)
 		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
 		if msg.LyricsErr != nil {
@@ -800,8 +791,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					a.avrcp.UpdatePlaybackStatus("Paused")
 				}
 			case player.Stopped:
-				if a.nowPlay != nil {
-					cmds = append(cmds, a.playTrackAt(a.currentIdx, *a.nowPlay))
+				if a.playback.NowPlay != nil {
+					cmds = append(cmds, a.playTrackAt(a.playback.CurrentIdx, *a.playback.NowPlay))
 				}
 			}
 		case "pause":
@@ -837,9 +828,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	focusedContent := a.sidebarActive != SideImport && (a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists)
-	a.left.queue = a.trackQueue
+	a.left.queue = a.playback.Queue
 	var leftCmd tea.Cmd
-	a.left, leftCmd = a.left.Update(msg, focusedContent, a.nowPlay)
+	a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
 	cmds = append(cmds, leftCmd)
 
 	if a.sidebarActive == SideImport {
@@ -932,7 +923,7 @@ func (a *App) View() tea.View {
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
 	case SideQueue:
-		mainView = a.left.ViewQueueContent(mainW, contentH, a.trackQueue)
+		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue)
 	case SidePlaylists:
 		mainView = a.left.ViewPlaylistsContent(mainW, contentH)
 	case SideLogs:
@@ -948,7 +939,7 @@ func (a *App) View() tea.View {
 	}
 
 	rStyle := HelpStyle
-	if a.random {
+	if a.playback.Random {
 		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
 	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev ") +
@@ -1025,7 +1016,7 @@ func (a *App) renderSomRow(somLogo string) string {
 	var hint string
 	switch a.sidebarActive {
 	case SideLyrics:
-		if a.nowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return somLogo
 		}
 		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
@@ -1073,7 +1064,7 @@ func (a *App) renderSomRow(somLogo string) string {
 }
 
 func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
-	if a.nowPlay == nil {
+	if a.playback.NowPlay == nil {
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
@@ -1093,13 +1084,13 @@ func (a *App) renderProgressBar(w int) string {
 
 	elapsedSec := 0
 	totalSec := 0
-	if a.nowPlay != nil {
+	if a.playback.NowPlay != nil {
 		elapsedSec = int(a.right.elapsed.Seconds())
 		if elapsedSec < 0 {
 			elapsedSec = 0
 		}
 
-		totalSec = a.nowPlay.Duration
+		totalSec = a.playback.NowPlay.Duration
 		if totalSec > 0 && elapsedSec > totalSec {
 			elapsedSec = totalSec
 		}
@@ -1162,8 +1153,8 @@ func (a *App) renderProgressBar(w int) string {
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 
 	title := ""
-	if a.nowPlay != nil {
-		title = a.nowPlay.Title
+	if a.playback.NowPlay != nil {
+		title = a.playback.NowPlay.Title
 	}
 	borderW := w - 2
 	if borderW < 0 {
@@ -1202,20 +1193,21 @@ func (a *App) renderProgressBar(w int) string {
 	return topBorder + "\n" + combinedLine + "\n" + bottomBorder
 }
 func (a *App) cancelResolve() {
-	if a.resolveCancel != nil {
-		a.resolveCancel()
-		a.resolveCancel = nil
+	if a.playback.ResolveCancel != nil {
+		a.playback.ResolveCancel()
+		a.playback.ResolveCancel = nil
 	}
 }
 
 func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
-	if a.nowPlay != nil && a.random {
-		a.playHistory = append(a.playHistory, *a.nowPlay)
+	if a.playback.NowPlay != nil && a.playback.Random {
+		a.playback.History = append(a.playback.History, *a.playback.NowPlay)
 	}
-	a.currentIdx = idx
-	a.nowPlay = &t
-	a.songStarted = false
-	a.nextPlay = nil
+	a.playback.RecordHistory()
+	a.playback.CurrentIdx = idx
+	a.playback.NowPlay = &t
+	a.playback.SongStarted = false
+	a.playback.NextPlay = nil
 	a.syncPlaylistState()
 
 	if idx >= 0 {
@@ -1265,15 +1257,15 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 
 	if strings.HasPrefix(t.ID, "local:") {
 		// Huỷ resolve stream (nếu có) đang chạy dở để nó không phát đè lên bài local vừa chọn
-		a.cancelResolve()
+		a.playback.CancelResolve()
 		a.left.loadingStream = false
 		path := strings.TrimPrefix(t.ID, "local:")
 		if err := a.player.Play(path); err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
 			return a.playNext()
 		}
-		a.playerGen = a.player.Generation()
-		a.songStarted = true
+		a.playback.PlayerGen = a.player.Generation()
+		a.playback.SongStarted = true
 		a.right.SetTrack(&t)
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 		if a.avrcp != nil {
@@ -1293,11 +1285,11 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 		return nil
 	}
-	a.cancelResolve()
+	a.playback.CancelResolve()
 	ctx, cancel := context.WithCancel(context.Background())
-	a.resolveCancel = cancel
+	a.playback.ResolveCancel = cancel
 	gen := a.player.Generation()
-	a.playerGen = gen
+	a.playback.PlayerGen = gen
 	return func() tea.Msg {
 		streamInfo, err := a.provider.ResolveStream(ctx, t.ID)
 		// Nếu resolve này không còn là request mới nhất (một bài khác đã được
@@ -1400,69 +1392,47 @@ func (a *App) updateCursorForTrack(t domain.Track) {
 }
 
 func (a *App) playNext() tea.Cmd {
-	if len(a.trackQueue) > 0 {
-		t := a.trackQueue[0]
-		a.trackQueue = a.trackQueue[1:]
-		if a.left.qCursor >= len(a.trackQueue) {
-			a.left.qCursor = maxInt(len(a.trackQueue)-1, 0)
+	t, idx, isQueue := a.playback.NextTrack()
+	if t == nil {
+		return nil
+	}
+	if isQueue {
+		if a.left.qCursor >= len(a.playback.Queue) {
+			a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 		}
-		a.highlightTrackInSidebar(t)
+		a.highlightTrackInSidebar(*t)
 		a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
-		return a.playTrackAt(-1, t)
 	}
-	if len(a.playlist) == 0 {
-		return nil
-	}
-	next := a.currentIdx + 1
-	if a.random {
-		next = a.pickAntiClumpIndex()
-	}
-	if next >= len(a.playlist) {
-		return nil
-	}
-	return a.playTrackAt(next, a.playlist[next])
+	return a.playTrackAt(idx, *t)
 }
 
 func (a *App) playPrev() tea.Cmd {
-	if len(a.playlist) == 0 {
+	t, idx := a.playback.PrevTrack()
+	if t == nil {
 		return nil
 	}
-	if a.random && len(a.playHistory) > 0 {
-		prev := a.playHistory[len(a.playHistory)-1]
-		a.playHistory = a.playHistory[:len(a.playHistory)-1]
-		for i, tr := range a.playlist {
-			if tr.ID == prev.ID {
-				return a.playTrackAt(i, tr)
-			}
-		}
-		return a.playTrackAt(-1, prev)
-	}
-	prev := a.currentIdx - 1
-	if prev < 0 {
-		return nil
-	}
-	return a.playTrackAt(prev, a.playlist[prev])
+	return a.playTrackAt(idx, *t)
 }
 
 // triggerPreDecodeNext pre-decodes the next track for gapless playback.
 // Only works for local files (no headers needed).
 func (a *App) triggerPreDecodeNext() {
-	if a.nextPlay != nil {
+	if a.playback.NextPlay != nil {
 		return
 	}
 
 	var next domain.Track
-	if len(a.trackQueue) > 0 {
-		next = a.trackQueue[0]
-	} else if len(a.playlist) > 0 {
-		idx := a.currentIdx + 1
-		if a.random {
-			idx = a.pickAntiClumpIndex()
+	if len(a.playback.Queue) > 0 {
+		next = a.playback.Queue[0]
+	} else if len(a.playback.Playlist) > 0 {
+		idx := a.playback.CurrentIdx + 1
+		if a.playback.Random {
+			idx = a.playback.pickAntiClumpIndex()
 		}
-		if idx >= len(a.playlist) {
+		if idx >= len(a.playback.Playlist) {
 			return
 		}
-		next = a.playlist[idx]
+		next = a.playback.Playlist[idx]
 	} else {
 		return
 	}
@@ -1472,7 +1442,7 @@ func (a *App) triggerPreDecodeNext() {
 	}
 	path := strings.TrimPrefix(next.ID, "local:")
 
-	a.nextPlay = &next
+	a.playback.NextPlay = &next
 	a.player.PreDecodeNext(path, nil)
 }
 
@@ -1494,7 +1464,7 @@ func (a *App) loadLyricsForTrack(t domain.Track) {
 }
 
 func (a *App) pickAntiClumpIndex() int {
-	n := len(a.playlist)
+	n := len(a.playback.Playlist)
 	if n <= 1 {
 		return 0
 	}
@@ -1503,23 +1473,23 @@ func (a *App) pickAntiClumpIndex() int {
 		histCap = 8
 	}
 
-	recent := make(map[int]bool, len(a.shuffleHist))
-	start := len(a.shuffleHist) - histCap
+	recent := make(map[int]bool, len(a.playback.ShuffleHist))
+	start := len(a.playback.ShuffleHist) - histCap
 	if start < 0 {
 		start = 0
 	}
-	for _, idx := range a.shuffleHist[start:] {
+	for _, idx := range a.playback.ShuffleHist[start:] {
 		recent[idx] = true
 	}
 
 	curArtist := ""
-	if a.currentIdx >= 0 && a.currentIdx < n {
-		curArtist = a.playlist[a.currentIdx].Artist
+	if a.playback.CurrentIdx >= 0 && a.playback.CurrentIdx < n {
+		curArtist = a.playback.Playlist[a.playback.CurrentIdx].Artist
 	}
 
 	var freshDiffArtist, freshSameArtist, usedDiffArtist []int
-	for i, t := range a.playlist {
-		if i == a.currentIdx {
+	for i, t := range a.playback.Playlist {
+		if i == a.playback.CurrentIdx {
 			continue
 		}
 		diffArtist := curArtist == "" || t.Artist != curArtist
@@ -1544,8 +1514,8 @@ func (a *App) pickAntiClumpIndex() int {
 		pool = usedDiffArtist
 	}
 	if len(pool) == 0 {
-		for i := range a.playlist {
-			if i != a.currentIdx {
+		for i := range a.playback.Playlist {
+			if i != a.playback.CurrentIdx {
 				pool = append(pool, i)
 			}
 		}
@@ -1553,17 +1523,17 @@ func (a *App) pickAntiClumpIndex() int {
 
 	picked := pool[rand.Intn(len(pool))]
 
-	a.shuffleHist = append(a.shuffleHist, picked)
-	if len(a.shuffleHist) > histCap*2 {
-		a.shuffleHist = a.shuffleHist[len(a.shuffleHist)-histCap:]
+	a.playback.ShuffleHist = append(a.playback.ShuffleHist, picked)
+	if len(a.playback.ShuffleHist) > histCap*2 {
+		a.playback.ShuffleHist = a.playback.ShuffleHist[len(a.playback.ShuffleHist)-histCap:]
 	}
 
 	return picked
 }
 
 func (a *App) syncPlaylistState() {
-	if a.playlist != nil {
-		a.right.SetPlaylistState(a.currentIdx, len(a.playlist), a.random)
+	if a.playback.Playlist != nil {
+		a.right.SetPlaylistState(a.playback.CurrentIdx, len(a.playback.Playlist), a.playback.Random)
 	}
 }
 
