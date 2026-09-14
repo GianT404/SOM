@@ -1142,37 +1142,44 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 
 	if idx >= 0 {
 		vis := a.left.visibleRows()
-		switch a.activeContext {
-		case SideSearch:
-			a.left.searchCursor = idx
-			if a.left.searchCursor < a.left.searchOffset {
-				a.left.searchOffset = a.left.searchCursor
-			}
-			if a.left.searchCursor >= a.left.searchOffset+vis {
-				a.left.searchOffset = a.left.searchCursor - vis + 1
-			}
-		case SideDownloads:
-			a.left.dlCursor = idx
-			if a.left.dlCursor < a.left.dlOffset {
-				a.left.dlOffset = a.left.dlCursor
-			}
-			if a.left.dlCursor >= a.left.dlOffset+vis {
-				a.left.dlOffset = a.left.dlCursor - vis + 1
-			}
-		case SidePlaylists:
-			if a.left.activePlaylist != nil {
-				tracks := a.left.getFilteredPlaylistTracks()
-				for i, pt := range tracks {
-					if pt.ID == t.ID {
-						a.left.plCursor = i
-						if a.left.plCursor < a.left.plOffset {
-							a.left.plOffset = a.left.plCursor
-						}
-						if a.left.plCursor >= a.left.plOffset+vis {
-							a.left.plOffset = a.left.plCursor - vis + 1
-						}
-						break
+		if strings.HasPrefix(t.ID, "local:") {
+			path := strings.TrimPrefix(t.ID, "local:")
+			for i, lf := range a.left.locals {
+				if lf.Path == path {
+					a.left.dlCursor = i
+					if a.left.dlCursor < a.left.dlOffset {
+						a.left.dlOffset = a.left.dlCursor
+					} else if a.left.dlCursor >= a.left.dlOffset+vis {
+						a.left.dlOffset = a.left.dlCursor - vis + 1
 					}
+					break
+				}
+			}
+		} else {
+			for i, tr := range a.left.tracks {
+				if tr.ID == t.ID {
+					a.left.searchCursor = i
+					if a.left.searchCursor < a.left.searchOffset {
+						a.left.searchOffset = a.left.searchCursor
+					} else if a.left.searchCursor >= a.left.searchOffset+vis {
+						a.left.searchOffset = a.left.searchCursor - vis + 1
+					}
+					break
+				}
+			}
+		}
+
+		if a.left.activePlaylist != nil {
+			tracks := a.left.getFilteredPlaylistTracks()
+			for i, pt := range tracks {
+				if pt.ID == t.ID {
+					a.left.plCursor = i
+					if a.left.plCursor < a.left.plOffset {
+						a.left.plOffset = a.left.plCursor
+					} else if a.left.plCursor >= a.left.plOffset+vis {
+						a.left.plOffset = a.left.plCursor - vis + 1
+					}
+					break
 				}
 			}
 		}
