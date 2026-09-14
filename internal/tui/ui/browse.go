@@ -280,15 +280,31 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						full := p.activePlaylist.Tracks
 						plTracks := make([]domain.Track, len(full))
 						startIdx := 0
+
 						for i, pt := range full {
-							plTracks[i] = domain.Track{ID: pt.ID, Title: pt.Title, Artist: pt.Artist, Duration: pt.Duration}
+							var thumb string
+							if strings.HasPrefix(pt.ID, "local:") {
+								path := strings.TrimPrefix(pt.ID, "local:")
+								for _, lf := range p.locals {
+									if lf.Path == path {
+										thumb = lf.Thumbnail
+										break
+									}
+								}
+							}
+
+							plTracks[i] = domain.Track{
+								ID:        pt.ID,
+								Title:     pt.Title,
+								Artist:    pt.Artist,
+								Duration:  pt.Duration,
+								Thumbnail: thumb,
+							}
 							if pt.ID == picked.ID {
 								startIdx = i
 							}
 						}
-						return p, func() tea.Msg {
-							return PlayPlaylistMsg{Tracks: plTracks, Index: startIdx}
-						}
+						return p, func() tea.Msg { return PlayPlaylistMsg{Tracks: plTracks, Index: startIdx} }
 					}
 				} else {
 					filtered := p.getFilteredPlaylists()
