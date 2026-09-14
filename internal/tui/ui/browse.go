@@ -659,7 +659,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				restored := false
 				if nowPlay != nil {
 					for i, t := range p.getFilteredPlaylistTracks() {
-						if t.ID == nowPlay.ID {
+						if "local:"+t.Path == nowPlay.ID || t.ID == nowPlay.ID {
 							p.plCursor = i
 							restored = true
 							break
@@ -668,7 +668,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 				if !restored && p.plPreFilterID != "" {
 					for i, t := range p.getFilteredPlaylistTracks() {
-						if t.ID == p.plPreFilterID {
+						if t.ID == p.plPreFilterID || "local:"+t.Path == p.plPreFilterID {
 							p.plCursor = i
 							restored = true
 							break
