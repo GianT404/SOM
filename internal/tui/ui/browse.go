@@ -408,7 +408,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				if len(p.suggestions) > 0 && p.activeTab == SideSearch {
 					p.suggestFocus = true
 					p.suggestCursor = 0
-				} else if p.activeTab == SideSearch || p.activeTab == SideDownloads {
+				} else if p.activeTab == SideSearch || p.activeTab == SideDownloads || p.activeTab == SidePlaylists {
 					p.input.Blur()
 				}
 				return p, nil

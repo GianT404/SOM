@@ -1347,7 +1347,6 @@ func (a *App) playPrev() tea.Cmd {
 		a.playHistory = a.playHistory[:len(a.playHistory)-1]
 		for i, tr := range a.playlist {
 			if tr.ID == prev.ID {
-				a.highlightTrackInSidebar(tr)
 				return a.playTrackAt(i, tr)
 			}
 		}
