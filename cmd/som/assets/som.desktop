@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=SOM
+Comment=SOM - Terminal Music Player
+Exec=kitty --class SOM @SOM_EXEC@
+Icon=som
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=SOM

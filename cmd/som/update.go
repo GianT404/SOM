@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -126,10 +127,20 @@ func runSelfUpdate(current string) error {
 		opts.Verifier = verifier
 	}
 	if err := selfupdate.Apply(reader, opts); err != nil {
-		if rerr := selfupdate.RollbackError(err); rerr != nil {
-			return fmt.Errorf("update failed AND rollback also failed (reinstall manually): %w", rerr)
-		}
-		return fmt.Errorf("update failed, rolled back to the previous version: %w", err)
+		return err
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("determine executable path: %w", err)
+	}
+
+	cmd := exec.Command(exe, "--sync-assets")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sync desktop assets: %w", err)
 	}
 	if total > 0 {
 		fmt.Printf("\r[%-40s] 100%%  \n", strings.Repeat("#", 40))

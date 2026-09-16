@@ -81,22 +81,30 @@ func alreadyInstalled() bool {
 }
 
 func installUnix() error {
-	if alreadyInstalled() {
-		fmt.Println("som is already installed at /usr/local/bin/som.")
-		return nil
-	}
-
 	const destDir = "/usr/local/bin"
 	dest := filepath.Join(destDir, "som")
 
-	if err := copyExecutableTo(dest); err != nil {
-		if os.IsPermission(err) {
-			return fmt.Errorf("no permission to write to %s — run again with sudo:\n  sudo som --install", destDir)
+	if !alreadyInstalled() {
+		if err := copyExecutableTo(dest); err != nil {
+			if os.IsPermission(err) {
+				return fmt.Errorf(
+					"no permission to write to %s — run again with sudo:\n  sudo som --install",
+					destDir,
+				)
+			}
+			return err
 		}
-		return err
+
+		fmt.Println("Installed to", dest)
+	} else {
+		fmt.Println("som is already installed at", dest)
 	}
-	fmt.Println("Installed to", dest)
-	fmt.Println("You can now run `som` from anywhere (open a new terminal if you don't see the effect).")
+
+	if err := installDesktopAssets(); err != nil {
+		return fmt.Errorf("install desktop assets: %w", err)
+	}
+
+	fmt.Println("Desktop launcher and icon installed.")
 	return nil
 }
 

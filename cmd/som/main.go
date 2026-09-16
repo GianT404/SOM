@@ -30,7 +30,7 @@ func main() {
 	var serverURL string
 	var apiKey string
 	var downloadDir string
-	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag bool
+	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag bool
 
 	var rootCmd = &cobra.Command{
 		Use:   "som",
@@ -72,6 +72,13 @@ func main() {
 			if installFlag {
 				if err := runInstall(); err != nil {
 					fmt.Fprintln(os.Stderr, "Install failed:", err)
+					os.Exit(1)
+				}
+				return
+			}
+			if syncAssetsFlag {
+				if err := installDesktopAssets(); err != nil {
+					fmt.Fprintln(os.Stderr, "Asset sync failed:", err)
 					os.Exit(1)
 				}
 				return
@@ -173,6 +180,12 @@ func main() {
 	rootCmd.Flags().BoolVar(&uninstallFlag, "uninstall", false, "remove the installed som binary from your machine")
 	rootCmd.Flags().BoolVar(&updateYtdlpFlag, "update-ytdlp", false, "update the yt-dlp binary to the latest version")
 	rootCmd.Flags().BoolVar(&changelogFlag, "changelog", false, "print the commits of the current version")
+	rootCmd.Flags().BoolVar(
+		&syncAssetsFlag,
+		"sync-assets",
+		false,
+		"internal: sync embedded desktop assets",
+	)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
