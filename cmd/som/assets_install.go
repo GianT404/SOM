@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func installDesktopAssets() error {
+func installDesktopAssets(exePath string) error {
 	home, err := somUserHome()
 	if err != nil {
 		return err
@@ -39,15 +39,10 @@ func installDesktopAssets() error {
 		return fmt.Errorf("create application directory: %w", err)
 	}
 
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("determine executable path: %w", err)
-	}
-
 	desktop := bytes.ReplaceAll(
 		somDesktop,
 		[]byte("@SOM_EXEC@"),
-		[]byte(exe),
+		[]byte(exePath),
 	)
 
 	iconPath := filepath.Join(iconDir, "som.svg")
@@ -67,7 +62,6 @@ func installDesktopAssets() error {
 
 	return nil
 }
-
 func somUserHome() (string, error) {
 	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
 		u, err := user.Lookup(sudoUser)

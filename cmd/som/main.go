@@ -77,7 +77,9 @@ func main() {
 				return
 			}
 			if syncAssetsFlag {
-				if err := installDesktopAssets(); err != nil {
+				const installedPath = "/usr/local/bin/som"
+
+				if err := installDesktopAssets(installedPath); err != nil {
 					fmt.Fprintln(os.Stderr, "Asset sync failed:", err)
 					os.Exit(1)
 				}

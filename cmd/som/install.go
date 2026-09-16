@@ -100,7 +100,7 @@ func installUnix() error {
 		fmt.Println("som is already installed at", dest)
 	}
 
-	if err := installDesktopAssets(); err != nil {
+	if err := installDesktopAssets(dest); err != nil {
 		return fmt.Errorf("install desktop assets: %w", err)
 	}
 
