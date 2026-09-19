@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, StatusBar, Image,
-    Alert, Modal, TouchableWithoutFeedback,
+    Alert, Modal, TouchableWithoutFeedback, TextInput, ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import {
@@ -9,6 +9,8 @@ import {
     HEADER, headerTitleContainer, headerTitle, headerLeft, backBtn,
 } from '../theme';
 import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
+import TransferClient from '../services/transferService';
+import { getPlaylist } from '../services/playlistStore';
 import {
     AudioSettings, BufferSize, SampleRate,
     BUFFER_SIZE_OPTIONS, SAMPLE_RATE_OPTIONS,
@@ -133,6 +135,8 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     });
     const [tooltipVisible, setTooltipVisible] = useState(false);
     const [tooltipContent, setTooltipContent] = useState({ title: '', body: '' });
+    const [pairUrl, setPairUrl] = useState('');
+    const [syncing, setSyncing] = useState(false);
 
     // Load saved settings
     useEffect(() => {
@@ -270,6 +274,75 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     />
                 </View>
 
+                {/* ═══ DEVICE SYNC ═══ */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>DEVICE SYNC</Text>
+                    <View style={styles.sectionBadge}>
+                        <MaterialIcons name="sync" size={12} color={COLORS.secondary} />
+                        <Text style={styles.sectionBadgeText}>LAN</Text>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <View style={[styles.engineCard, RETRO_SHADOW_SM]}>
+                        <View style={styles.engineCardHeader}>
+                            <View style={[styles.settingIcon, { backgroundColor: COLORS.secondary + '20' }]}>
+                                <MaterialIcons name="devices" size={20} color={COLORS.secondary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                                <Text style={styles.engineLabel}>TUI → Mobile / Mobile → TUI</Text>
+                                <Text style={styles.engineDesc}>
+                                    Kết nối trực tiếp qua LAN, không cần GCP.
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TextInput
+                            value={pairUrl}
+                            onChangeText={setPairUrl}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            placeholder="Dán Pair URL từ TUI..."
+                            placeholderTextColor={COLORS.textMuted}
+                            style={styles.syncInput}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.syncButton}
+                            disabled={syncing || !pairUrl.trim()}
+                            onPress={async () => {
+                                setSyncing(true);
+                                try {
+                                    const client = new TransferClient();
+                                    await client.pair(pairUrl);
+                                    const result = await client.syncBothWays();
+                                    Alert.alert(
+                                        'Sync hoàn tất',
+                                        `Nhận ${result.downloaded.length} bài • Gửi ${result.uploaded.length} bài • Bỏ qua ${result.skipped} bài`,
+                                    );
+                                } catch (e) {
+                                    Alert.alert('Sync thất bại', e instanceof Error ? e.message : String(e));
+                                } finally {
+                                    setSyncing(false);
+                                }
+                            }}
+                        >
+                            {syncing ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <>
+                                    <MaterialIcons name="sync" size={20} color="#FFF" />
+                                    <Text style={styles.syncButtonText}>SYNC NOW</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        <Text style={styles.syncHint}>
+                            TUI: nhấn S → copy URL → dán URL vào đây → Sync Now.
+                        </Text>
+                    </View>
+                </View>
+
                 {/* Version */}
                 <Text style={styles.version}>SOM • Version 4.2.0</Text>
             </ScrollView>
@@ -405,6 +478,41 @@ const styles = StyleSheet.create({
     },
 
     // Version
+    syncInput: {
+        marginTop: SPACING.md,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.background,
+        color: COLORS.textDark,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: 12,
+        fontSize: FONT_SIZE.sm,
+    },
+    syncButton: {
+        marginTop: SPACING.md,
+        minHeight: 48,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.secondary,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    syncButtonText: {
+        color: '#FFF',
+        fontSize: FONT_SIZE.sm,
+        fontWeight: '800',
+    },
+    syncHint: {
+        marginTop: SPACING.sm,
+        color: COLORS.textMuted,
+        fontSize: FONT_SIZE.xs,
+        lineHeight: 18,
+    },
+
     version: {
         textAlign: 'center', color: COLORS.textMuted,
         fontSize: FONT_SIZE.xs, marginTop: SPACING.xl, fontWeight: '600',
