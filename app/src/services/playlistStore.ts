@@ -212,6 +212,18 @@ export const downloadAndAdd = async (
     return offlineTrack;
 };
 
+export const upsertOfflineTrack = async (track: OfflineTrack): Promise<void> => {
+    const list = await getPlaylist();
+    const index = list.findIndex((t) => t.id === track.id);
+    if (index >= 0) {
+        const next = [...list];
+        next[index] = track;
+        await savePlaylist(next);
+        return;
+    }
+    await savePlaylist([...list, track]);
+};
+
 // ---------- Navigation & Logic ----------
 
 /**
