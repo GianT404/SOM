@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
 )
 
 func (a *App) renderTransferPopup() string {
@@ -39,4 +38,3 @@ func (a *App) renderTransferPopup() string {
 	return renderBox(width, "SOM Sync", b.String(), colorAccent)
 }
 
-var _ = lipgloss.Width
