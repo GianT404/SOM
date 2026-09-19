@@ -82,6 +82,20 @@ func (db *DB) DeleteLocalFile(path string) error {
 	return err
 }
 
+func (db *DB) GetLocalFileByVideoID(videoID string) (*LocalFile, error) {
+	var f LocalFile
+	err := db.conn.QueryRow(
+		"SELECT path, name, artist, duration, video_id, thumbnail, file_size, file_mtime FROM local_files WHERE video_id = ? LIMIT 1", videoID,
+	).Scan(&f.Path, &f.Name, &f.Artist, &f.Duration, &f.VideoID, &f.Thumbnail, &f.FileSize, &f.FileMTime)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
 func (db *DB) GetLocalFile(path string) (*LocalFile, error) {
 	var f LocalFile
 	err := db.conn.QueryRow(
