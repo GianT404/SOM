@@ -57,6 +57,7 @@ type PairResponse struct {
 type SessionInfo struct {
 	URLs      []string
 	ExpiresAt time.Time
+	Paired    bool
 }
 
 type Session struct {
@@ -134,11 +135,13 @@ func (s *Session) Info() SessionInfo {
 
 	_, port, _ := net.SplitHostPort(s.listener.Addr().String())
 	urls := make([]string, 0, 4)
-	for _, ip := range privateIPv4s() {
-		urls = append(urls, fmt.Sprintf("http://%s:%s/pair?token=%s", ip, port, s.pairToken))
+	if s.pairToken != "" {
+		for _, ip := range privateIPv4s() {
+			urls = append(urls, fmt.Sprintf("http://%s:%s/pair?token=%s", ip, port, s.pairToken))
+		}
 	}
 
-	return SessionInfo{URLs: urls, ExpiresAt: s.expiresAt}
+	return SessionInfo{URLs: urls, ExpiresAt: s.expiresAt, Paired: s.sessionToken != ""}
 }
 
 func (s *Session) Close() {
