@@ -9,6 +9,10 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+
+	"github.com/atotto/clipboard"
+
+	"som/internal/tui/transfer"
 	"time"
 
 	"som/internal/domain"
@@ -112,6 +116,8 @@ type App struct {
 	moveConfirmActive    bool
 	moveTargetPlIdx      int
 	moveShowTracksActive bool
+	transferSession      *transfer.Session
+	showTransferPopup    bool
 }
 
 const maxPendingKeys = 64
@@ -382,6 +388,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "alt+q":
+			if a.transferSession != nil { a.transferSession.Close(); a.transferSession = nil }
 			a.player.Stop()
 			if a.avrcp != nil {
 				a.avrcp.Close()
@@ -389,6 +396,22 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		}
 
+		if a.showTransferPopup {
+			switch msg.String() {
+			case "esc", "q":
+				a.showTransferPopup = false
+			case "c":
+				if a.transferSession != nil {
+					info := a.transferSession.Info()
+					if len(info.URLs) > 0 { _ = clipboard.WriteAll(info.URLs[0]); a.setStatus(StatusOKStyle.Render("> Pair URL copied")) }
+				}
+			case "x":
+				if a.transferSession != nil { a.transferSession.Close(); a.transferSession = nil }
+				a.showTransferPopup = false
+				a.setStatus(StatusMsgStyle.Render("> Sync server stopped"))
+			}
+			return a, nil
+		}
 		if a.showHelpPopup {
 			switch msg.String() {
 			case "?", "esc", "q":
@@ -564,6 +587,33 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			cmds = append(cmds, a.playPrev())
+
+		case "s", "S":
+			if a.left.input.Focused() || a.left.plInput.Focused() {
+				break
+			}
+			if a.transferSession != nil {
+				a.showTransferPopup = true
+				break
+			}
+			if a.left.plStore == nil {
+				a.setStatus(StatusErrStyle.Render("X storage unavailable"))
+				break
+			}
+			session, err := transfer.Start(a.left.plStore, a.downloadDir, transfer.DefaultSessionTTL)
+			if err != nil {
+				a.setStatus(StatusErrStyle.Render("X sync: " + err.Error()))
+				break
+			}
+			a.transferSession = session
+			a.showTransferPopup = true
+			info := session.Info()
+			if len(info.URLs) > 0 {
+				_ = clipboard.WriteAll(info.URLs[0])
+				a.setStatus(StatusOKStyle.Render("> Sync server started • URL copied"))
+			} else {
+				a.setStatus(StatusOKStyle.Render("> Sync server started"))
+			}
 
 		case "r", "R":
 			if a.left.input.Focused() || a.left.plInput.Focused() {
