@@ -26,7 +26,7 @@ func (a *App) renderTransferPopup() string {
 
 	if info.Paired {
 		b.WriteString(DimItemStyle.Render("  Pairing complete. Start Sync Now on mobile."))
-		b.WriteString("\\n")
+		b.WriteString("\n")
 	} else if len(info.URLs) == 0 {
 		b.WriteString(StatusErrStyle.Render("  No private IPv4 address found."))
 		b.WriteString("\n")
