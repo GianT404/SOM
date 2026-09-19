@@ -10,7 +10,6 @@ import {
 } from '../theme';
 import { NeoShadowWrapper } from '../components/NeoShadowWrapper';
 import TransferClient from '../services/transferService';
-import { getPlaylist } from '../services/playlistStore';
 import {
     AudioSettings, BufferSize, SampleRate,
     BUFFER_SIZE_OPTIONS, SAMPLE_RATE_OPTIONS,
