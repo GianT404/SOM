@@ -16,7 +16,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// 1. ROUTER: XỬ LÝ NHỊP ĐẬP (TICK & GAPLESS PLAYBACK)
 func (a *App) handleTick() tea.Cmd {
 	a.left.animTick++
 	a.right.TickAt()
@@ -90,7 +89,7 @@ func (a *App) handleTick() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// 2. ROUTER: XỬ LÝ ÂM THANH & TRẠNG THÁI PLAYER
+// XỬ LÝ ÂM THANH & TRẠNG THÁI PLAYER
 func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -275,7 +274,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// 3. ROUTER: XỬ LÝ DỮ LIỆU, SQLITE & THAY ĐỔI TRẠNG THÁI PANEL
+// XỬ LÝ DỮ LIỆU, SQLITE & THAY ĐỔI TRẠNG THÁI PANEL
 func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -408,7 +407,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// 4. ROUTER: XỬ LÝ TOÀN BỘ PHÍM BẤM
+// XỬ LÝ TOÀN BỘ PHÍM BẤM
 func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -509,7 +508,7 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	case "i":
 		if a.moveSession != nil && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
 			if a.selectedMoveCount() == 0 {
-				a.setStatus(StatusErrStyle.Render("X Chua chon track nao (phim . de chon)"))
+				a.setStatus(StatusErrStyle.Render("X No tracks selected to move"))
 			} else {
 				plName := a.left.playlists[a.moveSession.TargetPlIdx].Name
 				modal := NewMoveConfirmModal(plName, a.selectedMoveCount())
