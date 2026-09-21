@@ -160,54 +160,13 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 		return DimItemStyle.Render(" No matching tracks.")
 	}
 
-	var b strings.Builder
-	vis := p.visibleRows() + 1
-	end := p.plOffset + vis
-	if end > len(filtered) {
-		end = len(filtered)
-	}
-
-	idxW := 3
-	if len(filtered) >= 1000 {
-		idxW = 4
-	}
-	durW := 6
-	artistW := 27
-	titleW := innerW - idxW - artistW - durW - 8
-	if titleW < 10 {
-		titleW = 10
-	}
-	artistW = innerW - idxW - titleW - durW - 8
-	if artistW < 0 {
-		artistW = 0
-	}
-
-	header := fmt.Sprintf("  %*s  %-*s  %-*s  %*s", idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
-	b.WriteString(DimItemStyle.Width(innerW).Render(header))
-
-	for i := p.plOffset; i < end; i++ {
-		t := filtered[i]
-		mark := "  "
-		if i == p.plCursor {
-			mark = " "
-		}
-
-		idx := fmt.Sprintf("%*d", idxW, i+1)
-		title := runewidth.FillRight(truncate(t.Title, titleW), titleW)
-		safeArtist := truncate(t.Artist, artistW)
-		artistPlain := runewidth.FillRight(safeArtist, artistW)
-		dur := fmt.Sprintf("%*s", durW, FormatDuration(t.Duration))
-
-		line := mark + idx + "  " + title + "  " + artistPlain + "  " + dur
-		b.WriteString("\n")
-		if i == p.plCursor {
-			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
-		} else {
-			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
-		}
-	}
-
-	return b.String()
+	return renderSharedTrackList(
+		innerW, filtered, p.plCursor, p.plOffset, p.visibleRows()+1,
+		func(t storage.PlaylistTrack) (string, string, string, int) {
+			return t.Title, t.Artist, t.Path, t.Duration
+		},
+		false, nil, nil, // Playlists không có select mode
+	)
 }
 
 func (p LeftPanel) renderPlInputPopup() string {

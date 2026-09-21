@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/mattn/go-runewidth"
 )
 
 func (p *LeftPanel) scanLocalFiles() {
@@ -91,72 +90,14 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 		}
 		return DimItemStyle.Render(" No downloaded files in "+p.downloadDir+"/") + "\n"
 	}
-	var b strings.Builder
-	// +1: reclaim the row previously wasted by the trailing blank line below
-	vis := p.visibleRows() + 1
-	end := p.dlOffset + vis
-	if end > len(locals) {
-		end = len(locals)
-	}
-	idxW := 3
-	if len(locals) >= 1000 {
-		idxW = 4
-	}
-	durW := 6
-	artistW := 27
-	// selectMode
-	tickW := 0
-	if selectMode {
-		tickW = 8
-	}
-	titleW := innerW - tickW - idxW - artistW - durW - 8
-	if titleW < 10 {
-		titleW = 10
-		artistW = innerW - tickW - idxW - titleW - durW - 8
-		if artistW < 0 {
-			artistW = 0
-		}
-	}
-	headerTick := ""
-	if selectMode {
-		headerTick = "    "
-	}
-	header := fmt.Sprintf("%s  %*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
-	b.WriteString(DimItemStyle.Width(innerW).Render(header))
-	for i := p.dlOffset; i < end; i++ {
-		f := locals[i]
-		mark := "  "
-		if i == p.dlCursor {
-			mark = " "
-		}
-		tick := ""
-		if selectMode {
-			isAlreadyIn := alreadyIn[f.Path]
-			isToggled := selected[f.Path]
 
-			willBeIn := isAlreadyIn != isToggled
-
-			if willBeIn {
-				tick = "[+] "
-			} else {
-				tick = "[ ] "
-			}
-		}
-		idx := fmt.Sprintf("%*d", idxW, i+1)
-		title := runewidth.FillRight(truncate(f.Name, titleW), titleW)
-		safeArtist := truncate(f.Artist, artistW)
-		artistPlain := runewidth.FillRight(safeArtist, artistW)
-		dur := fmt.Sprintf("%*s", durW, FormatDuration(f.Duration))
-		line := mark + tick + idx + "  " + title + "  " + artistPlain + "  " + dur
-		b.WriteString("\n")
-		if i == p.dlCursor {
-			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
-		} else {
-			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
-		}
-	}
-
-	return b.String()
+	return renderSharedTrackList(
+		innerW, locals, p.dlCursor, p.dlOffset, p.visibleRows()+1,
+		func(f LocalFile) (string, string, string, int) {
+			return f.Name, f.Artist, f.Path, f.Duration
+		},
+		selectMode, selected, alreadyIn,
+	)
 }
 
 func localFileSidecar(path string) string {
