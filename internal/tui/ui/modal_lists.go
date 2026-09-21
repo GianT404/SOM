@@ -54,7 +54,7 @@ func (m *SortModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			chosen := sortOptions[m.cursor]
 			return m, tea.Batch(
-				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return CloseAllModalsMsg{} },
 				func() tea.Msg { return ApplySortMsg{Key: chosen.Key, Name: chosen.Name} }, // Bắn message về cho App
 			)
 		}
@@ -128,7 +128,7 @@ func (m *SpeedModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			chosen := playbackSpeeds[m.cursor]
 			return m, tea.Batch(
-				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return CloseAllModalsMsg{} },
 				func() tea.Msg { return ApplySpeedMsg{Index: m.cursor, Value: chosen.Value, Label: chosen.Label} },
 			)
 		}
@@ -203,7 +203,7 @@ func (m *PresetModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			chosen := audioPresets[m.cursor]
 			return m, tea.Batch(
-				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return CloseAllModalsMsg{} },
 				func() tea.Msg { return ApplyPresetMsg{Index: m.cursor, Filter: chosen.Filter, Name: chosen.Name} },
 			)
 		}

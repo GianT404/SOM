@@ -118,3 +118,4 @@ type LocalLyricsLoadedMsg struct {
 }
 
 type PlaybackTickMsg struct{}
+type CloseAllModalsMsg struct{}

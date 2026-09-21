@@ -37,7 +37,7 @@ func (m *MoveCreateModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 			name := strings.TrimSpace(m.input.Value())
 			if name != "" {
 				return m, tea.Batch(
-					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return CloseAllModalsMsg{} },
 					func() tea.Msg { return InitMoveSessionMsg{TargetPlIdx: -1, NewPlName: name} },
 				)
 			}
@@ -98,7 +98,7 @@ func (m *MovePickModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			idx := m.cursor
 			return m, tea.Batch(
-				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return CloseAllModalsMsg{} },
 				func() tea.Msg { return InitMoveSessionMsg{TargetPlIdx: idx} },
 			)
 		}
@@ -151,11 +151,11 @@ func (m *MoveConfirmModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			if m.cursor == 1 {
 				return m, tea.Batch(
-					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return CloseAllModalsMsg{} },
 					func() tea.Msg { return ExecuteMoveMsg{} },
 				)
 			}
-			return m, func() tea.Msg { return CloseModalMsg{} }
+			return m, func() tea.Msg { return CloseAllModalsMsg{} }
 		}
 	}
 	return m, nil

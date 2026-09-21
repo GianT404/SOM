@@ -74,7 +74,7 @@ type App struct {
 	splashFrame   int
 	pendingKeys   []tea.KeyPressMsg
 
-	activeModal    Overlay
+	modals         []Overlay
 	showSettings   bool
 	settingsCursor int
 	settingsItems  []Switch
@@ -240,13 +240,20 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	//  Modal Overlay (Highest Priority)
-	if a.activeModal != nil {
-		if _, ok := msg.(CloseModalMsg); ok {
-			a.activeModal = nil
+	if len(a.modals) > 0 {
+		if _, ok := msg.(CloseAllModalsMsg); ok {
+			a.modals = nil
 			return a, nil
 		}
+		if _, ok := msg.(CloseModalMsg); ok {
+			a.modals = a.modals[:len(a.modals)-1]
+			return a, nil
+		}
+
 		var modalCmd tea.Cmd
-		a.activeModal, modalCmd = a.activeModal.Update(msg)
+		top := len(a.modals) - 1
+		a.modals[top], modalCmd = a.modals[top].Update(msg)
+
 		switch msg.(type) {
 		case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
 			return a, modalCmd
@@ -451,8 +458,8 @@ func (a *App) View() tea.View {
 
 	view := b.String()
 
-	if a.activeModal != nil {
-		popup := a.activeModal.View()
+	if len(a.modals) > 0 {
+		popup := a.modals[len(a.modals)-1].View()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showHelpPopup {
 		popup := a.renderHelpPopup()

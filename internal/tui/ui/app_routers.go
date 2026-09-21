@@ -486,7 +486,7 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 			} else {
 				plName := a.left.playlists[a.moveSession.TargetPlIdx].Name
 				modal := NewMoveConfirmModal(plName, a.selectedMoveCount())
-				a.activeModal = modal
+				a.modals = []Overlay{modal}
 				cmds = append(cmds, modal.Init())
 			}
 		}
@@ -510,7 +510,8 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 			break
 		}
 		modal := NewCmdMenuModal(a.cmdOptionList())
-		a.activeModal = modal
+		a.modals = []Overlay{modal}
+		cmds = append(cmds, modal.Init())
 		cmds = append(cmds, modal.Init())
 	case "tab":
 		if a.left.input.Focused() {

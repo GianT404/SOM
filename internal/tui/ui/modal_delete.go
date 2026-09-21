@@ -31,17 +31,17 @@ func (m *DeleteModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 	if k, ok := msg.(tea.KeyPressMsg); ok {
 		switch k.String() {
 		case "esc", ":", "q":
-			return m, func() tea.Msg { return CloseModalMsg{} }
+			return m, func() tea.Msg { return CloseAllModalsMsg{} }
 		case "left", "h", "right", "l", "up", "down", "k", "j", "tab":
 			m.cursor = 1 - m.cursor
 		case "enter":
 			if m.cursor == 1 {
 				return m, tea.Batch(
-					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return CloseAllModalsMsg{} },
 					deleteCmd(m.plStore, m.target.Path, m.target.Name),
 				)
 			}
-			return m, func() tea.Msg { return CloseModalMsg{} }
+			return m, func() tea.Msg { return CloseAllModalsMsg{} }
 		}
 	}
 	return m, nil

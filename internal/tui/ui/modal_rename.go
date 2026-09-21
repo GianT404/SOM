@@ -70,7 +70,7 @@ func (m *RenameModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 
 			// Trả về 2 việc cùng lúc: Gửi lệnh đóng modal, và gửi lệnh đổi tên file
 			return m, tea.Batch(
-				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return CloseAllModalsMsg{} }, // Đổi thành CloseAllModalsMsg
 				renameCmd(m.plStore, oldPath, newPath, newTitle),
 			)
 		}

@@ -78,6 +78,7 @@ func (m *CmdMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 	if k, ok := msg.(tea.KeyPressMsg); ok {
 		switch k.String() {
 		case "esc", ":", "q":
+			// Đóng menu này (lùi về 1 nấc, hoặc tắt luôn nếu là nấc cuối)
 			return m, func() tea.Msg { return CloseModalMsg{} }
 		case "up", "k":
 			if m.cursor > 0 {
@@ -94,10 +95,7 @@ func (m *CmdMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			if len(m.options) > 0 {
 				opt := m.options[m.cursor]
-				// Sửa lại: Không gửi CloseModalMsg ở đây để tránh xung đột
-				return m, func() tea.Msg {
-					return ExecuteCmdOptionMsg{Option: opt}
-				}
+				return m, func() tea.Msg { return ExecuteCmdOptionMsg{Option: opt} }
 			}
 		}
 	}
@@ -197,11 +195,11 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 	switch opt {
 	case "Audio settings":
 		modal := NewPresetModal(a.activePreset)
-		a.activeModal = modal
+		a.modals = append(a.modals, modal)
 		return modal.Init()
 	case "Sort":
 		modal := NewSortModal(a.left.sortPref)
-		a.activeModal = modal
+		a.modals = append(a.modals, modal)
 		return modal.Init()
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
@@ -213,55 +211,57 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No track selected"))
 		}
-		a.activeModal = nil
+		a.modals = nil
+		return nil
 	case "Rename title":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewRenameModal(target, a.left.plStore, a.width)
-			a.activeModal = modal
+			a.modals = append(a.modals, modal)
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
-		a.activeModal = nil
+		// Lưu ý: Không đóng menu nếu lỗi, để user chọn lại
+		return nil
 	case "Playback speed":
 		modal := NewSpeedModal(a.activeSpeed)
-		a.activeModal = modal
+		a.modals = append(a.modals, modal)
 		return modal.Init()
 	case "Delete track":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewDeleteModal(target, a.left.plStore)
-			a.activeModal = modal
+			a.modals = append(a.modals, modal)
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
-		a.activeModal = nil
+		return nil
 	case "Show file info":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewInfoModal(target)
-			a.activeModal = modal
+			a.modals = append(a.modals, modal)
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
-		a.activeModal = nil
+		return nil
 	case "Move to playlist":
 		if len(a.left.playlists) == 0 {
 			modal := NewMoveCreateModal(a.width)
-			a.activeModal = modal
+			a.modals = append(a.modals, modal)
 			return modal.Init()
 		}
 		modal := NewMovePickModal(a.left.playlists)
-		a.activeModal = modal
+		a.modals = append(a.modals, modal)
 		return modal.Init()
 	case "Remove from playlist":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
 			if idxs := a.playlistsContainingSelected(); len(idxs) > 0 {
 				modal := NewRemoveTrackModal(idxs, a.left.playlists, track)
-				a.activeModal = modal
+				a.modals = append(a.modals, modal)
 				return modal.Init()
 			}
-			a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
 		}
-		a.activeModal = nil
+		a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
+		return nil
 	}
 	return nil
 }
