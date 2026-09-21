@@ -208,7 +208,7 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 				if pm.NextPlay != nil {
 					t := *pm.NextPlay
 					pm.NextPlay = nil
-
+					pm.NowPlay = &t
 					// Dọn dẹp hàng đợi / playlist
 					if len(pm.Queue) > 0 && pm.Queue[0].ID == t.ID {
 						pm.Queue = pm.Queue[1:]

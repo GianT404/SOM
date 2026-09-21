@@ -17,7 +17,6 @@ import (
 
 func (a *App) handleTick() tea.Cmd {
 	a.left.animTick++
-	a.right.TickAt()
 	var cmds []tea.Cmd
 
 	cmds = append(cmds, func() tea.Msg { return PlaybackTickMsg{} })
@@ -540,13 +539,13 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 			break
 		}
 		a.player.SeekBy(5)
-		a.right.TickAt()
+		cmds = append(cmds, func() tea.Msg { return PlaybackTickMsg{} })
 	case "left":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
 		a.player.SeekBy(-5)
-		a.right.TickAt()
+		cmds = append(cmds, func() tea.Msg { return PlaybackTickMsg{} })
 	case "]", "}":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break

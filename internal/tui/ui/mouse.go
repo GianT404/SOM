@@ -251,7 +251,6 @@ func (a *App) seekFromProgressClick(m tea.MouseClickMsg) bool {
 	}
 	target := frac * float64(a.playback.NowPlay.Duration)
 	a.player.SeekBy(target - a.player.Position().Seconds())
-	a.right.TickAt()
 	return true
 }
 
@@ -306,9 +305,8 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 
 	// Click lên thanh progress → tua.
 	if a.seekFromProgressClick(m) {
-		return nil
+		return func() tea.Msg { return PlaybackTickMsg{} }
 	}
-
 	contentTop := a.somRowHeight() + 1
 
 	// Sidebar: đổi tab.

@@ -75,43 +75,6 @@ func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
 	r.random = random
 }
 
-// TickAt đồng bộ vị trí lyrics theo đúng vị trí player
-func (r *RightPanel) TickAt() {
-	r.elapsed = r.player.Position()
-
-	if !r.loaded || len(r.lyrics.Synced) == 0 {
-		return
-	}
-
-	elapsed := r.elapsed.Seconds()
-	best := 0
-	for i, line := range r.lyrics.Synced {
-		if line.Time <= elapsed {
-			best = i
-		}
-	}
-
-	if best != r.curLine {
-		r.curLine = best
-		if r.manualSelect && best != r.highlightLine {
-			r.manualSelect = false
-		}
-		lyrH := r.lyricsHeight()
-		target := r.curLine - lyrH/2
-		if target < 0 {
-			target = 0
-		}
-		maxOff := len(r.lyrics.Synced) - lyrH
-		if maxOff < 0 {
-			maxOff = 0
-		}
-		if target > maxOff {
-			target = maxOff
-		}
-		r.offset = target
-	}
-}
-
 func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -220,7 +183,42 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 	case LocalLyricsLoadedMsg:
 		r.SetLyrics(msg.Lyrics)
 		return r, r.spinner.Tick
+	case PlaybackTickMsg:
+		if r.player != nil && r.nowPlay != nil {
+			// Tự lấy vị trí hiện tại của player
+			r.elapsed = r.player.Position()
 
+			// Tự cập nhật Lyrics
+			if r.loaded && len(r.lyrics.Synced) > 0 {
+				elapsedSec := r.elapsed.Seconds()
+				best := 0
+				for i, line := range r.lyrics.Synced {
+					if line.Time <= elapsedSec {
+						best = i
+					}
+				}
+				if best != r.curLine {
+					r.curLine = best
+					if r.manualSelect && best != r.highlightLine {
+						r.manualSelect = false
+					}
+					lyrH := r.lyricsHeight()
+					target := r.curLine - lyrH/2
+					if target < 0 {
+						target = 0
+					}
+					maxOff := len(r.lyrics.Synced) - lyrH
+					if maxOff < 0 {
+						maxOff = 0
+					}
+					if target > maxOff {
+						target = maxOff
+					}
+					r.offset = target
+				}
+			}
+		}
+		return r, nil
 	case spinner.TickMsg:
 		if r.loadingLyrics {
 			var cmd tea.Cmd
