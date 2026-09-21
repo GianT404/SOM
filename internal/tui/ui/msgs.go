@@ -2,6 +2,7 @@ package ui
 
 import (
 	"som/internal/domain"
+	"som/internal/storage"
 )
 
 type SearchResultMsg struct {
@@ -81,3 +82,12 @@ type InitMoveSessionMsg struct {
 }
 
 type ExecuteMoveMsg struct{}
+
+type ExecuteCmdOptionMsg struct {
+	Option string
+}
+
+type ExecuteRemovePlMsg struct {
+	PlIdx int
+	Track storage.PlaylistTrack
+}

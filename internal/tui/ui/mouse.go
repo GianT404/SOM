@@ -300,7 +300,7 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if !a.mouseEnabled {
 		return nil
 	}
-	if a.showSettings || a.showHelpPopup || a.showCmdPopup || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
+	if a.showSettings || a.showHelpPopup || a.activeModal != nil || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
 		return nil
 	}
 

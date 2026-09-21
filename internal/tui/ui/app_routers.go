@@ -272,6 +272,25 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 		}
+	case ExecuteCmdOptionMsg:
+		if c := a.runCmdOption(msg.Option); c != nil {
+			cmds = append(cmds, c)
+		}
+	case ExecuteRemovePlMsg:
+		if a.left.plStore != nil {
+			pl := a.left.playlists[msg.PlIdx]
+			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, msg.Track.Path); err == nil {
+				for j := range pl.Tracks {
+					if pl.Tracks[j].Path == msg.Track.Path || pl.Tracks[j].ID == msg.Track.ID {
+						a.left.playlists[msg.PlIdx].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
+						break
+					}
+				}
+				a.setStatus(StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""))
+			} else {
+				a.setStatus(StatusErrStyle.Render("X Failed: " + err.Error()))
+			}
+		}
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))
@@ -470,12 +489,6 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if a.showCmdPopup {
-		if c := a.updateCmdPopup(msg); c != nil {
-			cmds = append(cmds, c)
-		}
-		return tea.Batch(cmds...)
-	}
 
 	switch msg.String() {
 	case "esc":
@@ -525,13 +538,9 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
-		if a.showCmdPopup {
-			a.showCmdPopup = false
-		} else {
-			a.showCmdPopup = true
-			a.cmdCursor = 0
-			a.cmdMenuCursor = 0
-		}
+		modal := NewCmdMenuModal(a.cmdOptionList())
+		a.activeModal = modal
+		cmds = append(cmds, modal.Init())
 	case "tab":
 		if a.left.input.Focused() {
 			a.left.input.Blur()

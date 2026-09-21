@@ -74,11 +74,7 @@ type App struct {
 	splashFrame   int
 	pendingKeys   []tea.KeyPressMsg
 
-	showCmdPopup   bool
-	cmdCursor      int
-	cmdMenuCursor  int
 	activeModal    Overlay
-	plRmActive     bool
 	showSettings   bool
 	settingsCursor int
 	settingsItems  []Switch
@@ -464,9 +460,6 @@ func (a *App) View() tea.View {
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.showCmdPopup {
-		popup := a.renderCmdPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showSettings {
 		popup := a.renderSettingsPopup()

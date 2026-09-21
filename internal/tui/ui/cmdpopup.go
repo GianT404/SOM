@@ -52,16 +52,220 @@ var sortOptions = []struct {
 	{"duration", "Duration"},
 }
 
-func (a *App) cmdOptionList() []string {
-	if a.sidebarActive == SidePlaylists {
-		return []string{
-			"Audio settings",
-			"Playback speed",
-			"Show file info",
-			"Remove from playlist",
+type CmdMenuModal struct {
+	options []string
+	cursor  int
+}
+
+type RenameDoneMsg struct {
+	OldPath  string
+	NewPath  string
+	NewTitle string
+	Err      error
+}
+
+type DeleteDoneMsg struct {
+	Path string
+	Name string
+	Err  error
+}
+
+func NewCmdMenuModal(options []string) *CmdMenuModal {
+	return &CmdMenuModal{options: options, cursor: 0}
+}
+func (m *CmdMenuModal) Init() tea.Cmd { return nil }
+func (m *CmdMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	if k, ok := msg.(tea.KeyPressMsg); ok {
+		switch k.String() {
+		case "esc", ":", "q":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.options) - 1
+			}
+		case "down", "j":
+			if m.cursor < len(m.options)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+		case "enter":
+			if len(m.options) > 0 {
+				opt := m.options[m.cursor]
+				return m, tea.Batch(
+					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return ExecuteCmdOptionMsg{Option: opt} },
+				)
+			}
 		}
 	}
+	return m, nil
+}
+func (m *CmdMenuModal) View() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	for i, opt := range m.options {
+		line := "  " + opt
+		if i == m.cursor {
+			pad := 36 - runewidth.StringWidth(line)
+			if pad < 0 {
+				pad = 0
+			}
+			b.WriteString(SelectedItemStyle.Render(line+strings.Repeat(" ", pad)) + "\n")
+		} else {
+			b.WriteString(NormalItemStyle.Render(line) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: close)"))
+	return renderBox(40, "Commands", b.String(), themeCol("#e8593c"))
+}
 
+// ==========================================
+// 2. REMOVE FROM PLAYLIST MODAL
+// ==========================================
+type RemoveTrackModal struct {
+	idxs      []int
+	playlists []storage.Playlist
+	track     storage.PlaylistTrack
+	cursor    int
+}
+
+func NewRemoveTrackModal(idxs []int, playlists []storage.Playlist, track storage.PlaylistTrack) *RemoveTrackModal {
+	return &RemoveTrackModal{idxs: idxs, playlists: playlists, track: track, cursor: 0}
+}
+func (m *RemoveTrackModal) Init() tea.Cmd { return nil }
+func (m *RemoveTrackModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	if k, ok := msg.(tea.KeyPressMsg); ok {
+		switch k.String() {
+		case "esc", ":", "q":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.idxs) - 1
+			}
+		case "down", "j":
+			if m.cursor < len(m.idxs)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+		case "enter":
+			if len(m.idxs) > 0 {
+				idx := m.idxs[m.cursor]
+				return m, tea.Batch(
+					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return ExecuteRemovePlMsg{PlIdx: idx, Track: m.track} },
+				)
+			}
+		}
+	}
+	return m, nil
+}
+func (m *RemoveTrackModal) View() string {
+	var b strings.Builder
+	b.WriteString("\n ")
+	b.WriteString(NormalItemStyle.Render("Remove \"" + m.track.Title + "\" from:"))
+	b.WriteString("\n\n ")
+	for i, plIdx := range m.idxs {
+		marker := "  "
+		if i == m.cursor {
+			marker = "▸ "
+		}
+		line := marker + m.playlists[plIdx].Name
+		if i == m.cursor {
+			pad := 51 - runewidth.StringWidth(line)
+			if pad < 0 {
+				pad = 0
+			}
+			b.WriteString(SelectedItemStyle.Render(line+strings.Repeat(" ", pad)) + "\n ")
+		} else {
+			b.WriteString(NormalItemStyle.Render(line) + "\n ")
+		}
+	}
+	b.WriteString("\n ")
+	b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
+	return renderBox(56, "Remove from Playlist", b.String(), themeCol("#e8593c"))
+}
+
+// --- APP ROUTING CỦA LỆNH ---
+func (a *App) runCmdOption(opt string) tea.Cmd {
+	switch opt {
+	case "Audio settings":
+		modal := NewPresetModal(a.activePreset)
+		a.activeModal = modal
+		return modal.Init()
+	case "Sort":
+		modal := NewSortModal(a.left.sortPref)
+		a.activeModal = modal
+		return modal.Init()
+	case "Add to queue":
+		track, ok := a.selectedTrackForPlaylist()
+		if ok {
+			a.playback.Queue = append(a.playback.Queue, domain.Track{
+				ID: track.ID, Title: track.Title, Artist: track.Artist, Duration: track.Duration,
+			})
+			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Queued: %s", track.Title)))
+		} else {
+			a.setStatus(StatusErrStyle.Render("X No track selected"))
+		}
+	case "Rename title":
+		if target, ok := a.renameTarget(); ok {
+			modal := NewRenameModal(target, a.left.plStore, a.width)
+			a.activeModal = modal
+			return modal.Init()
+		}
+		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+	case "Playback speed":
+		modal := NewSpeedModal(a.activeSpeed)
+		a.activeModal = modal
+		return modal.Init()
+	case "Delete track":
+		if target, ok := a.renameTarget(); ok {
+			modal := NewDeleteModal(target, a.left.plStore)
+			a.activeModal = modal
+			return modal.Init()
+		}
+		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+	case "Show file info":
+		if target, ok := a.renameTarget(); ok {
+			modal := NewInfoModal(target)
+			a.activeModal = modal
+			return modal.Init()
+		}
+		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+	case "Move to playlist":
+		if len(a.left.playlists) == 0 {
+			modal := NewMoveCreateModal(a.width)
+			a.activeModal = modal
+			return modal.Init()
+		}
+		modal := NewMovePickModal(a.left.playlists)
+		a.activeModal = modal
+		return modal.Init()
+	case "Remove from playlist":
+		track, ok := a.selectedTrackForPlaylist()
+		if ok {
+			if idxs := a.playlistsContainingSelected(); len(idxs) > 0 {
+				modal := NewRemoveTrackModal(idxs, a.left.playlists, track)
+				a.activeModal = modal
+				return modal.Init()
+			}
+		}
+		a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
+	}
+	return nil
+}
+
+// --- HELPER FUNC ---
+func (a *App) cmdOptionList() []string {
+	if a.sidebarActive == SidePlaylists {
+		return []string{"Audio settings", "Playback speed", "Show file info", "Remove from playlist"}
+	}
 	opts := cmdOptions
 	if _, ok := a.selectedTrackForPlaylist(); ok && len(a.playlistsContainingSelected()) > 0 {
 		opts = append(append([]string{}, cmdOptions...), "Remove from playlist")
@@ -84,152 +288,6 @@ func (a *App) playlistsContainingSelected() []int {
 		}
 	}
 	return idxs
-}
-func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
-	if a.plRmActive {
-		idxs := a.playlistsContainingSelected()
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(idxs) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(idxs)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
-		case "enter":
-			if a.cmdCursor < len(idxs) && a.left.plStore != nil {
-				pl := a.left.playlists[idxs[a.cmdCursor]]
-				track, _ := a.selectedTrackForPlaylist()
-				if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, track.Path); err == nil {
-					for j := range pl.Tracks {
-						if pl.Tracks[j].Path == track.Path || pl.Tracks[j].ID == track.ID {
-							a.left.playlists[idxs[a.cmdCursor]].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
-							break
-						}
-					}
-					a.setStatus(StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""))
-				} else {
-					a.setStatus(StatusErrStyle.Render("X Failed: " + err.Error()))
-				}
-				a.plRmActive = false
-				return nil
-			}
-		case "esc", ":":
-			a.plRmActive = false
-			return nil
-		}
-		return nil
-	}
-
-	switch k.String() {
-	case "esc", ":":
-		a.showCmdPopup = false
-	case "up", "k":
-		if a.cmdMenuCursor > 0 {
-			a.cmdMenuCursor--
-		} else {
-			a.cmdMenuCursor = len(a.cmdOptionList()) - 1
-		}
-	case "down", "j":
-		if a.cmdMenuCursor < len(a.cmdOptionList())-1 {
-			a.cmdMenuCursor++
-		} else {
-			a.cmdMenuCursor = 0
-		}
-	case "enter":
-		return a.runCmdOption(a.cmdMenuCursor)
-	}
-	return nil
-}
-
-func (a *App) runCmdOption(idx int) tea.Cmd {
-	opts := a.cmdOptionList()
-	if idx < 0 || idx >= len(opts) {
-		return nil
-	}
-	switch opts[idx] {
-	case "Audio settings":
-		modal := NewPresetModal(a.activePreset)
-		a.activeModal = modal
-		a.showCmdPopup = false
-		return modal.Init()
-	case "Sort":
-		modal := NewSortModal(a.left.sortPref)
-		a.activeModal = modal
-		a.showCmdPopup = false
-		return modal.Init()
-	case "Add to queue":
-		track, ok := a.selectedTrackForPlaylist()
-		if ok {
-			a.playback.Queue = append(a.playback.Queue, domain.Track{
-				ID:       track.ID,
-				Title:    track.Title,
-				Artist:   track.Artist,
-				Duration: track.Duration,
-			})
-			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Queued: %s", track.Title)))
-		} else {
-			a.setStatus(StatusErrStyle.Render("X No track selected"))
-		}
-		a.showCmdPopup = false
-	case "Rename title":
-		target, ok := a.renameTarget()
-		if !ok {
-			a.setStatus(StatusErrStyle.Render("X No local track selected"))
-			return nil
-		}
-
-		// Tắt menu commands
-		a.showCmdPopup = false
-
-		// Khởi tạo Modal mới và gán vào activeModal
-		modal := NewRenameModal(target, a.left.plStore, a.width)
-		a.activeModal = modal
-		return modal.Init()
-	case "Playback speed":
-		modal := NewSpeedModal(a.activeSpeed)
-		a.activeModal = modal
-		a.showCmdPopup = false
-		return modal.Init()
-	case "Delete track":
-		if target, ok := a.renameTarget(); ok {
-			a.showCmdPopup = false
-			modal := NewDeleteModal(target, a.left.plStore)
-			a.activeModal = modal
-			return modal.Init()
-		} else {
-			a.setStatus(StatusErrStyle.Render("X No local track selected"))
-		}
-	case "Show file info":
-		if target, ok := a.renameTarget(); ok {
-			a.showCmdPopup = false
-			modal := NewInfoModal(target)
-			a.activeModal = modal
-			return modal.Init()
-		} else {
-			a.setStatus(StatusErrStyle.Render("X No local track selected"))
-		}
-	case "Move to playlist":
-		a.showCmdPopup = false
-		if len(a.left.playlists) == 0 {
-			modal := NewMoveCreateModal(a.width)
-			a.activeModal = modal
-			return modal.Init()
-		} else {
-			modal := NewMovePickModal(a.left.playlists)
-			a.activeModal = modal
-			return modal.Init()
-		}
-	case "Remove from playlist":
-		a.plRmActive = true
-		a.cmdCursor = 0
-	}
-	return nil
 }
 
 func (a *App) selectedTrackForPlaylist() (storage.PlaylistTrack, bool) {
@@ -277,12 +335,7 @@ func formatDBTime(s string) string {
 	if s == "" {
 		return "-"
 	}
-	layouts := []string{
-		time.RFC3339,
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05Z",
-	}
-	for _, layout := range layouts {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05Z"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t.Format("15:04:05 02-01-2006")
 		}
@@ -316,69 +369,6 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 	}
 	return nil, false
 }
-
-func (a *App) renderCmdPopup() string {
-	var b strings.Builder
-	if a.plRmActive {
-		track, _ := a.selectedTrackForPlaylist()
-		idxs := a.playlistsContainingSelected()
-		b.WriteString("\n ")
-		b.WriteString(NormalItemStyle.Render("Remove \"" + track.Title + "\" from:"))
-		b.WriteString("\n\n ")
-		for i, plIdx := range idxs {
-			marker := "  "
-			if i == a.cmdCursor {
-				marker = "▸ "
-			}
-			line := marker + a.left.playlists[plIdx].Name
-			if i == a.cmdCursor {
-				pad := 51 - runewidth.StringWidth(line)
-				if pad < 0 {
-					pad = 0
-				}
-				b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
-			} else {
-				b.WriteString(NormalItemStyle.Render(line))
-			}
-			b.WriteString("\n ")
-		}
-		b.WriteString("\n ")
-		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
-		return renderBox(56, "Remove from Playlist", b.String(), themeCol("#e8593c"))
-	}
-
-	b.WriteString("\n")
-	for i, opt := range a.cmdOptionList() {
-		line := "  " + opt
-		if i == a.cmdMenuCursor {
-			pad := 36 - runewidth.StringWidth(line)
-			if pad < 0 {
-				pad = 0
-			}
-			b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
-		} else {
-			b.WriteString(NormalItemStyle.Render(line))
-		}
-		b.WriteString("\n")
-	}
-	b.WriteString("\n")
-	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: close)"))
-	return renderBox(40, "Commands", b.String(), themeCol("#e8593c"))
-}
-
-type RenameDoneMsg struct {
-	OldPath  string
-	NewPath  string
-	NewTitle string
-	Err      error
-}
-
-type DeleteDoneMsg struct {
-	Path string
-	Name string
-	Err  error
-}
-
 func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 	return func() tea.Msg {
 		if newPath != oldPath {
