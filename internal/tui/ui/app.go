@@ -78,8 +78,6 @@ type App struct {
 	cmdCursor      int
 	cmdMenuCursor  int
 	activeModal    Overlay
-	delActive      bool
-	infoActive     bool
 	plRmActive     bool
 	showSettings   bool
 	settingsCursor int

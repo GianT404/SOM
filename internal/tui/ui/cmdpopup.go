@@ -159,41 +159,6 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if a.infoActive {
-		switch k.String() {
-		case "esc", "enter", ":", "q":
-			a.infoActive = false
-			return nil
-		}
-		return nil
-	}
-
-	if a.delActive {
-		switch k.String() {
-		case "up", "k", "down", "j", "left", "h", "right", "l":
-			a.cmdCursor = 1 - a.cmdCursor
-		case "enter":
-			if a.cmdCursor == 1 {
-				target, ok := a.renameTarget()
-				if !ok {
-					a.setStatus(StatusErrStyle.Render("X No local track selected"))
-					return nil
-				}
-
-				a.delActive = false
-				a.showCmdPopup = false
-				a.setStatus(StatusMsgStyle.Render("> Deleting..."))
-				return deleteCmd(a.left.plStore, target.Path, target.Name)
-			} else {
-				a.delActive = false
-			}
-			return nil
-		case "esc", ":":
-			a.delActive = false
-			return nil
-		}
-		return nil
-	}
 
 	if a.sortActive {
 		switch k.String() {
@@ -336,15 +301,20 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 		a.speedActive = true
 		a.cmdCursor = a.activeSpeed
 	case "Delete track":
-		if _, ok := a.renameTarget(); ok {
-			a.delActive = true
-			a.cmdCursor = 0
+		if target, ok := a.renameTarget(); ok {
+			a.showCmdPopup = false
+			modal := NewDeleteModal(target, a.left.plStore)
+			a.activeModal = modal
+			return modal.Init()
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		}
 	case "Show file info":
-		if _, ok := a.renameTarget(); ok {
-			a.infoActive = true
+		if target, ok := a.renameTarget(); ok {
+			a.showCmdPopup = false
+			modal := NewInfoModal(target)
+			a.activeModal = modal
+			return modal.Init()
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		}
@@ -555,69 +525,6 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 
 		return renderBox(boxW, "Audio settings", b.String(), themeCol("#e8593c"))
-	}
-
-	if a.infoActive {
-		target, ok := a.renameTarget()
-		if ok {
-			name := target.Name
-			artist := target.Artist
-			if artist == "" {
-				artist = "-"
-			}
-			durStr := FormatDuration(target.Duration)
-			var sizeStr, bitrateStr string
-			var pathStr string
-			if fi, err := os.Stat(target.Path); err == nil {
-				sizeStr = formatBytes(fi.Size())
-				if target.Duration > 0 {
-					kbps := (fi.Size() * 8) / (1000 * int64(target.Duration))
-					bitrateStr = fmt.Sprintf("~%d kbps", kbps)
-				} else {
-					bitrateStr = "-"
-				}
-				pathStr = target.Path
-			} else {
-				sizeStr = "-"
-				bitrateStr = "-"
-				pathStr = target.Path
-			}
-			b.WriteString("\n " + DimItemStyle.Render(" Title:") + LocalFileStyle.Render(" "+name))
-			b.WriteString("\n " + DimItemStyle.Render(" Artist:") + LocalFileStyle.Render(" "+artist))
-			b.WriteString("\n " + DimItemStyle.Render(" Duration: ") + LocalFileStyle.Render(durStr))
-			b.WriteString("\n " + DimItemStyle.Render(" Size: ") + LocalFileStyle.Render(sizeStr))
-			b.WriteString("\n " + DimItemStyle.Render(" Bitrate: ") + LocalFileStyle.Render(bitrateStr))
-			b.WriteString("\n " + DimItemStyle.Render(" Video ID: ") + LocalFileStyle.Render(" "+target.VideoID))
-			b.WriteString("\n " + DimItemStyle.Render(" Modified: ") + LocalFileStyle.Render(" "+formatDBTime(target.FileMTime)))
-			b.WriteString("\n " + DimItemStyle.Render(" Created: ") + LocalFileStyle.Render(" "+formatDBTime(target.CreatedAt)))
-			b.WriteString("\n " + DimItemStyle.Render(" Path: ") + LocalFileStyle.Render(pathStr))
-			b.WriteString("\n\n")
-			b.WriteString(DimItemStyle.Render(" (esc: close)"))
-			return renderBox(64, "File Info", b.String(), themeCol("#E8593C"))
-		}
-	}
-
-	if a.delActive {
-		target, _ := a.renameTarget()
-		name := "(No local track)"
-		if target != nil {
-			name = target.Name
-		}
-		b.WriteString("\n ")
-		b.WriteString(DimItemStyle.Render("Delete \"" + name + "\" permanently?"))
-		b.WriteString("\n\n ")
-
-		cancelStyle := NormalItemStyle
-		confirmStyle := NormalItemStyle
-		if a.cmdCursor == 0 {
-			cancelStyle = SelectedItemStyle
-		} else {
-			confirmStyle = SelectedItemStyle.Foreground(deleteColor)
-		}
-		b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Delete ]")))
-		b.WriteString("\n\n")
-		b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: back)"))
-		return renderBox(60, "Delete Track", b.String(), themeCol("#E24B4A"))
 	}
 
 	b.WriteString("\n")
