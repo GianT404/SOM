@@ -15,7 +15,12 @@ func kp(code rune) tea.KeyPressMsg {
 
 func TestSettingsDefaults(t *testing.T) {
 	setTheme(themeDefault)
-	a := &App{width: 100, height: 30}
+	a := &App{
+		width:    100,
+		height:   30,
+		playback: NewPlaybackManager(),
+		palette:  NewCommandPalette(),
+	}
 	if a.hideHint || a.hideLogo {
 		t.Fatal("hide options should default to false")
 	}
@@ -44,7 +49,12 @@ func TestRenderSettingsPopup(t *testing.T) {
 func TestSettingsToggleViaKeys(t *testing.T) {
 	setTheme(themeDefault)
 	defer setTheme(themeDefault)
-	a := &App{width: 100, height: 30}
+	a := &App{
+		width:    100,
+		height:   30,
+		playback: NewPlaybackManager(),
+		palette:  NewCommandPalette(),
+	}
 
 	// Esc mở esc menu
 	if _, cmd := a.Update(kp(tea.KeyEsc)); cmd != nil || !a.showEscMenu {
