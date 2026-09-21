@@ -31,8 +31,7 @@ type DownloadDoneMsg struct {
 	Err   error
 	Track domain.Track
 }
-type StreamStartedMsg struct {
-	Track     domain.Track
+type StreamResolvedMsg struct {
 	Lyrics    domain.LyricsResp
 	LyricsErr error
 	Err       error
@@ -106,7 +105,16 @@ type PlaybackErrorMsg struct {
 	Err error
 }
 type TrackChangedMsg struct {
-	Track   domain.Track
-	IsLocal bool
-	Gen     uint64
+	Track       domain.Track
+	IsLocal     bool
+	Gen         uint64
+	PlaylistPos int
+	PlaylistLen int
+	IsRandom    bool
 }
+
+type LocalLyricsLoadedMsg struct {
+	Lyrics domain.LyricsResp
+}
+
+type PlaybackTickMsg struct{}

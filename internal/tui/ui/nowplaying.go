@@ -217,12 +217,42 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 			}
 		}
 
+	case LocalLyricsLoadedMsg:
+		r.SetLyrics(msg.Lyrics)
+		return r, r.spinner.Tick
+
 	case spinner.TickMsg:
 		if r.loadingLyrics {
 			var cmd tea.Cmd
 			r.spinner, cmd = r.spinner.Update(msg)
 			return r, cmd
 		}
+	case TrackChangedMsg:
+		track := msg.Track
+		r.nowPlay = &track
+		r.elapsed = 0
+		r.curLine = 0
+		r.offset = 0
+		r.loaded = false
+		r.loadingLyrics = true
+		r.showLangPopup = false
+		r.langCursor = 0
+		r.highlightLine = 0
+		r.manualSelect = false
+
+		r.playlistPos = msg.PlaylistPos
+		r.playlistTotal = msg.PlaylistLen
+		r.random = msg.IsRandom
+
+		return r, nil
+
+	case StreamResolvedMsg:
+		if msg.LyricsErr != nil {
+			r.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
+		} else {
+			r.SetLyrics(msg.Lyrics)
+		}
+		return r, r.spinner.Tick
 	}
 	return r, nil
 }

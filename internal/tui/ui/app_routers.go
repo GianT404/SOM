@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"strings"
-	"time"
 
 	"som/internal/domain"
 	"som/internal/storage"
@@ -21,65 +20,7 @@ func (a *App) handleTick() tea.Cmd {
 	a.right.TickAt()
 	var cmds []tea.Cmd
 
-	if !a.left.loadingStream && a.playback.SongStarted && a.player.State() == player.Stopped && a.playback.NowPlay != nil {
-		playErr := a.player.PlaybackError()
-		a.playback.NowPlay = nil
-		if a.avrcp != nil {
-			a.avrcp.UpdatePlaybackStatus("Stopped")
-		}
-		if playErr != nil {
-			a.setStatus(StatusErrStyle.Render("X playback failed: " + playErr.Error()))
-		} else if a.sidebarActive != SideImport {
-			if a.player.PlayFromBuffer() {
-				if a.playback.NextPlay != nil {
-					a.playback.NowPlay = a.playback.NextPlay
-					if len(a.playback.Queue) > 0 && a.playback.Queue[0].ID == a.playback.NowPlay.ID {
-						a.playback.Queue = a.playback.Queue[1:]
-						if a.left.qCursor >= len(a.playback.Queue) {
-							a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
-						}
-					} else {
-						for i, tr := range a.playback.Playlist {
-							if tr.ID == a.playback.NowPlay.ID {
-								a.playback.CurrentIdx = i
-								break
-							}
-						}
-					}
-					a.playback.NextPlay = nil
-					a.playback.SongStarted = true
-					a.playback.PlayerGen = a.player.Generation()
-					a.left.FocusTrack(a.playback.NowPlay.ID)
-					a.right.SetTrack(a.playback.NowPlay)
-					a.setStatus(StatusOKStyle.Render(">  " + a.playback.NowPlay.Title))
-					if a.avrcp != nil {
-						a.avrcp.UpdateMetadata(a.playback.NowPlay.ID, a.playback.NowPlay.Title, a.playback.NowPlay.Artist, "", a.playback.NowPlay.Thumbnail, int64(a.playback.NowPlay.Duration)*1_000_000)
-						a.avrcp.UpdatePlaybackStatus("Playing")
-					}
-					a.loadLyricsForTrack(*a.playback.NowPlay)
-				}
-			} else if len(a.playback.Queue) > 0 {
-				t := a.playback.Queue[0]
-				a.playback.Queue = a.playback.Queue[1:]
-				if a.left.qCursor >= len(a.playback.Queue) {
-					a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
-				}
-				a.focusTrackAndSwitchTab(t)
-				cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: -1, Track: t} })
-				a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
-			} else {
-				cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
-			}
-		}
-	}
-
-	if a.playback.SongStarted && a.player.State() == player.Playing && a.playback.NowPlay != nil && a.sidebarActive != SideImport {
-		pos := a.player.Position()
-		dur := time.Duration(a.playback.NowPlay.Duration) * time.Second
-		if remaining := dur - pos; remaining > 0 && remaining <= 3*time.Second {
-			a.triggerPreDecodeNext()
-		}
-	}
+	cmds = append(cmds, func() tea.Msg { return PlaybackTickMsg{} })
 
 	if a.avrcp != nil && a.playback.NowPlay != nil {
 		a.avrcp.UpdatePosition(a.player.Position().Microseconds())
@@ -131,10 +72,10 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		a.activeContext = SideDownloads
 		cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: a.playback.Playlist[idx]} })
 
-	case StreamStartedMsg:
+	case StreamResolvedMsg:
 		if msg.Err != nil {
 			a.left.loadingStream = false
-			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+			a.setStatus(StatusErrStyle.Render("X Lỗi stream: " + msg.Err.Error()))
 			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 			break
 		}
@@ -142,21 +83,15 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			a.left.loadingStream = false
 			break
 		}
+
 		a.left.loadingStream = false
-		a.playback.NowPlay = &msg.Track
-		a.playback.SongStarted = true
-		a.right.SetTrack(&msg.Track)
-		a.setStatus(StatusOKStyle.Render(">  " + msg.Track.Title))
+
 		if msg.LyricsErr != nil {
 			a.right.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
 		} else {
 			a.right.SetLyrics(msg.Lyrics)
 		}
 		cmds = append(cmds, a.right.spinner.Tick)
-		if a.avrcp != nil {
-			a.avrcp.UpdateMetadata(msg.Track.ID, msg.Track.Title, msg.Track.Artist, "", msg.Track.Thumbnail, int64(msg.Track.Duration)*1_000_000)
-			a.avrcp.UpdatePlaybackStatus("Playing")
-		}
 
 	case PlayPlaylistMsg:
 		a.playback.Playlist = msg.Tracks
@@ -200,12 +135,8 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		//  Cập nhật Status Bar của App
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 
-		a.left.FocusTrack(t.ID)
-
 		// Cập nhật Player (RightPanel & Lyrics)
-		a.right.SetTrack(&t)
 		if msg.IsLocal {
-			a.left.loadingStream = false
 			a.loadLyricsForTrack(t)
 		} else {
 			a.playback.PlayerGen = msg.Gen
@@ -217,7 +148,6 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
-		a.syncPlaylistState()
 
 	case PlaybackStateChangedMsg:
 		if a.avrcp != nil {

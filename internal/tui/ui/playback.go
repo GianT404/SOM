@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	"som/internal/domain"
 	"som/internal/tui/player"
@@ -186,6 +187,65 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 
 	case PlayTrackAtMsg:
 		cmds = append(cmds, pm.playTrackCmd(msg.Index, msg.Track))
+
+	case PlaybackTickMsg:
+		if !pm.SongStarted || pm.NowPlay == nil {
+			return pm, nil
+		}
+
+		// Xử lý khi bài hát KẾT THÚC
+		if pm.Player.State() == player.Stopped {
+			playErr := pm.Player.PlaybackError()
+			pm.NowPlay = nil
+
+			if playErr != nil {
+				cmds = append(cmds, func() tea.Msg { return PlaybackErrorMsg{Err: playErr} })
+				return pm, tea.Batch(cmds...)
+			}
+
+			// Nếu đã Pre-decode sẵn từ buffer (Gapless)
+			if pm.Player.PlayFromBuffer() {
+				if pm.NextPlay != nil {
+					t := *pm.NextPlay
+					pm.NextPlay = nil
+
+					// Dọn dẹp hàng đợi / playlist
+					if len(pm.Queue) > 0 && pm.Queue[0].ID == t.ID {
+						pm.Queue = pm.Queue[1:]
+					} else {
+						for i, tr := range pm.Playlist {
+							if tr.ID == t.ID {
+								pm.CurrentIdx = i
+								break
+							}
+						}
+					}
+
+					pm.PlayerGen = pm.Player.Generation()
+					pm.SongStarted = true
+
+					//  UI cập nhật
+					cmds = append(cmds, func() tea.Msg {
+						return TrackChangedMsg{
+							Track:       t,
+							IsLocal:     true,
+							Gen:         pm.PlayerGen,
+							PlaylistPos: pm.CurrentIdx,
+							PlaylistLen: len(pm.Playlist),
+							IsRandom:    pm.Random,
+						}
+					})
+				}
+			} else {
+				cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
+			}
+		} else if pm.Player.State() == player.Playing {
+			pos := pm.Player.Position()
+			dur := time.Duration(pm.NowPlay.Duration) * time.Second
+			if remaining := dur - pos; remaining > 0 && remaining <= 3*time.Second {
+				pm.triggerPreDecodeNext()
+			}
+		}
 	case TogglePauseMsg:
 		pm.Player.TogglePause()
 		cmds = append(cmds, func() tea.Msg { return PlaybackStateChangedMsg{State: int(pm.Player.State())} })
@@ -207,14 +267,25 @@ func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
 		pm.RecordHistory()
 	}
 
-	if strings.HasPrefix(t.ID, "local:") {
+	trackChangedMsg := TrackChangedMsg{
+		Track:       t,
+		IsLocal:     strings.HasPrefix(t.ID, "local:"),
+		Gen:         pm.PlayerGen,
+		PlaylistPos: pm.CurrentIdx,
+		PlaylistLen: len(pm.Playlist),
+		IsRandom:    pm.Random,
+	}
+
+	if trackChangedMsg.IsLocal {
 		path := strings.TrimPrefix(t.ID, "local:")
 		if err := pm.Player.Play(path); err != nil {
 			return func() tea.Msg { return PlaybackErrorMsg{Err: err} }
 		}
 		pm.PlayerGen = pm.Player.Generation()
 		pm.SongStarted = true
-		return func() tea.Msg { return TrackChangedMsg{Track: t, IsLocal: true} }
+
+		trackChangedMsg.Gen = pm.PlayerGen
+		return func() tea.Msg { return trackChangedMsg }
 	}
 
 	// Logic Stream
@@ -223,7 +294,10 @@ func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
 	gen := pm.Player.Generation()
 	pm.PlayerGen = gen
 
-	return func() tea.Msg {
+	trackChangedMsg.Gen = gen
+
+	// Luồng ngầm: Đi lấy stream URL
+	resolveStreamCmd := func() tea.Msg {
 		streamInfo, err := pm.Provider.ResolveStream(ctx, t.ID)
 		if ctx.Err() != nil || gen != pm.Player.Generation() {
 			return nil
@@ -236,6 +310,46 @@ func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
 			return PlaybackErrorMsg{Err: err}
 		}
 
-		return TrackChangedMsg{Track: t, IsLocal: false, Gen: gen}
+		lr, lyricsErr := getCachedLyrics(pm.Provider, t.ID, t.Title, t.Artist, t.Duration)
+		return StreamResolvedMsg{
+			Lyrics:    lr,
+			LyricsErr: lyricsErr,
+			Gen:       gen,
+		}
 	}
+
+	// Batch: Ném TrackChangedMsg NGAY LẬP TỨC để UI đổi chữ,
+	// đồng thời chạy resolveStreamCmd ở background.
+	return tea.Batch(
+		func() tea.Msg { return trackChangedMsg },
+		resolveStreamCmd,
+	)
+}
+
+func (pm *PlaybackManager) triggerPreDecodeNext() {
+	if pm.NextPlay != nil {
+		return
+	}
+	var next domain.Track
+	if len(pm.Queue) > 0 {
+		next = pm.Queue[0]
+	} else if len(pm.Playlist) > 0 {
+		idx := pm.CurrentIdx + 1
+		if pm.Random {
+			idx = pm.pickAntiClumpIndex()
+		}
+		if idx >= len(pm.Playlist) {
+			return
+		}
+		next = pm.Playlist[idx]
+	} else {
+		return
+	}
+
+	if !strings.HasPrefix(next.ID, "local:") {
+		return
+	}
+	path := strings.TrimPrefix(next.ID, "local:")
+	pm.NextPlay = &next
+	pm.Player.PreDecodeNext(path, nil)
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"log"
 	"som/internal/domain"
 	"som/internal/storage"
@@ -526,7 +527,34 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		if cur != "" && cur == msg.Query {
 			cmds = append(cmds, suggestCmd(cur))
 		}
+	case TrackChangedMsg:
+		if msg.IsLocal {
+			p.loadingStream = false
 
+			// LeftPanel tự móc DB lấy lyrics và ném ra Message
+			path := strings.TrimPrefix(msg.Track.ID, "local:")
+			if p.plStore != nil {
+				if lyricsJSON, err := p.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
+					var lr domain.LyricsResp
+					if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
+						cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: lr} })
+					}
+				} else {
+					cmds = append(cmds, func() tea.Msg {
+						return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}}
+					})
+				}
+			}
+		} else {
+			p.loadingStream = true
+		}
+
+		p.FocusTrack(msg.Track.ID)
+		return p, nil
+
+	case StreamResolvedMsg:
+		p.loadingStream = false
+		return p, nil
 	case SuggestionsMsg:
 		if p.activeTab != SideSearch || !p.input.Focused() {
 			break
