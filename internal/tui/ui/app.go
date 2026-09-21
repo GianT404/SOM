@@ -52,6 +52,11 @@ func logoTick() tea.Cmd {
 	})
 }
 
+type MoveSession struct {
+	TargetPlIdx int
+	Selected    map[string]bool
+}
+
 type App struct {
 	provider      domain.MusicProvider
 	downloadDir   string
@@ -89,22 +94,15 @@ type App struct {
 	mouseEnabled   bool
 	skipSilence    bool
 
-	mouseLastClickAt     time.Time
-	mouseLastClickY      int
-	mouseLastClickTab    SidebarItem
-	avrcp                *avrcp.Server
-	activePreset         int
-	activeSpeed          int
-	activeSort           string
-	importPanel          ImportPanel
-	moveSelectActive     bool
-	moveSelected         map[string]bool
-	movePickActive       bool
-	moveCreateActive     bool
-	moveCreateInput      textinput.Model
-	moveConfirmActive    bool
-	moveTargetPlIdx      int
-	moveShowTracksActive bool
+	mouseLastClickAt  time.Time
+	mouseLastClickY   int
+	mouseLastClickTab SidebarItem
+	avrcp             *avrcp.Server
+	activePreset      int
+	activeSpeed       int
+	activeSort        string
+	importPanel       ImportPanel
+	moveSession       *MoveSession
 }
 type Overlay interface {
 	Init() tea.Cmd
@@ -119,22 +117,85 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 	mi.CharLimit = 50
 	mi.Prompt = ""
 	return &App{
-		provider:        provider,
-		downloadDir:     downloadDir,
-		sidebarActive:   SideDownloads,
-		activeContext:   SideDownloads,
-		palette:         NewCommandPalette(),
-		booting:         true,
-		activeSpeed:     3,
-		mouseEnabled:    false,
-		importPanel:     NewImportPanel(),
-		moveCreateInput: mi,
-		playback:        NewPlaybackManager(),
+		provider:      provider,
+		downloadDir:   downloadDir,
+		sidebarActive: SideDownloads,
+		activeContext: SideDownloads,
+		palette:       NewCommandPalette(),
+		booting:       true,
+		activeSpeed:   3,
+		mouseEnabled:  false,
+		importPanel:   NewImportPanel(),
+		playback:      NewPlaybackManager(),
 	}
 }
 
 func (a *App) Init() tea.Cmd {
 	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
+}
+
+func (a *App) selectedMoveCount() int {
+	n := 0
+	if a.moveSession != nil {
+		for _, v := range a.moveSession.Selected {
+			if v {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func (a *App) toggleMoveSelection() {
+	locals := a.left.getFilteredLocals()
+	if a.left.dlCursor < 0 || a.left.dlCursor >= len(locals) {
+		return
+	}
+	if a.moveSession != nil {
+		path := locals[a.left.dlCursor].Path
+		a.moveSession.Selected[path] = !a.moveSession.Selected[path]
+	}
+}
+
+func (a *App) applyMoveToPlaylist() {
+	if a.moveSession == nil || a.moveSession.TargetPlIdx < 0 || a.moveSession.TargetPlIdx >= len(a.left.playlists) {
+		return
+	}
+	pl := &a.left.playlists[a.moveSession.TargetPlIdx]
+	existing := make(map[string]bool, len(pl.Tracks))
+	for _, t := range pl.Tracks {
+		existing[t.ID] = true
+	}
+
+	added, removed := 0, 0
+	for _, lf := range a.left.locals {
+		if !a.moveSession.Selected[lf.Path] {
+			continue
+		}
+		id := "local:" + lf.Path
+		if existing[id] {
+			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, lf.Path); err == nil {
+				var newTracks []storage.PlaylistTrack
+				for _, t := range pl.Tracks {
+					if t.ID != id {
+						newTracks = append(newTracks, t)
+					}
+				}
+				pl.Tracks = newTracks
+				existing[id] = false
+				removed++
+			}
+		} else {
+			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, lf.Path); err == nil {
+				pl.Tracks = append(pl.Tracks, storage.PlaylistTrack{
+					ID: lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, Thumbnail: lf.Thumbnail, Path: lf.Path,
+				})
+				existing[id] = true
+				added++
+			}
+		}
+	}
+	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Changed: %d added, %d removed in \"%s\"", added, removed, pl.Name)))
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -214,6 +275,29 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.resizePanels()
+	case InitMoveSessionMsg:
+		idx := msg.TargetPlIdx
+		if idx == -1 && msg.NewPlName != "" && a.left.plStore != nil {
+			if pl, err := a.left.plStore.CreatePlaylist(msg.NewPlName); err == nil {
+				a.left.playlists = append(a.left.playlists, pl)
+				idx = len(a.left.playlists) - 1
+			} else {
+				a.setStatus(StatusErrStyle.Render("X " + err.Error()))
+				break
+			}
+		}
+		if idx >= 0 {
+			a.moveSession = &MoveSession{
+				TargetPlIdx: idx,
+				Selected:    make(map[string]bool),
+			}
+			cmds = append(cmds, a.switchSidebar(SideDownloads))
+			a.left.input.Blur()
+		}
+
+	case ExecuteMoveMsg:
+		a.applyMoveToPlaylist()
+		a.moveSession = nil
 
 	case tickMsg:
 		a.left.animTick++
@@ -403,17 +487,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.showCmdPopup {
 			return a, a.updateCmdPopup(msg)
 		}
-		if a.movePickActive || a.moveCreateActive || a.moveConfirmActive || a.moveShowTracksActive {
-			return a, a.updateMovePopup(msg)
-		}
 
 		switch msg.String() {
 
 		case "esc":
-			if a.moveSelectActive {
-				a.moveSelectActive = false
-				a.moveSelected = nil
-				a.setStatus(StatusMsgStyle.Render(">No changes to playlist"))
+			if a.moveSession != nil {
+				a.moveSession = nil
+				a.setStatus(StatusMsgStyle.Render("> No changes to playlist"))
 			} else if a.palette.Visible() {
 				a.palette.Close()
 			} else if !a.left.input.Focused() && !a.left.plInput.Focused() && !a.left.showDeletePopup && !a.left.showPlInput {
@@ -426,13 +506,20 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case ".":
-			if a.moveSelectActive && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
+			if a.moveSession != nil && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
 				a.toggleMoveSelection()
 			}
 
 		case "i":
-			if a.moveSelectActive && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
-				a.finishMoveSelection()
+			if a.moveSession != nil && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
+				if a.selectedMoveCount() == 0 {
+					a.setStatus(StatusErrStyle.Render("X Chua chon track nao (phim . de chon)"))
+				} else {
+					plName := a.left.playlists[a.moveSession.TargetPlIdx].Name
+					modal := NewMoveConfirmModal(plName, a.selectedMoveCount())
+					a.activeModal = modal
+					cmds = append(cmds, modal.Init())
+				}
 			}
 		case "1", "2", "3", "4", "5", "6", "7":
 			if a.left.input.Focused() || a.left.plInput.Focused() {
@@ -958,9 +1045,13 @@ func (a *App) View() tea.View {
 		mainView = a.left.ViewSearchContent(mainW, contentH)
 	case SideDownloads:
 		var alreadyInMove map[string]bool
-		if a.moveSelectActive && a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
+		var selected map[string]bool
+		selectMode := false
+		if a.moveSession != nil && a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
+			selectMode = true
+			selected = a.moveSession.Selected
 			alreadyInMove = map[string]bool{}
-			for _, t := range a.left.playlists[a.moveTargetPlIdx].Tracks {
+			for _, t := range a.left.playlists[a.moveSession.TargetPlIdx].Tracks {
 				path := t.Path
 				if path == "" {
 					path = strings.TrimPrefix(t.ID, "local:")
@@ -968,7 +1059,7 @@ func (a *App) View() tea.View {
 				alreadyInMove[path] = true
 			}
 		}
-		mainView = a.left.ViewDownloadsContent(mainW, contentH, a.moveSelected, a.moveSelectActive, alreadyInMove)
+		mainView = a.left.ViewDownloadsContent(mainW, contentH, selected, selectMode, alreadyInMove)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -1029,15 +1120,6 @@ func (a *App) View() tea.View {
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.moveCreateActive {
-		popup := a.renderMoveCreatePopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.movePickActive {
-		popup := a.renderMovePickPopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.moveConfirmActive {
-		popup := a.renderMoveConfirmPopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showCmdPopup {
 		popup := a.renderCmdPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
@@ -1079,12 +1161,12 @@ func (a *App) renderSomRow(somLogo string) string {
 		}
 		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
 	case SideDownloads:
-		if !a.moveSelectActive {
+		if a.moveSession == nil {
 			return somLogo
 		}
 		plName := ""
-		if a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
-			plName = a.left.playlists[a.moveTargetPlIdx].Name
+		if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
+			plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
 		}
 		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
 	case SidePlaylists:

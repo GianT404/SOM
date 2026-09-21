@@ -216,7 +216,15 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 		}
 	case "Move to playlist":
 		a.showCmdPopup = false
-		return a.startMoveToPlaylist()
+		if len(a.left.playlists) == 0 {
+			modal := NewMoveCreateModal(a.width)
+			a.activeModal = modal
+			return modal.Init()
+		} else {
+			modal := NewMovePickModal(a.left.playlists)
+			a.activeModal = modal
+			return modal.Init()
+		}
 	case "Remove from playlist":
 		a.plRmActive = true
 		a.cmdCursor = 0

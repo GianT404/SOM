@@ -2,236 +2,117 @@ package ui
 
 import (
 	"fmt"
+	"som/internal/storage"
 	"strings"
 
-	"som/internal/storage"
-
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/mattn/go-runewidth"
 )
 
-// startMoveToPlaylist mo popup chon playlist dich ngay (hoac popup tao moi
-// neu chua co playlist nao), truoc khi vao buoc chon track o tab Download.
-func (a *App) startMoveToPlaylist() tea.Cmd {
-	cmd := a.switchSidebar(SideDownloads)
-	a.left.input.Blur()
-	if len(a.left.playlists) == 0 {
-		a.moveCreateActive = true
-		a.moveCreateInput.SetValue("")
-		a.moveCreateInput.Focus()
-		a.moveCreateInput.CursorEnd()
-	} else {
-		a.movePickActive = true
-		a.cmdCursor = 0
-	}
-	return cmd
+// ==========================================
+// 1. CREATE PLAYLIST MODAL
+// ==========================================
+type MoveCreateModal struct {
+	input textinput.Model
+	width int
 }
 
-// toggleMoveSelection bat/tat chon track dang highlight trong tab Download.
-func (a *App) toggleMoveSelection() {
-	locals := a.left.getFilteredLocals()
-	if a.left.dlCursor < 0 || a.left.dlCursor >= len(locals) {
-		return
-	}
-	if a.moveSelected == nil {
-		a.moveSelected = map[string]bool{}
-	}
-	path := locals[a.left.dlCursor].Path
-	a.moveSelected[path] = !a.moveSelected[path]
+func NewMoveCreateModal(appWidth int) *MoveCreateModal {
+	ti := textinput.New()
+	ti.CharLimit = 50
+	ti.Prompt = ""
+	ti.Focus()
+	return &MoveCreateModal{input: ti, width: appWidth}
 }
 
-// selectedMoveCount dem so track dang duoc chon de move.
-func (a *App) selectedMoveCount() int {
-	n := 0
-	for _, v := range a.moveSelected {
-		if v {
-			n++
-		}
-	}
-	return n
-}
-
-// finishMoveSelection duoc goi khi bam 'i': playlist dich da chon tu truoc
-// (moveTargetPlIdx), chi can validate selection roi qua thang buoc confirm.
-func (a *App) finishMoveSelection() {
-	if a.selectedMoveCount() == 0 {
-		a.setStatus(StatusErrStyle.Render("X Chua chon track nao (phim . de chon)"))
-		return
-	}
-	a.moveSelectActive = false
-	a.moveConfirmActive = true
-	a.cmdCursor = 0
-}
-
-// updateMovePopup xu ly phim bam cho cac popup cua luong move: tao playlist
-// moi, chon playlist dich, va xac nhan cuoi cung.
-func (a *App) updateMovePopup(k tea.KeyMsg) tea.Cmd {
-	if a.moveCreateActive {
-		switch k.String() {
-		case "enter":
-			name := strings.TrimSpace(a.moveCreateInput.Value())
-			if name == "" {
-				return nil
-			}
-			if a.left.plStore == nil {
-				a.setStatus(StatusErrStyle.Render("X Database not initialized"))
-				return nil
-			}
-			pl, err := a.left.plStore.CreatePlaylist(name)
-			if err != nil {
-				a.setStatus(StatusErrStyle.Render("X " + err.Error()))
-				return nil
-			}
-			a.left.playlists = append(a.left.playlists, pl)
-			a.moveCreateActive = false
-			a.moveCreateInput.Blur()
-			a.moveCreateInput.SetValue("")
-			a.moveTargetPlIdx = len(a.left.playlists) - 1
-			a.moveSelectActive = true
-			a.moveSelected = map[string]bool{}
-			return nil
+func (m *MoveCreateModal) Init() tea.Cmd { return textinput.Blink }
+func (m *MoveCreateModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
 		case "esc":
-			a.moveCreateActive = false
-			a.moveCreateInput.Blur()
-			a.moveCreateInput.SetValue("")
-			a.moveSelected = nil
-			return nil
-		}
-		var cmd tea.Cmd
-		a.moveCreateInput, cmd = a.moveCreateInput.Update(k)
-		return cmd
-	}
-
-	if a.movePickActive {
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(a.left.playlists) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(a.left.playlists)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
+			return m, func() tea.Msg { return CloseModalMsg{} }
 		case "enter":
-			if a.cmdCursor < len(a.left.playlists) {
-				a.movePickActive = false
-				a.moveTargetPlIdx = a.cmdCursor
-				a.moveSelectActive = true
-				a.moveSelected = map[string]bool{}
+			name := strings.TrimSpace(m.input.Value())
+			if name != "" {
+				return m, tea.Batch(
+					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return InitMoveSessionMsg{TargetPlIdx: -1, NewPlName: name} },
+				)
 			}
-		case "esc", ":":
-			a.movePickActive = false
-			a.moveSelected = nil
 		}
-		return nil
 	}
-
-	if a.moveConfirmActive {
-		switch k.String() {
-		case "left", "h", "right", "l", "up", "down", "k", "j", "tab":
-			a.cmdCursor = 1 - a.cmdCursor
-		case "enter":
-			if a.cmdCursor == 1 {
-				a.applyMoveToPlaylist()
-			}
-			a.moveConfirmActive = false
-			a.moveSelected = nil
-		case "esc", ":":
-			a.moveConfirmActive = false
-			a.moveSelected = nil
-		}
-		return nil
-	}
-	return nil
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }
-
-func (a *App) applyMoveToPlaylist() {
-	if a.moveTargetPlIdx < 0 || a.moveTargetPlIdx >= len(a.left.playlists) {
-		return
-	}
-	if a.left.plStore == nil {
-		a.setStatus(StatusErrStyle.Render("X Database not initialized"))
-		return
-	}
-
-	pl := &a.left.playlists[a.moveTargetPlIdx]
-	existing := make(map[string]bool, len(pl.Tracks))
-	for _, t := range pl.Tracks {
-		existing[t.ID] = true
-	}
-
-	added := 0
-	removed := 0
-
-	for _, lf := range a.left.locals {
-		if !a.moveSelected[lf.Path] {
-			continue
-		}
-
-		id := "local:" + lf.Path
-
-		if existing[id] {
-			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, lf.Path); err == nil {
-				var newTracks []storage.PlaylistTrack
-				for _, t := range pl.Tracks {
-					if t.ID != id {
-						newTracks = append(newTracks, t)
-					}
-				}
-				pl.Tracks = newTracks
-				existing[id] = false
-				removed++
-			}
-		} else {
-			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, lf.Path); err == nil {
-				track := storage.PlaylistTrack{
-					ID:        lf.Path,
-					Title:     lf.Name,
-					Artist:    lf.Artist,
-					Duration:  lf.Duration,
-					Thumbnail: lf.Thumbnail,
-					Path:      lf.Path,
-				}
-				pl.Tracks = append(pl.Tracks, track)
-				existing[lf.Path] = true
-				added++
-			}
-		}
-	}
-
-	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Changed: %d added, %d removed in \"%s\"", added, removed, pl.Name)))
-}
-
-func (a *App) renderMoveCreatePopup() string {
+func (m *MoveCreateModal) View() string {
 	var b strings.Builder
 	b.WriteString("\n ")
-	b.WriteString(NormalItemStyle.Render(fmt.Sprintf("No playlist yet. Enter name for %d track:", a.selectedMoveCount())))
+	b.WriteString(NormalItemStyle.Render("Enter name for new playlist:"))
 	b.WriteString("\n\n  ")
-	b.WriteString(a.moveCreateInput.View())
+	b.WriteString(m.input.View())
 	b.WriteString("\n\n ")
 	b.WriteString(DimItemStyle.Render(" (enter: create  | esc: cancel)"))
-	w := a.moveCreateInput.Width() + 8
+
+	w := m.input.Width() + 8
 	if w < 48 {
 		w = 48
 	}
-	if a.width > 0 && w > a.width-2 {
-		w = a.width - 2
+	if m.width > 0 && w > m.width-2 {
+		w = m.width - 2
 	}
 	return renderBox(w, "Create New Playlist", b.String(), themeCol("#e8593c"))
 }
 
-func (a *App) renderMovePickPopup() string {
+// ==========================================
+// 2. PICK PLAYLIST MODAL
+// ==========================================
+type MovePickModal struct {
+	playlists []storage.Playlist
+	cursor    int
+}
+
+func NewMovePickModal(playlists []storage.Playlist) *MovePickModal {
+	return &MovePickModal{playlists: playlists, cursor: 0}
+}
+func (m *MovePickModal) Init() tea.Cmd { return nil }
+func (m *MovePickModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	if k, ok := msg.(tea.KeyPressMsg); ok {
+		switch k.String() {
+		case "esc", "q", ":":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.playlists) - 1
+			}
+		case "down", "j":
+			if m.cursor < len(m.playlists)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+		case "enter":
+			idx := m.cursor
+			return m, tea.Batch(
+				func() tea.Msg { return CloseModalMsg{} },
+				func() tea.Msg { return InitMoveSessionMsg{TargetPlIdx: idx} },
+			)
+		}
+	}
+	return m, nil
+}
+func (m *MovePickModal) View() string {
 	var b strings.Builder
 	b.WriteString("\n ")
 	b.WriteString(NormalItemStyle.Render("Select target playlist:"))
 	b.WriteString("\n\n ")
-	for i, pl := range a.left.playlists {
+	for i, pl := range m.playlists {
 		line := fmt.Sprintf("  %s (%d)", pl.Name, len(pl.Tracks))
-		if i == a.cmdCursor {
+		if i == m.cursor {
 			pad := 51 - runewidth.StringWidth(line)
 			if pad < 0 {
 				pad = 0
@@ -247,19 +128,45 @@ func (a *App) renderMovePickPopup() string {
 	return renderBox(56, "Select Playlist", b.String(), themeCol("#e8593c"))
 }
 
-func (a *App) renderMoveConfirmPopup() string {
-	var b strings.Builder
-	name := ""
-	if a.moveTargetPlIdx >= 0 && a.moveTargetPlIdx < len(a.left.playlists) {
-		name = a.left.playlists[a.moveTargetPlIdx].Name
-	}
-	b.WriteString("\n ")
-	b.WriteString(DimItemStyle.Render(fmt.Sprintf("Move %d track to \"%s\"?", a.selectedMoveCount(), name)))
-	b.WriteString("\n\n ")
+// ==========================================
+// 3. CONFIRM MOVE MODAL
+// ==========================================
+type MoveConfirmModal struct {
+	plName string
+	count  int
+	cursor int
+}
 
-	cancelStyle := NormalItemStyle
-	confirmStyle := NormalItemStyle
-	if a.cmdCursor == 0 {
+func NewMoveConfirmModal(plName string, count int) *MoveConfirmModal {
+	return &MoveConfirmModal{plName: plName, count: count, cursor: 1}
+}
+func (m *MoveConfirmModal) Init() tea.Cmd { return nil }
+func (m *MoveConfirmModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	if k, ok := msg.(tea.KeyPressMsg); ok {
+		switch k.String() {
+		case "esc", ":", "q":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		case "left", "h", "right", "l", "tab":
+			m.cursor = 1 - m.cursor
+		case "enter":
+			if m.cursor == 1 {
+				return m, tea.Batch(
+					func() tea.Msg { return CloseModalMsg{} },
+					func() tea.Msg { return ExecuteMoveMsg{} },
+				)
+			}
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		}
+	}
+	return m, nil
+}
+func (m *MoveConfirmModal) View() string {
+	var b strings.Builder
+	b.WriteString("\n ")
+	b.WriteString(DimItemStyle.Render(fmt.Sprintf("Move %d track to \"%s\"?", m.count, m.plName)))
+	b.WriteString("\n\n ")
+	cancelStyle, confirmStyle := NormalItemStyle, NormalItemStyle
+	if m.cursor == 0 {
 		cancelStyle = SelectedItemStyle
 	} else {
 		confirmStyle = SelectedItemStyle
