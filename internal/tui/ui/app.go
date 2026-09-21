@@ -692,54 +692,8 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.playback.SongStarted = false
 	a.playback.NextPlay = nil
 	a.syncPlaylistState()
-
-	if idx >= 0 {
-		vis := a.left.visibleRows()
-		if strings.HasPrefix(t.ID, "local:") {
-			path := strings.TrimPrefix(t.ID, "local:")
-			for i, lf := range a.left.locals {
-				if lf.Path == path {
-					a.left.dlCursor = i
-					if a.left.dlCursor < a.left.dlOffset {
-						a.left.dlOffset = a.left.dlCursor
-					} else if a.left.dlCursor >= a.left.dlOffset+vis {
-						a.left.dlOffset = a.left.dlCursor - vis + 1
-					}
-					break
-				}
-			}
-		} else {
-			for i, tr := range a.left.tracks {
-				if tr.ID == t.ID {
-					a.left.searchCursor = i
-					if a.left.searchCursor < a.left.searchOffset {
-						a.left.searchOffset = a.left.searchCursor
-					} else if a.left.searchCursor >= a.left.searchOffset+vis {
-						a.left.searchOffset = a.left.searchCursor - vis + 1
-					}
-					break
-				}
-			}
-		}
-
-		if a.left.activePlaylist != nil {
-			tracks := a.left.getFilteredPlaylistTracks()
-			for i, pt := range tracks {
-				if "local:"+pt.Path == t.ID || pt.ID == t.ID {
-					a.left.plCursor = i
-					if a.left.plCursor < a.left.plOffset {
-						a.left.plOffset = a.left.plCursor
-					} else if a.left.plCursor >= a.left.plOffset+vis {
-						a.left.plOffset = a.left.plCursor - vis + 1
-					}
-					break
-				}
-			}
-		}
-	}
-
+	a.left.FocusTrack(t.ID)
 	if strings.HasPrefix(t.ID, "local:") {
-		// Huỷ resolve stream (nếu có) đang chạy dở để nó không phát đè lên bài local vừa chọn
 		a.playback.CancelResolve()
 		a.left.loadingStream = false
 		path := strings.TrimPrefix(t.ID, "local:")
@@ -755,7 +709,6 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
-		// Read lyrics from SQLite.
 		if a.left.plStore != nil {
 			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
 				var lr domain.LyricsResp
@@ -768,6 +721,7 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 		return nil
 	}
+
 	a.playback.CancelResolve()
 	ctx, cancel := context.WithCancel(context.Background())
 	a.playback.ResolveCancel = cancel
@@ -775,21 +729,15 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 	a.playback.PlayerGen = gen
 	return func() tea.Msg {
 		streamInfo, err := a.provider.ResolveStream(ctx, t.ID)
-		// Nếu resolve này không còn là request mới nhất (một bài khác đã được
-		// phát — local/remote — trong lúc chờ yt-dlp) thì bỏ qua, tuyệt đối
-		// không PlayWithHeaders đè lên bài đang phát.
 		if ctx.Err() != nil || gen != a.player.Generation() {
 			return nil
 		}
-
 		if err != nil || streamInfo == nil || streamInfo.URL == "" {
-			return StreamStartedMsg{Err: fmt.Errorf("l y link CDN: %v", err)}
+			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
 		}
-
 		if err := a.player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
 			return StreamStartedMsg{Err: err}
 		}
-
 		lr, lyricsErr := getCachedLyrics(a.provider, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamStartedMsg{
 			Track:     t,
@@ -799,79 +747,17 @@ func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
 		}
 	}
 }
-
-func (a *App) highlightTrackInSidebar(t domain.Track) {
+func (a *App) focusTrackAndSwitchTab(t domain.Track) {
 	if strings.HasPrefix(t.ID, "local:") {
-		path := strings.TrimPrefix(t.ID, "local:")
 		a.activeContext = SideDownloads
 		a.sidebarActive = SideDownloads
 		a.left.activeTab = SideDownloads
-		for i, lf := range a.left.locals {
-			if lf.Path == path {
-				a.left.dlCursor = i
-				a.left.dlOffset = 0
-				if i >= a.left.visibleRows() {
-					a.left.dlOffset = i - a.left.visibleRows() + 1
-				}
-				break
-			}
-		}
 	} else {
 		a.activeContext = SideSearch
 		a.sidebarActive = SideSearch
 		a.left.activeTab = SideSearch
-		for i, tr := range a.left.tracks {
-			if tr.ID == t.ID {
-				a.left.searchCursor = i
-				a.left.searchOffset = 0
-				if i >= a.left.visibleRows() {
-					a.left.searchOffset = i - a.left.visibleRows() + 1
-				}
-				break
-			}
-		}
 	}
-}
-
-func (a *App) updateCursorForTrack(t domain.Track) {
-	vis := a.left.visibleRows()
-	if strings.HasPrefix(t.ID, "local:") {
-		path := strings.TrimPrefix(t.ID, "local:")
-		for i, lf := range a.left.locals {
-			if lf.Path == path {
-				a.left.dlCursor = i
-				a.left.dlOffset = 0
-				if i >= vis {
-					a.left.dlOffset = i - vis + 1
-				}
-				break
-			}
-		}
-	} else {
-		for i, tr := range a.left.tracks {
-			if tr.ID == t.ID {
-				a.left.searchCursor = i
-				a.left.searchOffset = 0
-				if i >= vis {
-					a.left.searchOffset = i - vis + 1
-				}
-				break
-			}
-		}
-	}
-	if a.activeContext == SidePlaylists && a.left.activePlaylist != nil {
-		tracks := a.left.getFilteredPlaylistTracks()
-		for i, pt := range tracks {
-			if "local:"+pt.Path == t.ID || pt.ID == t.ID {
-				a.left.plCursor = i
-				a.left.plOffset = 0
-				if i >= vis {
-					a.left.plOffset = i - vis + 1
-				}
-				break
-			}
-		}
-	}
+	a.left.FocusTrack(t.ID)
 }
 
 func (a *App) playNext() tea.Cmd {
@@ -883,7 +769,7 @@ func (a *App) playNext() tea.Cmd {
 		if a.left.qCursor >= len(a.playback.Queue) {
 			a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 		}
-		a.highlightTrackInSidebar(*t)
+		a.focusTrackAndSwitchTab(*t)
 		a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 	}
 	return a.playTrackAt(idx, *t)

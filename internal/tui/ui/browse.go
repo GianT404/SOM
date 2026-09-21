@@ -828,3 +828,48 @@ func loadInputForTab(p *LeftPanel, tab SidebarItem) {
 		p.input.SetValue(p.inputPlaylist)
 	}
 }
+func (p *LeftPanel) FocusTrack(trackID string) {
+	// Hàm tiện ích nội bộ để tính offset (Wrap và Scroll)
+	updateScroll := func(cursor *int, offset *int, uiVis int) {
+		if *cursor < *offset {
+			*offset = *cursor
+		} else if *cursor >= *offset+uiVis {
+			*offset = *cursor - uiVis + 1
+		}
+		if *offset < 0 {
+			*offset = 0
+		}
+	}
+
+	if strings.HasPrefix(trackID, "local:") {
+		path := strings.TrimPrefix(trackID, "local:")
+		locals := p.getFilteredLocals() // CHÍNH XÁC: Phải dùng danh sách đã filter
+		for i, lf := range locals {
+			if lf.Path == path {
+				p.dlCursor = i
+				updateScroll(&p.dlCursor, &p.dlOffset, p.visibleRows()+1)
+				break
+			}
+		}
+	} else {
+		for i, tr := range p.tracks {
+			if tr.ID == trackID {
+				p.searchCursor = i
+				updateScroll(&p.searchCursor, &p.searchOffset, p.visibleRows())
+				break
+			}
+		}
+	}
+
+	// Xử lý riêng cho tab Playlists
+	if p.activePlaylist != nil {
+		tracks := p.getFilteredPlaylistTracks() // CHÍNH XÁC: Phải dùng danh sách đã filter
+		for i, pt := range tracks {
+			if "local:"+pt.Path == trackID || pt.ID == trackID {
+				p.plCursor = i
+				updateScroll(&p.plCursor, &p.plOffset, p.visibleRows()+1)
+				break
+			}
+		}
+	}
+}

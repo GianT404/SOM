@@ -49,7 +49,7 @@ func (a *App) handleTick() tea.Cmd {
 					a.playback.NextPlay = nil
 					a.playback.SongStarted = true
 					a.playback.PlayerGen = a.player.Generation()
-					a.updateCursorForTrack(*a.playback.NowPlay)
+					a.left.FocusTrack(a.playback.NowPlay.ID)
 					a.right.SetTrack(a.playback.NowPlay)
 					a.setStatus(StatusOKStyle.Render(">  " + a.playback.NowPlay.Title))
 					if a.avrcp != nil {
@@ -64,7 +64,7 @@ func (a *App) handleTick() tea.Cmd {
 				if a.left.qCursor >= len(a.playback.Queue) {
 					a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 				}
-				a.highlightTrackInSidebar(t)
+				a.focusTrackAndSwitchTab(t)
 				cmds = append(cmds, a.playTrackAt(-1, t))
 				a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 			} else {
@@ -130,16 +130,6 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		}
 		a.activeContext = SideDownloads
 		cmds = append(cmds, a.playTrackAt(idx, a.playback.Playlist[idx]))
-		for fi, lf := range a.left.getFilteredLocals() {
-			if lf.Path == msg.Path || lf.Name == msg.Title {
-				a.left.dlCursor = fi
-				a.left.dlOffset = 0
-				if fi >= a.left.visibleRows() {
-					a.left.dlOffset = fi - a.left.visibleRows() + 1
-				}
-				break
-			}
-		}
 
 	case StreamStartedMsg:
 		if msg.Err != nil {
@@ -183,7 +173,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			if a.left.qCursor >= len(a.playback.Queue) {
 				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 			}
-			a.highlightTrackInSidebar(t)
+			a.focusTrackAndSwitchTab(t)
 			cmds = append(cmds, a.playTrackAt(-1, t))
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 		}
