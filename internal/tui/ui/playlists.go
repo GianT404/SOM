@@ -162,8 +162,8 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 
 	return renderSharedTrackList(
 		innerW, filtered, p.plCursor, p.plOffset, p.visibleRows()+1,
-		func(t storage.PlaylistTrack) (string, string, string, int) {
-			return t.Title, t.Artist, t.Path, t.Duration
+		func(t storage.PlaylistTrack) (string, string, string, int, bool) {
+			return t.Title, t.Artist, t.Path, t.Duration, false
 		},
 		false, nil, nil, // Playlists không có select mode
 	)

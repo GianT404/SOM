@@ -93,8 +93,8 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 
 	return renderSharedTrackList(
 		innerW, locals, p.dlCursor, p.dlOffset, p.visibleRows()+1,
-		func(f LocalFile) (string, string, string, int) {
-			return f.Name, f.Artist, f.Path, f.Duration
+		func(f LocalFile) (string, string, string, int, bool) {
+			return f.Name, f.Artist, f.Path, f.Duration, false
 		},
 		selectMode, selected, alreadyIn,
 	)

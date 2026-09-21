@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"fmt"
+	"som/internal/domain"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -43,7 +43,17 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 		} else if p.loadingDownload {
 			statusLine = DimItemStyle.Render(" "+p.spinner.View()+" Downloading...") + "\n"
 		}
-		resultContent = statusLine + p.renderSearchList(innerW)
+
+		// Gọi hàm dùng chung
+		list := renderSharedTrackList(
+			innerW, p.tracks, p.searchCursor, p.searchOffset, p.visibleRows(),
+			func(t domain.Track) (string, string, string, int, bool) {
+				// Check xem bài này đã down chưa để trả về true/false cho showCheck
+				return t.Title, t.Artist, t.ID, t.Duration, p.isDownloaded(t)
+			},
+			false, nil, nil,
+		)
+		resultContent = statusLine + list
 	} else if !p.searched {
 		padLeft := (innerW) / 2
 		if padLeft < 0 {
@@ -87,65 +97,6 @@ func (p LeftPanel) renderSuggestions(innerW int) string {
 		} else {
 			b.WriteString(NormalItemStyle.Render(line + strings.Repeat(" ", pad)))
 		}
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-func (p LeftPanel) renderSearchList(innerW int) string {
-	if !p.searched {
-		padLeft := (innerW - len([]rune(" Type to search…"))) / 2
-		if padLeft < 0 {
-			padLeft = 0
-		}
-		return strings.Repeat(" ", padLeft) + SubtitleStyle.Render(" Type to search…") + "\n"
-	}
-	if len(p.tracks) == 0 {
-		return DimItemStyle.Render(" No results.") + "\n"
-	}
-	var b strings.Builder
-	vis := p.visibleRows()
-	end := p.searchOffset + vis
-	if end > len(p.tracks) {
-		end = len(p.tracks)
-	}
-	titleW := innerW - 12
-	if titleW < 10 {
-		titleW = 10
-	}
-	for i := p.searchOffset; i < end; i++ {
-		t := p.tracks[i]
-		mark := "  "
-		safeTitle := truncate(t.Title, titleW)
-		titlePlain := runewidth.FillRight(safeTitle, titleW)
-		durationBlock := FormatDuration(t.Duration)
-		downloaded := p.isDownloaded(t)
-		checkPlaceholder := " "
-		plainLine := mark + titlePlain + " " + durationBlock + " " + checkPlaceholder
-		pad := innerW - runewidth.StringWidth(plainLine)
-		if pad < 0 {
-			pad = 0
-		}
-		rowStyle := NormalItemStyle
-		if i == p.searchCursor {
-			rowStyle = SelectedItemStyle
-		}
-		before := rowStyle.Render(mark + titlePlain + " " + durationBlock + " ")
-		var checkFrag string
-		if downloaded {
-			checkStyle := rowStyle.Foreground(colorDark)
-			checkFrag = checkStyle.Render(IconCheck)
-		} else {
-			checkFrag = rowStyle.Render(" ")
-		}
-		after := rowStyle.Render(strings.Repeat(" ", pad))
-		b.WriteString(before)
-		b.WriteString(checkFrag)
-		b.WriteString(after)
-		b.WriteString("\n")
-	}
-	if len(p.tracks) > vis {
-		b.WriteString(DimItemStyle.Render(fmt.Sprintf(" %d/%d", p.searchCursor+1, len(p.tracks))))
 		b.WriteString("\n")
 	}
 	return b.String()

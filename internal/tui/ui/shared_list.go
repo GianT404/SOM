@@ -13,7 +13,7 @@ func renderSharedTrackList[T any](
 	cursor int,
 	offset int,
 	visibleRows int,
-	extract func(T) (title, artist, path string, duration int),
+	extract func(T) (title, artist, path string, duration int, showCheck bool), // Thêm showCheck
 	selectMode bool,
 	selected map[string]bool,
 	alreadyIn map[string]bool,
@@ -30,17 +30,19 @@ func renderSharedTrackList[T any](
 	}
 	durW := 6
 	artistW := 27
+	checkW := 3 // Dành 3 ký tự cho dấu check tải về
 
 	tickW := 0
 	if selectMode {
 		tickW = 8
 	}
 
-	titleW := innerW - tickW - idxW - artistW - durW - 8
+	// Trừ thêm checkW khỏi độ rộng của Title
+	titleW := innerW - tickW - idxW - artistW - durW - checkW - 8
 	if titleW < 10 {
 		titleW = 10
 	}
-	artistW = innerW - tickW - idxW - titleW - durW - 8
+	artistW = innerW - tickW - idxW - titleW - durW - checkW - 8
 	if artistW < 0 {
 		artistW = 0
 	}
@@ -50,11 +52,12 @@ func renderSharedTrackList[T any](
 		headerTick = "    "
 	}
 
-	header := fmt.Sprintf("%s  %*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
+	// Thêm padding rỗng ở cuối header cho thẳng cột check
+	header := fmt.Sprintf("%s  %*s  %-*s  %-*s  %*s   ", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
 	b.WriteString(DimItemStyle.Width(innerW).Render(header))
 
 	for i := offset; i < end; i++ {
-		title, artist, path, durSec := extract(items[i])
+		title, artist, path, durSec, showCheck := extract(items[i])
 
 		mark := "  "
 		if i == cursor {
@@ -74,18 +77,23 @@ func renderSharedTrackList[T any](
 			}
 		}
 
+		checkStr := "   "
+		if showCheck {
+			checkStr = " " + IconCheck + " "
+		}
+
 		idx := fmt.Sprintf("%*d", idxW, i+1)
 		safeTitle := runewidth.FillRight(truncate(title, titleW), titleW)
 		safeArtist := runewidth.FillRight(truncate(artist, artistW), artistW)
 		dur := fmt.Sprintf("%*s", durW, FormatDuration(durSec))
 
-		line := mark + tick + idx + "  " + safeTitle + "  " + safeArtist + "  " + dur
+		line := mark + tick + idx + "  " + safeTitle + "  " + safeArtist + "  " + dur + checkStr
 
 		b.WriteString("\n")
 		if i == cursor {
-			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
+			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
 		} else {
-			b.WriteString(LocalFileStyle.Width(innerW).Render(line))
+			b.WriteString(NormalItemStyle.Width(innerW).Render(line))
 		}
 	}
 	return b.String()
