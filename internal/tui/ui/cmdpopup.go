@@ -125,109 +125,6 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if a.presetActive {
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(audioPresets) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(audioPresets)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
-		case "enter":
-			p := audioPresets[a.cmdCursor]
-			a.player.SetAudioFilter(p.Filter)
-			a.activePreset = a.cmdCursor
-			a.presetActive = false
-			a.showCmdPopup = false
-			a.setStatus(StatusOKStyle.Render("Applied: " + p.Name))
-
-			// Khởi động lại ffmpeg để ép ăn filter ngay lập tức
-			if a.playback.NowPlay != nil {
-				pos := int(a.player.Position().Seconds())
-				a.player.SeekTo(float64(pos))
-			}
-			return nil
-		case "esc", ":":
-			a.presetActive = false
-			return nil
-		}
-		return nil
-	}
-
-	if a.sortActive {
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(sortOptions) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(sortOptions)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
-		case "enter":
-			chosen := sortOptions[a.cmdCursor]
-			a.left.sortPref = chosen.Key
-			if a.left.plStore != nil {
-				a.left.plStore.SetSetting("sort_downloads", chosen.Key)
-			}
-			a.left.scanLocalFiles()
-			a.sortActive = false
-			a.showCmdPopup = false
-			a.setStatus(StatusOKStyle.Render("> Sorted by " + chosen.Name))
-			return nil
-		case "esc", ":":
-			a.sortActive = false
-			return nil
-		}
-		return nil
-	}
-	if a.speedActive {
-		switch k.String() {
-		case "up", "k":
-			if a.cmdCursor > 0 {
-				a.cmdCursor--
-			} else {
-				a.cmdCursor = len(playbackSpeeds) - 1
-			}
-		case "down", "j":
-			if a.cmdCursor < len(playbackSpeeds)-1 {
-				a.cmdCursor++
-			} else {
-				a.cmdCursor = 0
-			}
-		case "enter":
-			pos := 0.0
-			if a.playback.NowPlay != nil {
-				pos = a.player.Position().Seconds()
-			}
-
-			s := playbackSpeeds[a.cmdCursor]
-			a.player.SetSpeed(s.Value)
-			a.activeSpeed = a.cmdCursor
-			a.speedActive = false
-			a.showCmdPopup = false
-			a.setStatus(StatusOKStyle.Render("Speed set to: " + s.Label))
-
-			if a.playback.NowPlay != nil {
-				a.player.SeekTo(pos)
-			}
-			return nil
-		case "esc", ":", "q":
-			a.speedActive = false
-			return nil
-		}
-		return nil
-	}
 
 	switch k.String() {
 	case "esc", ":":
@@ -257,17 +154,15 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 	}
 	switch opts[idx] {
 	case "Audio settings":
-		a.presetActive = true
-		a.cmdCursor = a.activePreset
+		modal := NewPresetModal(a.activePreset)
+		a.activeModal = modal
+		a.showCmdPopup = false
+		return modal.Init()
 	case "Sort":
-		a.sortActive = true
-		// Find current sort index
-		for i, s := range sortOptions {
-			if s.Key == a.left.sortPref {
-				a.cmdCursor = i
-				break
-			}
-		}
+		modal := NewSortModal(a.left.sortPref)
+		a.activeModal = modal
+		a.showCmdPopup = false
+		return modal.Init()
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
@@ -296,10 +191,11 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 		modal := NewRenameModal(target, a.left.plStore, a.width)
 		a.activeModal = modal
 		return modal.Init()
-
 	case "Playback speed":
-		a.speedActive = true
-		a.cmdCursor = a.activeSpeed
+		modal := NewSpeedModal(a.activeSpeed)
+		a.activeModal = modal
+		a.showCmdPopup = false
+		return modal.Init()
 	case "Delete track":
 		if target, ok := a.renameTarget(); ok {
 			a.showCmdPopup = false
@@ -441,90 +337,6 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString("\n ")
 		b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
 		return renderBox(56, "Remove from Playlist", b.String(), themeCol("#e8593c"))
-	}
-	if a.speedActive {
-		const boxW = 35
-		const innerW = boxW - 4
-		var b strings.Builder
-		b.WriteString("\n")
-		for i, s := range playbackSpeeds {
-			cursor := "   "
-			tick := " "
-			if i == a.activeSpeed {
-				tick = "+"
-			}
-			namePart := fmt.Sprintf(" %s [%s] %s", cursor, tick, s.Label)
-			if i == a.cmdCursor {
-				pad := innerW - runewidth.StringWidth(namePart)
-				if pad < 0 {
-					pad = 0
-				}
-				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
-			} else {
-				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
-			}
-		}
-		b.WriteString("\n")
-		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
-		return renderBox(boxW, "Playback speed", b.String(), themeCol("#e8593c"))
-	}
-	if a.sortActive {
-		const boxW = 35
-		const innerW = boxW - 4
-		var b strings.Builder
-		b.WriteString("\n")
-		for i, s := range sortOptions {
-			tick := " "
-			if s.Key == a.left.sortPref {
-				tick = "+"
-			}
-			namePart := fmt.Sprintf("   [%s] %s", tick, s.Name)
-			if i == a.cmdCursor {
-				pad := innerW - runewidth.StringWidth(namePart)
-				if pad < 0 {
-					pad = 0
-				}
-				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
-			} else {
-				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
-			}
-		}
-		b.WriteString("\n")
-		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
-		return renderBox(boxW, "Sort by", b.String(), themeCol("#e8593c"))
-	}
-	if a.presetActive {
-		const boxW = 55
-		const innerW = boxW - 4
-		b.WriteString("\n")
-		for i, p := range audioPresets {
-			cursor := " "
-			tick := " "
-			if i == a.activePreset {
-				tick = "+"
-			}
-
-			namePart := fmt.Sprintf(" %s [%s] %s", cursor, tick, p.Name)
-
-			if i == a.cmdCursor {
-				pad := innerW - runewidth.StringWidth(namePart)
-				if pad < 0 {
-					pad = 0
-				}
-				b.WriteString(SelectedItemStyle.Render(namePart+strings.Repeat(" ", pad)) + "\n")
-			} else {
-				b.WriteString(NormalItemStyle.Render(namePart) + "\n")
-			}
-		}
-
-		b.WriteString("\n")
-		activeDesc := audioPresets[a.cmdCursor].Desc
-		b.WriteString(DimItemStyle.Render("  "+activeDesc) + "\n")
-
-		b.WriteString("\n")
-		b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
-
-		return renderBox(boxW, "Audio settings", b.String(), themeCol("#e8593c"))
 	}
 
 	b.WriteString("\n")

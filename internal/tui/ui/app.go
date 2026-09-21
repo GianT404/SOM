@@ -93,11 +93,8 @@ type App struct {
 	mouseLastClickY      int
 	mouseLastClickTab    SidebarItem
 	avrcp                *avrcp.Server
-	presetActive         bool
 	activePreset         int
-	speedActive          bool
 	activeSpeed          int
-	sortActive           bool
 	activeSort           string
 	importPanel          ImportPanel
 	moveSelectActive     bool
@@ -641,7 +638,34 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
+	case ApplySortMsg:
+		a.left.sortPref = msg.Key
+		if a.left.plStore != nil {
+			a.left.plStore.SetSetting("sort_downloads", msg.Key)
+		}
+		a.left.scanLocalFiles()
+		a.setStatus(StatusOKStyle.Render("> Sorted by " + msg.Name))
 
+	case ApplySpeedMsg:
+		pos := 0.0
+		if a.playback.NowPlay != nil {
+			pos = a.player.Position().Seconds()
+		}
+		a.player.SetSpeed(msg.Value)
+		a.activeSpeed = msg.Index
+		a.setStatus(StatusOKStyle.Render("Speed set to: " + msg.Label))
+		if a.playback.NowPlay != nil {
+			a.player.SeekTo(pos)
+		}
+
+	case ApplyPresetMsg:
+		a.player.SetAudioFilter(msg.Filter)
+		a.activePreset = msg.Index
+		a.setStatus(StatusOKStyle.Render("Applied: " + msg.Name))
+		if a.playback.NowPlay != nil {
+			pos := int(a.player.Position().Seconds())
+			a.player.SeekTo(float64(pos))
+		}
 	case StreamStartedMsg:
 		if msg.Err != nil {
 			a.left.loadingStream = false
