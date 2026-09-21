@@ -77,9 +77,7 @@ type App struct {
 	showCmdPopup   bool
 	cmdCursor      int
 	cmdMenuCursor  int
-	renameActive   bool
-	renameInput    textinput.Model
-	renameErr      string
+	activeModal    Overlay
 	delActive      bool
 	infoActive     bool
 	plRmActive     bool
@@ -113,12 +111,15 @@ type App struct {
 	moveTargetPlIdx      int
 	moveShowTracksActive bool
 }
+type Overlay interface {
+	Init() tea.Cmd
+	Update(tea.Msg) (Overlay, tea.Cmd)
+	View() string
+}
 
 const maxPendingKeys = 64
 
 func NewApp(provider domain.MusicProvider, downloadDir string) *App {
-	ri := textinput.New()
-	ri.CharLimit = 200
 	mi := textinput.New()
 	mi.CharLimit = 50
 	mi.Prompt = ""
@@ -128,7 +129,6 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		sidebarActive:   SideDownloads,
 		activeContext:   SideDownloads,
 		palette:         NewCommandPalette(),
-		renameInput:     ri,
 		booting:         true,
 		activeSpeed:     3,
 		mouseEnabled:    false,
@@ -197,7 +197,22 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
+	if a.activeModal != nil {
+		if _, ok := msg.(CloseModalMsg); ok {
+			a.activeModal = nil
+			return a, nil
+		}
 
+		var modalCmd tea.Cmd
+		a.activeModal, modalCmd = a.activeModal.Update(msg)
+
+		switch msg.(type) {
+		case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
+			return a, modalCmd
+		}
+
+		cmds = append(cmds, modalCmd)
+	}
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -446,13 +461,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if a.showCmdPopup {
 				a.showCmdPopup = false
-				a.renameActive = false
-				a.renameInput.Blur()
 			} else {
 				a.showCmdPopup = true
 				a.cmdCursor = 0
 				a.cmdMenuCursor = 0
-				a.renameActive = false
 			}
 
 		case "tab":
@@ -980,7 +992,10 @@ func (a *App) View() tea.View {
 
 	view := b.String()
 
-	if a.showHelpPopup {
+	if a.activeModal != nil {
+		popup := a.activeModal.View()
+		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	} else if a.showHelpPopup {
 		popup := a.renderHelpPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.showEscMenu {

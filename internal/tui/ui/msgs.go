@@ -53,6 +53,8 @@ type LocalFile struct {
 	CreatedAt string
 }
 
+type CloseModalMsg struct{}
+
 type Pane int
 
 const (

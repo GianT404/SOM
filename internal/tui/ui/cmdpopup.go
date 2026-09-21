@@ -226,49 +226,6 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	}
-
-	if a.renameActive {
-		switch k.String() {
-		case "enter":
-			newTitle := strings.TrimSpace(a.renameInput.Value())
-			if newTitle == "" {
-				a.setStatus(StatusErrStyle.Render("X Title cannot be empty"))
-				return nil
-			}
-
-			target, ok := a.renameTarget()
-			if !ok {
-				a.setStatus(StatusErrStyle.Render("X No local track selected"))
-				return nil
-			}
-
-			oldPath := target.Path
-			newBase := sanitizeLocalName(newTitle)
-			if newBase == "" {
-				newBase = target.VideoID
-			}
-			newPath := filepath.Join(filepath.Dir(oldPath), newBase+filepath.Ext(oldPath))
-
-			a.renameActive = false
-			a.renameInput.Blur()
-			a.renameInput.SetValue("")
-			a.showCmdPopup = false
-			a.setStatus(StatusMsgStyle.Render("> Renaming..."))
-
-			return renameCmd(a.left.plStore, oldPath, newPath, newTitle)
-		case "esc":
-			a.renameActive = false
-			a.renameErr = ""
-			a.renameInput.Blur()
-			a.renameInput.SetValue("")
-			return nil
-		}
-		a.renameErr = ""
-		var cmd tea.Cmd
-		a.renameInput, cmd = a.renameInput.Update(k)
-		return cmd
-	}
-
 	if a.speedActive {
 		switch k.String() {
 		case "up", "k":
@@ -361,23 +318,19 @@ func (a *App) runCmdOption(idx int) tea.Cmd {
 		}
 		a.showCmdPopup = false
 	case "Rename title":
-		a.renameActive = true
-		a.renameErr = ""
-		iw := 60
-		if a.width > 0 && a.width-12 < iw {
-			iw = a.width - 12
+		target, ok := a.renameTarget()
+		if !ok {
+			a.setStatus(StatusErrStyle.Render("X No local track selected"))
+			return nil
 		}
-		if iw < 20 {
-			iw = 20
-		}
-		a.renameInput.SetWidth(iw)
-		a.renameInput.Focus()
-		if target, ok := a.renameTarget(); ok {
-			a.renameInput.SetValue(target.Name)
-		} else {
-			a.renameInput.SetValue("")
-		}
-		a.renameInput.CursorEnd()
+
+		// Tắt menu commands
+		a.showCmdPopup = false
+
+		// Khởi tạo Modal mới và gán vào activeModal
+		modal := NewRenameModal(target, a.left.plStore, a.width)
+		a.activeModal = modal
+		return modal.Init()
 
 	case "Playback speed":
 		a.speedActive = true
@@ -665,24 +618,6 @@ func (a *App) renderCmdPopup() string {
 		b.WriteString("\n\n")
 		b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: back)"))
 		return renderBox(60, "Delete Track", b.String(), themeCol("#E24B4A"))
-	}
-
-	if a.renameActive {
-		b.WriteString("\n  ")
-		b.WriteString(a.renameInput.View())
-		if a.renameErr != "" {
-			b.WriteString("\n  " + a.renameErr)
-		}
-		b.WriteString("\n\n")
-		b.WriteString(DimItemStyle.Render(" (enter: rename  | esc: back)"))
-		w := a.renameInput.Width() + 8
-		if w < 48 {
-			w = 48
-		}
-		if a.width > 0 && w > a.width-2 {
-			w = a.width - 2
-		}
-		return renderBox(w, "Rename Title", b.String(), themeCol("#e8593c"))
 	}
 
 	b.WriteString("\n")
