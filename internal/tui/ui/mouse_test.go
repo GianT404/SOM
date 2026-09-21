@@ -25,6 +25,7 @@ func mouseApp(t *testing.T) *App {
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
 		mouseEnabled:  true,
+		playback:      NewPlaybackManager(),
 	}
 }
 
