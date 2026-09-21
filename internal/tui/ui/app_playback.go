@@ -1,15 +1,11 @@
 package ui
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"strings"
 
 	"som/internal/domain"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 func (a *App) cancelResolve() {
@@ -19,71 +15,6 @@ func (a *App) cancelResolve() {
 	}
 }
 
-func (a *App) playTrackAt(idx int, t domain.Track) tea.Cmd {
-	if a.playback.NowPlay != nil && a.playback.Random {
-		a.playback.History = append(a.playback.History, *a.playback.NowPlay)
-	}
-	a.playback.RecordHistory()
-	a.playback.CurrentIdx = idx
-	a.playback.NowPlay = &t
-	a.playback.SongStarted = false
-	a.playback.NextPlay = nil
-	a.syncPlaylistState()
-	a.left.FocusTrack(t.ID)
-	if strings.HasPrefix(t.ID, "local:") {
-		a.playback.CancelResolve()
-		a.left.loadingStream = false
-		path := strings.TrimPrefix(t.ID, "local:")
-		if err := a.player.Play(path); err != nil {
-			a.setStatus(StatusErrStyle.Render("X " + err.Error()))
-			return a.playNext()
-		}
-		a.playback.PlayerGen = a.player.Generation()
-		a.playback.SongStarted = true
-		a.right.SetTrack(&t)
-		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
-		if a.avrcp != nil {
-			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
-			a.avrcp.UpdatePlaybackStatus("Playing")
-		}
-		if a.left.plStore != nil {
-			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
-				var lr domain.LyricsResp
-				if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
-					a.right.SetLyrics(lr)
-					return nil
-				}
-			}
-		}
-		a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
-		return nil
-	}
-
-	a.playback.CancelResolve()
-	ctx, cancel := context.WithCancel(context.Background())
-	a.playback.ResolveCancel = cancel
-	gen := a.player.Generation()
-	a.playback.PlayerGen = gen
-	return func() tea.Msg {
-		streamInfo, err := a.provider.ResolveStream(ctx, t.ID)
-		if ctx.Err() != nil || gen != a.player.Generation() {
-			return nil
-		}
-		if err != nil || streamInfo == nil || streamInfo.URL == "" {
-			return StreamStartedMsg{Err: fmt.Errorf("lỗi lấy link CDN: %v", err)}
-		}
-		if err := a.player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
-			return StreamStartedMsg{Err: err}
-		}
-		lr, lyricsErr := getCachedLyrics(a.provider, t.ID, t.Title, t.Artist, t.Duration)
-		return StreamStartedMsg{
-			Track:     t,
-			Lyrics:    lr,
-			LyricsErr: lyricsErr,
-			Gen:       gen,
-		}
-	}
-}
 func (a *App) focusTrackAndSwitchTab(t domain.Track) {
 	if strings.HasPrefix(t.ID, "local:") {
 		a.activeContext = SideDownloads
@@ -95,29 +26,6 @@ func (a *App) focusTrackAndSwitchTab(t domain.Track) {
 		a.left.activeTab = SideSearch
 	}
 	a.left.FocusTrack(t.ID)
-}
-
-func (a *App) playNext() tea.Cmd {
-	t, idx, isQueue := a.playback.NextTrack()
-	if t == nil {
-		return nil
-	}
-	if isQueue {
-		if a.left.qCursor >= len(a.playback.Queue) {
-			a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
-		}
-		a.focusTrackAndSwitchTab(*t)
-		a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
-	}
-	return a.playTrackAt(idx, *t)
-}
-
-func (a *App) playPrev() tea.Cmd {
-	t, idx := a.playback.PrevTrack()
-	if t == nil {
-		return nil
-	}
-	return a.playTrackAt(idx, *t)
 }
 
 // triggerPreDecodeNext pre-decodes the next track for gapless playback.

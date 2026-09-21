@@ -65,10 +65,10 @@ func (a *App) handleTick() tea.Cmd {
 					a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 				}
 				a.focusTrackAndSwitchTab(t)
-				cmds = append(cmds, a.playTrackAt(-1, t))
+				cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: -1, Track: t} })
 				a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 			} else {
-				cmds = append(cmds, a.playNext())
+				cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 			}
 		}
 	}
@@ -107,7 +107,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			}
 		}
 		a.left.loadingStream = true
-		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(idx, t))
+		cmds = append(cmds, a.left.spinner.Tick, func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: t} })
 
 	case PlayLocalMsg:
 		locals := a.left.locals
@@ -129,13 +129,13 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			idx = 0
 		}
 		a.activeContext = SideDownloads
-		cmds = append(cmds, a.playTrackAt(idx, a.playback.Playlist[idx]))
+		cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: a.playback.Playlist[idx]} })
 
 	case StreamStartedMsg:
 		if msg.Err != nil {
 			a.left.loadingStream = false
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
-			cmds = append(cmds, a.playNext())
+			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 			break
 		}
 		if msg.Gen != a.playback.PlayerGen {
@@ -164,7 +164,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		a.playback.History = nil
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
-		cmds = append(cmds, a.left.spinner.Tick, a.playTrackAt(msg.Index, msg.Tracks[msg.Index]))
+		cmds = append(cmds, a.left.spinner.Tick, func() tea.Msg { return PlayTrackAtMsg{Index: msg.Index, Track: msg.Tracks[msg.Index]} })
 
 	case PlayQueueMsg:
 		if msg.Index >= 0 && msg.Index < len(a.playback.Queue) {
@@ -174,7 +174,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
 			}
 			a.focusTrackAndSwitchTab(t)
-			cmds = append(cmds, a.playTrackAt(-1, t))
+			cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: -1, Track: t} })
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
 		}
 
@@ -188,13 +188,55 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
 		}
 
+	case PlaybackErrorMsg:
+		a.setStatus(StatusErrStyle.Render("X Playback error: " + msg.Err.Error()))
+		a.left.loadingStream = false
+		// Chuyển bài tự động nếu lỗi
+		cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
+
+	case TrackChangedMsg:
+		t := msg.Track
+
+		//  Cập nhật Status Bar của App
+		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+
+		a.left.FocusTrack(t.ID)
+
+		// Cập nhật Player (RightPanel & Lyrics)
+		a.right.SetTrack(&t)
+		if msg.IsLocal {
+			a.left.loadingStream = false
+			a.loadLyricsForTrack(t)
+		} else {
+			a.playback.PlayerGen = msg.Gen
+		}
+
+		// 4. Đồng bộ Bluetooth AVRCP
+		if a.avrcp != nil {
+			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
+
+			a.avrcp.UpdatePlaybackStatus("Playing")
+		}
+		a.syncPlaylistState()
+
+	case PlaybackStateChangedMsg:
+		if a.avrcp != nil {
+			if msg.State == int(player.Playing) {
+				a.avrcp.UpdatePlaybackStatus("Playing")
+			} else if msg.State == int(player.Paused) {
+				a.avrcp.UpdatePlaybackStatus("Paused")
+			} else if msg.State == int(player.Stopped) {
+				a.avrcp.UpdatePlaybackStatus("Stopped")
+			}
+		}
+
 	case avrcp.AVRCPCmdMsg:
 		switch msg.Cmd {
 		case "next":
 			a.player.Stop()
-			cmds = append(cmds, a.playNext())
+			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 		case "previous":
-			cmds = append(cmds, a.playPrev())
+			cmds = append(cmds, func() tea.Msg { return PlayPrevMsg{} })
 		case "play", "playpause":
 			switch a.player.State() {
 			case player.Paused:
@@ -209,7 +251,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 				}
 			case player.Stopped:
 				if a.playback.NowPlay != nil {
-					cmds = append(cmds, a.playTrackAt(a.playback.CurrentIdx, *a.playback.NowPlay))
+					cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: a.playback.CurrentIdx, Track: *a.playback.NowPlay} })
 				}
 			}
 		case "pause":
@@ -579,12 +621,12 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
-		cmds = append(cmds, a.playNext())
+		cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 	case "[", "{":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
-		cmds = append(cmds, a.playPrev())
+		cmds = append(cmds, func() tea.Msg { return PlayPrevMsg{} })
 	case "r", "R":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break

@@ -208,6 +208,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.left = msg.left
 			a.left.input.Blur()
 			a.booting = false
+			a.playback.SetDependencies(msg.player, a.provider)
 			a.loadSettings()
 			a.resizePanels()
 			a.avrcp = avrcp.New()
@@ -324,6 +325,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var paletteCmd tea.Cmd
 	a.palette, paletteCmd = a.palette.Update(msg)
 	cmds = append(cmds, paletteCmd)
+
+	var pbCmd tea.Cmd
+	a.playback, pbCmd = a.playback.Update(msg)
+	cmds = append(cmds, pbCmd)
 
 	return a, tea.Batch(cmds...)
 }

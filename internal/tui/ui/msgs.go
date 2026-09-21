@@ -91,3 +91,22 @@ type ExecuteRemovePlMsg struct {
 	PlIdx int
 	Track storage.PlaylistTrack
 }
+
+type PlayNextMsg struct{}
+type PlayPrevMsg struct{}
+type PlayTrackAtMsg struct {
+	Index int
+	Track domain.Track
+}
+type TogglePauseMsg struct{}
+type PlaybackStateChangedMsg struct {
+	State int
+}
+type PlaybackErrorMsg struct {
+	Err error
+}
+type TrackChangedMsg struct {
+	Track   domain.Track
+	IsLocal bool
+	Gen     uint64
+}

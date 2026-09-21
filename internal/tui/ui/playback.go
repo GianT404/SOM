@@ -2,29 +2,41 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"som/internal/domain"
+	"som/internal/tui/player"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 // PlaybackManager quản dữ liệu hàng đợi, lịch sử và thuật toán chọn bài.
 type PlaybackManager struct {
-	NowPlay       *domain.Track
-	NextPlay      *domain.Track
-	SongStarted   bool
-	PlayerGen     uint64
-	ResolveCancel context.CancelFunc
+	Player      *player.Player
+	Provider    domain.MusicProvider
+	NowPlay     *domain.Track
+	NextPlay    *domain.Track
+	SongStarted bool
+	PlayerGen   uint64
 
-	Playlist    []domain.Track
-	CurrentIdx  int
-	Random      bool
-	ShuffleHist []int
-	History     []domain.Track
-	Queue       []domain.Track
+	ResolveCancel context.CancelFunc
+	Playlist      []domain.Track
+	CurrentIdx    int
+	Random        bool
+	ShuffleHist   []int
+	History       []domain.Track
+	Queue         []domain.Track
 }
 
 func NewPlaybackManager() *PlaybackManager {
 	return &PlaybackManager{}
+}
+
+func (pm *PlaybackManager) SetDependencies(p *player.Player, prov domain.MusicProvider) {
+	pm.Player = p
+	pm.Provider = prov
 }
 
 // CancelResolve hủy các luồng tải stream cũ an toàn
@@ -149,4 +161,81 @@ func (pm *PlaybackManager) pickAntiClumpIndex() int {
 	}
 
 	return picked
+}
+
+func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	switch msg := msg.(type) {
+	case PlayNextMsg:
+		t, idx, isQueue := pm.NextTrack()
+		if t == nil {
+			return pm, nil
+		}
+		if isQueue {
+			cmds = append(cmds, pm.playTrackCmd(-1, *t))
+		} else {
+			cmds = append(cmds, pm.playTrackCmd(idx, *t))
+		}
+
+	case PlayPrevMsg:
+		t, idx := pm.PrevTrack()
+		if t != nil {
+			cmds = append(cmds, pm.playTrackCmd(idx, *t))
+		}
+
+	case PlayTrackAtMsg:
+		cmds = append(cmds, pm.playTrackCmd(msg.Index, msg.Track))
+	case TogglePauseMsg:
+		pm.Player.TogglePause()
+		cmds = append(cmds, func() tea.Msg { return PlaybackStateChangedMsg{State: int(pm.Player.State())} })
+	}
+
+	return pm, tea.Batch(cmds...)
+}
+
+func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
+	pm.CancelResolve()
+
+	pm.NowPlay = &t
+	pm.CurrentIdx = idx
+	pm.SongStarted = false
+	pm.NextPlay = nil
+
+	if pm.Random {
+		pm.History = append(pm.History, t)
+		pm.RecordHistory()
+	}
+
+	if strings.HasPrefix(t.ID, "local:") {
+		path := strings.TrimPrefix(t.ID, "local:")
+		if err := pm.Player.Play(path); err != nil {
+			return func() tea.Msg { return PlaybackErrorMsg{Err: err} }
+		}
+		pm.PlayerGen = pm.Player.Generation()
+		pm.SongStarted = true
+		return func() tea.Msg { return TrackChangedMsg{Track: t, IsLocal: true} }
+	}
+
+	// Logic Stream
+	ctx, cancel := context.WithCancel(context.Background())
+	pm.ResolveCancel = cancel
+	gen := pm.Player.Generation()
+	pm.PlayerGen = gen
+
+	return func() tea.Msg {
+		streamInfo, err := pm.Provider.ResolveStream(ctx, t.ID)
+		if ctx.Err() != nil || gen != pm.Player.Generation() {
+			return nil
+		}
+		if err != nil || streamInfo == nil || streamInfo.URL == "" {
+			return PlaybackErrorMsg{Err: fmt.Errorf("lỗi lấy link: %v", err)}
+		}
+
+		if err := pm.Player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
+			return PlaybackErrorMsg{Err: err}
+		}
+
+		return TrackChangedMsg{Track: t, IsLocal: false, Gen: gen}
+	}
 }
