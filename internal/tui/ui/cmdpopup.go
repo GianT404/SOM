@@ -94,10 +94,10 @@ func (m *CmdMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			if len(m.options) > 0 {
 				opt := m.options[m.cursor]
-				return m, tea.Batch(
-					func() tea.Msg { return CloseModalMsg{} },
-					func() tea.Msg { return ExecuteCmdOptionMsg{Option: opt} },
-				)
+				// Sửa lại: Không gửi CloseModalMsg ở đây để tránh xung đột
+				return m, func() tea.Msg {
+					return ExecuteCmdOptionMsg{Option: opt}
+				}
 			}
 		}
 	}
@@ -213,6 +213,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No track selected"))
 		}
+		a.activeModal = nil
 	case "Rename title":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewRenameModal(target, a.left.plStore, a.width)
@@ -220,6 +221,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+		a.activeModal = nil
 	case "Playback speed":
 		modal := NewSpeedModal(a.activeSpeed)
 		a.activeModal = modal
@@ -231,6 +233,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+		a.activeModal = nil
 	case "Show file info":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewInfoModal(target)
@@ -238,6 +241,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 			return modal.Init()
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
+		a.activeModal = nil
 	case "Move to playlist":
 		if len(a.left.playlists) == 0 {
 			modal := NewMoveCreateModal(a.width)
@@ -255,8 +259,9 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 				a.activeModal = modal
 				return modal.Init()
 			}
+			a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
 		}
-		a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
+		a.activeModal = nil
 	}
 	return nil
 }
