@@ -182,12 +182,6 @@ func (a *App) updateCmdPopup(k tea.KeyMsg) tea.Cmd {
 
 				a.delActive = false
 				a.showCmdPopup = false
-				if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == target.Path {
-					a.player.Stop()
-					a.playback.NowPlay = nil
-					a.playback.SongStarted = false
-				}
-
 				a.setStatus(StatusMsgStyle.Render("> Deleting..."))
 				return deleteCmd(a.left.plStore, target.Path, target.Name)
 			} else {

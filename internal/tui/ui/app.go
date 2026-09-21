@@ -145,66 +145,6 @@ func (a *App) Init() tea.Cmd {
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if a.booting {
 		switch msg := msg.(type) {
-		case RenameDoneMsg:
-			if msg.Err != nil {
-				a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
-				break
-			}
-			for i := range a.playback.Playlist {
-				if a.playback.Playlist[i].ID == "local:"+msg.OldPath {
-					a.playback.Playlist[i].ID = "local:" + msg.NewPath
-					a.playback.Playlist[i].Title = msg.NewTitle
-				}
-			}
-			if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == msg.OldPath {
-				a.playback.NowPlay.ID = "local:" + msg.NewPath
-				a.playback.NowPlay.Title = msg.NewTitle
-			}
-
-			a.left.scanLocalFiles()
-			if a.left.plStore != nil {
-				if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
-					a.left.playlists = pls
-					if a.left.activePlaylist != nil {
-						for i := range a.left.playlists {
-							if a.left.playlists[i].ID == a.left.activePlaylist.ID {
-								a.left.activePlaylist = &a.left.playlists[i]
-								break
-							}
-						}
-					}
-				}
-			}
-			a.setStatus(StatusOKStyle.Render("> Renamed to " + msg.NewTitle))
-
-		case DeleteDoneMsg:
-			if msg.Err != nil {
-				a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
-				break
-			}
-
-			for i := range a.left.locals {
-				if a.left.locals[i].Path == msg.Path {
-					a.left.locals = append(a.left.locals[:i], a.left.locals[i+1:]...)
-					break
-				}
-			}
-			if a.left.dlCursor >= len(a.left.locals) {
-				a.left.dlCursor = len(a.left.locals) - 1
-				if a.left.dlCursor < 0 {
-					a.left.dlCursor = 0
-				}
-			}
-
-			newPlaylist := a.playback.Playlist[:0]
-			for _, t := range a.playback.Playlist {
-				if t.ID != "local:"+msg.Path {
-					newPlaylist = append(newPlaylist, t)
-				}
-			}
-			a.playback.Playlist = newPlaylist
-
-			a.setStatus(StatusOKStyle.Render("> Deleted " + msg.Name))
 		case tea.WindowSizeMsg:
 			a.width = msg.Width
 			a.height = msg.Height
@@ -763,6 +703,82 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ImportDoneMsg:
 		a.handleImportDone(msg)
+
+	case RenameDoneMsg:
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+			break
+		}
+		for i := range a.playback.Playlist {
+			if a.playback.Playlist[i].ID == "local:"+msg.OldPath {
+				a.playback.Playlist[i].ID = "local:" + msg.NewPath
+				a.playback.Playlist[i].Title = msg.NewTitle
+			}
+		}
+		if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == msg.OldPath {
+			a.playback.NowPlay.ID = "local:" + msg.NewPath
+			a.playback.NowPlay.Title = msg.NewTitle
+		}
+		a.left.scanLocalFiles()
+		if a.left.plStore != nil {
+			if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
+				a.left.playlists = pls
+				if a.left.activePlaylist != nil {
+					for i := range a.left.playlists {
+						if a.left.playlists[i].ID == a.left.activePlaylist.ID {
+							a.left.activePlaylist = &a.left.playlists[i]
+							break
+						}
+					}
+				}
+			}
+		}
+		a.setStatus(StatusOKStyle.Render("> Renamed to " + msg.NewTitle))
+
+	case DeleteDoneMsg:
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
+			break
+		}
+		// dừng nếu đang play track bị xóa
+		if a.playback.NowPlay != nil && a.playback.NowPlay.ID == "local:"+msg.Path {
+			a.player.Stop()
+			a.playback.NowPlay = nil
+			a.playback.SongStarted = false
+			a.playback.NextPlay = nil
+			a.right.SetTrack(nil)
+		}
+		// reload downloads tab từ DB
+		a.left.scanLocalFiles()
+		if a.left.dlCursor >= len(a.left.locals) {
+			a.left.dlCursor = len(a.left.locals) - 1
+			if a.left.dlCursor < 0 {
+				a.left.dlCursor = 0
+			}
+		}
+		// reload playlists tab từ DB
+		if a.left.plStore != nil {
+			if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
+				a.left.playlists = pls
+				if a.left.activePlaylist != nil {
+					for i := range a.left.playlists {
+						if a.left.playlists[i].ID == a.left.activePlaylist.ID {
+							a.left.activePlaylist = &a.left.playlists[i]
+							break
+						}
+					}
+				}
+			}
+		}
+		// lọc playback playlist
+		newPl := a.playback.Playlist[:0]
+		for _, t := range a.playback.Playlist {
+			if t.ID != "local:"+msg.Path {
+				newPl = append(newPl, t)
+			}
+		}
+		a.playback.Playlist = newPl
+		a.setStatus(StatusOKStyle.Render("> Deleted " + msg.Name))
 
 	case spinner.TickMsg:
 		if a.importPanel.importing {
