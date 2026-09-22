@@ -549,7 +549,56 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		p.FocusTrack(msg.Track.ID)
 
 		return p, tea.Batch(cmds...)
+	case ApplySortMsg:
+		p.sortPref = msg.Key
+		p.scanLocalFiles()
+		return p, nil
 
+	case RenameDoneMsg:
+		if msg.Err == nil {
+			p.scanLocalFiles()
+			if p.plStore != nil {
+				if pls, err := p.plStore.LoadAllPlaylists(); err == nil {
+					p.playlists = pls
+					if p.activePlaylist != nil {
+						for i := range p.playlists {
+							if p.playlists[i].ID == p.activePlaylist.ID {
+								p.activePlaylist = &p.playlists[i]
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		return p, nil
+
+	case DeleteDoneMsg:
+		if msg.Err == nil {
+			p.scanLocalFiles()
+
+			// Tự động cuốn con trỏ (cursor) lùi lại nếu bài hát cuối cùng bị xóa
+			locals := p.getFilteredLocals()
+			if p.dlCursor >= len(locals) {
+				p.dlCursor = maxInt(len(locals)-1, 0)
+			}
+
+			// Nạp lại danh sách playlist để số lượng track được đồng bộ
+			if p.plStore != nil {
+				if pls, err := p.plStore.LoadAllPlaylists(); err == nil {
+					p.playlists = pls
+					if p.activePlaylist != nil {
+						for i := range p.playlists {
+							if p.playlists[i].ID == p.activePlaylist.ID {
+								p.activePlaylist = &p.playlists[i]
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		return p, nil
 	case StreamResolvedMsg:
 		p.loadingStream = false
 		return p, nil
