@@ -637,10 +637,10 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 
 	case DownloadDoneMsg:
 		p.loadingDownload = false
+	case MetaSavedMsg:
 		if msg.Err == nil {
 			p.scanLocalFiles()
 		}
-
 	case spinner.TickMsg:
 		if p.loading || p.loadingDownload || p.loadingStream {
 			var cmd tea.Cmd

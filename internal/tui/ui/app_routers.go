@@ -248,17 +248,17 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))
 		} else {
+			// Cập nhật trạng thái tải xong, đang xử lý meta
+			a.setStatus(StatusMsgStyle.Render("> Saving metadata for " + msg.Path + "..."))
 			if a.left.plStore != nil && msg.Path != "" {
-				info, _ := os.Stat(msg.Path)
-				fileSize, fileMTime := int64(0), ""
-				if info != nil {
-					fileSize = info.Size()
-					fileMTime = info.ModTime().Format("2006-01-02 15:04:05")
-				}
-				lr, _ := getCachedLyrics(a.provider, msg.Track.ID, msg.Track.Title, msg.Track.Artist, msg.Track.Duration)
-				lrJSON, _ := json.Marshal(lr)
-				_ = a.left.plStore.UpsertLocalFileWithMeta(storage.LocalFile{Path: msg.Path, Name: msg.Track.Title, Artist: msg.Track.Artist, Duration: msg.Track.Duration, VideoID: msg.Track.ID, Thumbnail: msg.Track.Thumbnail, FileSize: fileSize, FileMTime: fileMTime}, &storage.LocalFileMeta{Artist: msg.Track.Artist, Title: msg.Track.Title, VideoID: msg.Track.ID, Thumbnail: msg.Track.Thumbnail, LyricsJSON: string(lrJSON)})
+				// Dispatch lệnh chạy ngầm
+				cmds = append(cmds, saveLocalMetaCmd(a.provider, a.left.plStore, msg.Path, msg.Track))
 			}
+		}
+	case MetaSavedMsg:
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X Metadata error: " + msg.Err.Error()))
+		} else {
 			a.setStatus(StatusOKStyle.Render("Saved " + msg.Path))
 		}
 	case ImportDoneMsg:
@@ -447,4 +447,37 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		cmds = append(cmds, modal.Init())
 	}
 	return tea.Batch(cmds...)
+}
+func saveLocalMetaCmd(p domain.MusicProvider, store *storage.DB, path string, t domain.Track) tea.Cmd {
+	return func() tea.Msg {
+		info, _ := os.Stat(path)
+		fileSize, fileMTime := int64(0), ""
+		if info != nil {
+			fileSize = info.Size()
+			fileMTime = info.ModTime().Format("2006-01-02 15:04:05")
+		}
+
+		// Tác vụ mạng chạy ngầm, không block UI
+		lr, _ := getCachedLyrics(p, t.ID, t.Title, t.Artist, t.Duration)
+		lrJSON, _ := json.Marshal(lr)
+
+		err := store.UpsertLocalFileWithMeta(storage.LocalFile{
+			Path:      path,
+			Name:      t.Title,
+			Artist:    t.Artist,
+			Duration:  t.Duration,
+			VideoID:   t.ID,
+			Thumbnail: t.Thumbnail,
+			FileSize:  fileSize,
+			FileMTime: fileMTime,
+		}, &storage.LocalFileMeta{
+			Artist:     t.Artist,
+			Title:      t.Title,
+			VideoID:    t.ID,
+			Thumbnail:  t.Thumbnail,
+			LyricsJSON: string(lrJSON),
+		})
+
+		return MetaSavedMsg{Path: path, Track: t, Err: err}
+	}
 }
