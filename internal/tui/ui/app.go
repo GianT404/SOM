@@ -20,7 +20,7 @@ import (
 type tickMsg time.Time
 
 func tick() tea.Cmd {
-	return tea.Tick(250*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
