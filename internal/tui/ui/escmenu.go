@@ -37,15 +37,9 @@ func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "enter":
 			switch m.cursor {
 			case 0:
-				return m, tea.Sequence(
-					func() tea.Msg { return CloseModalMsg{} },
-					func() tea.Msg { return OpenSettingsMsg{} },
-				)
+				return m, func() tea.Msg { return OpenSettingsMsg{} }
 			case 1:
-				return m, tea.Sequence(
-					func() tea.Msg { return CloseModalMsg{} },
-					func() tea.Msg { return OpenHelpMsg{} },
-				)
+				return m, func() tea.Msg { return OpenHelpMsg{} }
 			case 2:
 				return m, tea.Quit
 			}
