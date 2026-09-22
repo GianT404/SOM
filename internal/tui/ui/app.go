@@ -314,7 +314,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	//  Update Component Con
 	focusedContent := a.sidebarActive != SideImport && (a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists)
-	a.left.queue = a.playback.Queue
 	var leftCmd tea.Cmd
 	a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
 	cmds = append(cmds, leftCmd)

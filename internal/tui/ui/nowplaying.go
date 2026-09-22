@@ -227,6 +227,12 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		}
 	case TrackChangedMsg:
 		track := msg.Track
+		if track.ID == "" { // Track rỗng do bị xóa
+			r.nowPlay = nil
+			r.loaded = false
+			r.loadingLyrics = false
+			return r, nil
+		}
 		r.nowPlay = &track
 		r.elapsed = 0
 		r.curLine = 0

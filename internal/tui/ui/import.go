@@ -232,7 +232,7 @@ func (a *App) handleImportKeys(msg tea.KeyMsg) []tea.Cmd {
 				a.playback.SongStarted = false
 				a.right.SetTrack(nil)
 			} else {
-				a.cancelResolve()
+				a.playback.CancelResolve()
 				a.left.loadingStream = false
 				if err := a.player.Play(f.Path); err != nil {
 					a.setStatus(StatusErrStyle.Render("X " + err.Error()))

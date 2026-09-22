@@ -168,6 +168,96 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case SetPlaylistMsg:
+		pm.Playlist = msg.Tracks
+		pm.ShuffleHist = nil
+		pm.History = nil
+
+	case EnqueueTrackMsg:
+		pm.Queue = append(pm.Queue, msg.Track)
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+
+	case ToggleRandomMsg:
+		pm.Random = !pm.Random
+		pm.ShuffleHist = nil
+		pm.History = nil
+		if pm.NowPlay != nil {
+			// Báo cho UI biết để cập nhật biểu tượng Random [r]
+			cmds = append(cmds, func() tea.Msg {
+				return TrackChangedMsg{
+					Track:       *pm.NowPlay,
+					IsLocal:     strings.HasPrefix(pm.NowPlay.ID, "local:"),
+					Gen:         pm.PlayerGen,
+					PlaylistPos: pm.CurrentIdx,
+					PlaylistLen: len(pm.Playlist),
+					IsRandom:    pm.Random,
+				}
+			})
+		}
+
+	case PlayQueueMsg:
+		if msg.Index >= 0 && msg.Index < len(pm.Queue) {
+			t := pm.Queue[msg.Index]
+			pm.Queue = append(pm.Queue[:msg.Index], pm.Queue[msg.Index+1:]...)
+			cmds = append(cmds, pm.playTrackCmd(-1, t))
+			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+		}
+
+	case RemoveFromQueueMsg:
+		if msg.Index >= 0 && msg.Index < len(pm.Queue) {
+			pm.Queue = append(pm.Queue[:msg.Index], pm.Queue[msg.Index+1:]...)
+			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+		}
+
+	case DeleteDoneMsg:
+		if pm.NowPlay != nil && pm.NowPlay.ID == "local:"+msg.Path {
+			pm.Player.Stop()
+			pm.NowPlay = nil
+			pm.SongStarted = false
+			pm.NextPlay = nil
+			cmds = append(cmds, func() tea.Msg { return TrackChangedMsg{Track: domain.Track{}, IsLocal: true} })
+		}
+		var newPl []domain.Track
+		for _, t := range pm.Playlist {
+			if t.ID != "local:"+msg.Path {
+				newPl = append(newPl, t)
+			}
+		}
+		pm.Playlist = newPl
+		var newQueue []domain.Track
+		for _, t := range pm.Queue {
+			if t.ID != "local:"+msg.Path {
+				newQueue = append(newQueue, t)
+			}
+		}
+		pm.Queue = newQueue
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+
+	case RenameDoneMsg:
+		if msg.Err != nil {
+			break
+		}
+		for i := range pm.Playlist {
+			if pm.Playlist[i].ID == "local:"+msg.OldPath {
+				pm.Playlist[i].ID = "local:" + msg.NewPath
+				pm.Playlist[i].Title = msg.NewTitle
+			}
+		}
+		for i := range pm.Queue {
+			if pm.Queue[i].ID == "local:"+msg.OldPath {
+				pm.Queue[i].ID = "local:" + msg.NewPath
+				pm.Queue[i].Title = msg.NewTitle
+			}
+		}
+		if pm.NowPlay != nil && pm.NowPlay.ID == "local:"+msg.OldPath {
+			pm.NowPlay.ID = "local:" + msg.NewPath
+			pm.NowPlay.Title = msg.NewTitle
+			cmds = append(cmds, func() tea.Msg {
+				return TrackChangedMsg{Track: *pm.NowPlay, IsLocal: true, Gen: pm.PlayerGen, PlaylistPos: pm.CurrentIdx, PlaylistLen: len(pm.Playlist), IsRandom: pm.Random}
+			})
+		}
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+
 	case PlayNextMsg:
 		t, idx, isQueue := pm.NextTrack()
 		if t == nil {

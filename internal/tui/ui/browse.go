@@ -553,6 +553,14 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 	case StreamResolvedMsg:
 		p.loadingStream = false
 		return p, nil
+
+	case QueueChangedMsg:
+		p.queue = msg.Queue
+		if p.qCursor >= len(p.queue) {
+			p.qCursor = maxInt(len(p.queue)-1, 0)
+		}
+		return p, nil
+
 	case SuggestionsMsg:
 		if p.activeTab != SideSearch || !p.input.Focused() {
 			break

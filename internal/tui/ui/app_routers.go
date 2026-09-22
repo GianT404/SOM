@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 
 	"som/internal/domain"
 	"som/internal/storage"
@@ -35,19 +34,20 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case PlayStartedMsg:
 		t := msg.Track
-		a.playback.Playlist = a.left.tracks
-		a.playback.ShuffleHist = nil
-		a.playback.History = nil
 		a.activeContext = SideSearch
 		idx := -1
-		for i, tr := range a.playback.Playlist {
+		for i, tr := range a.left.tracks {
 			if tr.ID == t.ID {
 				idx = i
 				break
 			}
 		}
 		a.left.loadingStream = true
-		cmds = append(cmds, a.left.spinner.Tick, func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: t} })
+		cmds = append(cmds,
+			func() tea.Msg { return SetPlaylistMsg{Tracks: a.left.tracks} },
+			a.left.spinner.Tick,
+			func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: t} },
+		)
 
 	case PlayLocalMsg:
 		locals := a.left.locals
@@ -55,12 +55,17 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
 			break
 		}
-		a.playback.Playlist = make([]domain.Track, len(locals))
-		a.playback.ShuffleHist = nil
-		a.playback.History = nil
+
+		pl := make([]domain.Track, len(locals))
 		idx := -1
 		for i, lf := range locals {
-			a.playback.Playlist[i] = domain.Track{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, Thumbnail: lf.Thumbnail}
+			pl[i] = domain.Track{
+				ID:        "local:" + lf.Path,
+				Title:     lf.Name,
+				Artist:    lf.Artist,
+				Duration:  lf.Duration,
+				Thumbnail: lf.Thumbnail,
+			}
 			if lf.Path == msg.Path || lf.Name == msg.Title {
 				idx = i
 			}
@@ -68,44 +73,28 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		if idx < 0 {
 			idx = 0
 		}
+
 		a.activeContext = SideDownloads
-		cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: a.playback.Playlist[idx]} })
+
+		cmds = append(cmds,
+			func() tea.Msg { return SetPlaylistMsg{Tracks: pl} },
+			func() tea.Msg { return PlayTrackAtMsg{Index: idx, Track: pl[idx]} },
+		)
 
 	case StreamResolvedMsg:
 		if msg.Err != nil {
-			a.setStatus(StatusErrStyle.Render("X Error resolving stream: " + msg.Err.Error()))
+			a.setStatus(StatusErrStyle.Render("X Error stream: " + msg.Err.Error()))
 			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 		}
 
 	case PlayPlaylistMsg:
-		a.playback.Playlist = msg.Tracks
-		a.playback.ShuffleHist = nil
-		a.playback.History = nil
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
-		cmds = append(cmds, a.left.spinner.Tick, func() tea.Msg { return PlayTrackAtMsg{Index: msg.Index, Track: msg.Tracks[msg.Index]} })
-
-	case PlayQueueMsg:
-		if msg.Index >= 0 && msg.Index < len(a.playback.Queue) {
-			t := a.playback.Queue[msg.Index]
-			a.playback.Queue = append(a.playback.Queue[:msg.Index], a.playback.Queue[msg.Index+1:]...)
-			if a.left.qCursor >= len(a.playback.Queue) {
-				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
-			}
-			a.focusTrackAndSwitchTab(t)
-			cmds = append(cmds, func() tea.Msg { return PlayTrackAtMsg{Index: -1, Track: t} })
-			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Playing from queue: %s", t.Title)))
-		}
-
-	case RemoveFromQueueMsg:
-		if msg.Index >= 0 && msg.Index < len(a.playback.Queue) {
-			removed := a.playback.Queue[msg.Index]
-			a.playback.Queue = append(a.playback.Queue[:msg.Index], a.playback.Queue[msg.Index+1:]...)
-			if a.left.qCursor >= len(a.playback.Queue) {
-				a.left.qCursor = maxInt(len(a.playback.Queue)-1, 0)
-			}
-			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Removed from queue: %s", removed.Title)))
-		}
+		cmds = append(cmds,
+			func() tea.Msg { return SetPlaylistMsg{Tracks: msg.Tracks} },
+			a.left.spinner.Tick,
+			func() tea.Msg { return PlayTrackAtMsg{Index: msg.Index, Track: msg.Tracks[msg.Index]} },
+		)
 
 	case PlaybackErrorMsg:
 		a.setStatus(StatusErrStyle.Render("X Playback error: " + msg.Err.Error()))
@@ -255,82 +244,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		}
 	case ImportDoneMsg:
 		a.handleImportDone(msg)
-	case RenameDoneMsg:
-		if msg.Err != nil {
-			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
-			break
-		}
-		for i := range a.playback.Playlist {
-			if a.playback.Playlist[i].ID == "local:"+msg.OldPath {
-				a.playback.Playlist[i].ID = "local:" + msg.NewPath
-				a.playback.Playlist[i].Title = msg.NewTitle
-			}
-		}
-		if a.playback.NowPlay != nil && strings.HasPrefix(a.playback.NowPlay.ID, "local:") && strings.TrimPrefix(a.playback.NowPlay.ID, "local:") == msg.OldPath {
-			a.playback.NowPlay.ID = "local:" + msg.NewPath
-			a.playback.NowPlay.Title = msg.NewTitle
-		}
-		a.left.scanLocalFiles()
-		if a.left.plStore != nil {
-			if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
-				a.left.playlists = pls
-				if a.left.activePlaylist != nil {
-					for i := range a.left.playlists {
-						if a.left.playlists[i].ID == a.left.activePlaylist.ID {
-							a.left.activePlaylist = &a.left.playlists[i]
-							break
-						}
-					}
-				}
-			}
-		}
-		a.setStatus(StatusOKStyle.Render("> Renamed to " + msg.NewTitle))
-	case DeleteDoneMsg:
-		if msg.Err != nil {
-			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
-			break
-		}
-		if a.playback.NowPlay != nil && a.playback.NowPlay.ID == "local:"+msg.Path {
-			a.player.Stop()
-			a.playback.NowPlay = nil
-			a.playback.SongStarted = false
-			a.playback.NextPlay = nil
-			a.right.SetTrack(nil)
-		}
-		a.left.scanLocalFiles()
-		if a.left.dlCursor >= len(a.left.locals) {
-			a.left.dlCursor = maxInt(len(a.left.locals)-1, 0)
-		}
-		if a.left.plStore != nil {
-			if pls, err := a.left.plStore.LoadAllPlaylists(); err == nil {
-				a.left.playlists = pls
-				if a.left.activePlaylist != nil {
-					for i := range a.left.playlists {
-						if a.left.playlists[i].ID == a.left.activePlaylist.ID {
-							a.left.activePlaylist = &a.left.playlists[i]
-							break
-						}
-					}
-				}
-			}
-		}
-		var newPl []domain.Track
-		for _, t := range a.playback.Playlist {
-			if t.ID != "local:"+msg.Path {
-				newPl = append(newPl, t)
-			}
-		}
-		a.playback.Playlist = newPl
 
-		var newQueue []domain.Track
-		for _, t := range a.playback.Queue {
-			if t.ID != "local:"+msg.Path {
-				newQueue = append(newQueue, t)
-			}
-		}
-		a.playback.Queue = newQueue
-		a.left.queue = a.playback.Queue
-		a.setStatus(StatusOKStyle.Render("> Deleted " + msg.Name))
 	case ApplySortMsg:
 		a.left.sortPref = msg.Key
 		if a.left.plStore != nil {
@@ -535,10 +449,7 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
-		a.playback.Random = !a.playback.Random
-		a.playback.ShuffleHist = nil
-		a.playback.History = nil
-		a.syncPlaylistState()
+		cmds = append(cmds, func() tea.Msg { return ToggleRandomMsg{} })
 	case "up":
 		if a.sidebarActive == SideLogs {
 			if a.logOffset < LogBuf.Len()-1 {

@@ -203,16 +203,16 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		return modal.Init()
 	case "Add to queue":
 		track, ok := a.selectedTrackForPlaylist()
+		var cmd tea.Cmd
 		if ok {
-			a.playback.Queue = append(a.playback.Queue, domain.Track{
-				ID: track.ID, Title: track.Title, Artist: track.Artist, Duration: track.Duration,
-			})
+			t := domain.Track{ID: track.ID, Title: track.Title, Artist: track.Artist, Duration: track.Duration}
+			cmd = func() tea.Msg { return EnqueueTrackMsg{Track: t} }
 			a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Queued: %s", track.Title)))
 		} else {
 			a.setStatus(StatusErrStyle.Render("X No track selected"))
 		}
 		a.modals = nil
-		return nil
+		return cmd
 	case "Rename title":
 		if target, ok := a.renameTarget(); ok {
 			modal := NewRenameModal(target, a.left.plStore, a.width)

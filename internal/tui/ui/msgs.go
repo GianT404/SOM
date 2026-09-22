@@ -119,3 +119,14 @@ type LocalLyricsLoadedMsg struct {
 
 type PlaybackTickMsg struct{}
 type CloseAllModalsMsg struct{}
+
+type SetPlaylistMsg struct {
+	Tracks []domain.Track
+}
+type EnqueueTrackMsg struct {
+	Track domain.Track
+}
+type ToggleRandomMsg struct{}
+type QueueChangedMsg struct {
+	Queue []domain.Track
+}
