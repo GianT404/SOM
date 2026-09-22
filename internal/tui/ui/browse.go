@@ -530,8 +530,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 	case TrackChangedMsg:
 		if msg.IsLocal {
 			p.loadingStream = false
-
-			// LeftPanel tự móc DB lấy lyrics và ném ra Message
 			path := strings.TrimPrefix(msg.Track.ID, "local:")
 			if p.plStore != nil {
 				if lyricsJSON, err := p.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
@@ -540,17 +538,17 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: lr} })
 					}
 				} else {
-					cmds = append(cmds, func() tea.Msg {
-						return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}}
-					})
+					cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}} })
 				}
+			} else {
+				cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}} })
 			}
 		} else {
 			p.loadingStream = true
 		}
-
 		p.FocusTrack(msg.Track.ID)
-		return p, nil
+
+		return p, tea.Batch(cmds...)
 
 	case StreamResolvedMsg:
 		p.loadingStream = false

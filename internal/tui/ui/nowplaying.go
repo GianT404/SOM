@@ -237,12 +237,11 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		r.langCursor = 0
 		r.highlightLine = 0
 		r.manualSelect = false
-
 		r.playlistPos = msg.PlaylistPos
 		r.playlistTotal = msg.PlaylistLen
 		r.random = msg.IsRandom
 
-		return r, nil
+		return r, r.spinner.Tick
 
 	case StreamResolvedMsg:
 		if msg.LyricsErr != nil {

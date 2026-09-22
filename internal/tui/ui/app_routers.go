@@ -73,24 +73,9 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 
 	case StreamResolvedMsg:
 		if msg.Err != nil {
-			a.left.loadingStream = false
-			a.setStatus(StatusErrStyle.Render("X Lỗi stream: " + msg.Err.Error()))
+			a.setStatus(StatusErrStyle.Render("X Error resolving stream: " + msg.Err.Error()))
 			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
-			break
 		}
-		if msg.Gen != a.playback.PlayerGen {
-			a.left.loadingStream = false
-			break
-		}
-
-		a.left.loadingStream = false
-
-		if msg.LyricsErr != nil {
-			a.right.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
-		} else {
-			a.right.SetLyrics(msg.Lyrics)
-		}
-		cmds = append(cmds, a.right.spinner.Tick)
 
 	case PlayPlaylistMsg:
 		a.playback.Playlist = msg.Tracks
@@ -130,21 +115,10 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 
 	case TrackChangedMsg:
 		t := msg.Track
-
-		//  Cập nhật Status Bar của App
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 
-		// Cập nhật Player (RightPanel & Lyrics)
-		if msg.IsLocal {
-			a.loadLyricsForTrack(t)
-		} else {
-			a.playback.PlayerGen = msg.Gen
-		}
-
-		// 4. Đồng bộ Bluetooth AVRCP
 		if a.avrcp != nil {
 			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
-
 			a.avrcp.UpdatePlaybackStatus("Playing")
 		}
 

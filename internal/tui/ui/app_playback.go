@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"encoding/json"
 	"math/rand"
 	"strings"
 
@@ -58,23 +57,6 @@ func (a *App) triggerPreDecodeNext() {
 
 	a.playback.NextPlay = &next
 	a.player.PreDecodeNext(path, nil)
-}
-
-// loadLyricsForTrack reads lyrics from SQLite for local files or sets placeholder.
-func (a *App) loadLyricsForTrack(t domain.Track) {
-	if strings.HasPrefix(t.ID, "local:") {
-		path := strings.TrimPrefix(t.ID, "local:")
-		if a.left.plStore != nil {
-			if lyricsJSON, err := a.left.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
-				var lr domain.LyricsResp
-				if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
-					a.right.SetLyrics(lr)
-					return
-				}
-			}
-		}
-	}
-	a.right.SetLyrics(domain.LyricsResp{Plain: "(No lyrics available)"})
 }
 
 func (a *App) pickAntiClumpIndex() int {
