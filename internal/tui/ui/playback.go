@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"som/internal/domain"
+	"som/internal/storage"
 	"som/internal/tui/player"
 
 	tea "charm.land/bubbletea/v2"
@@ -29,15 +30,17 @@ type PlaybackManager struct {
 	ShuffleHist   []int
 	History       []domain.Track
 	Queue         []domain.Track
+	Store         *storage.DB
 }
 
 func NewPlaybackManager() *PlaybackManager {
 	return &PlaybackManager{}
 }
 
-func (pm *PlaybackManager) SetDependencies(p *player.Player, prov domain.MusicProvider) {
+func (pm *PlaybackManager) SetDependencies(p *player.Player, prov domain.MusicProvider, store *storage.DB) {
 	pm.Player = p
 	pm.Provider = prov
+	pm.Store = store
 }
 
 // CancelResolve hủy các luồng tải stream cũ an toàn
@@ -400,7 +403,7 @@ func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
 			return PlaybackErrorMsg{Err: err}
 		}
 
-		lr, lyricsErr := getCachedLyrics(pm.Provider, t.ID, t.Title, t.Artist, t.Duration)
+		lr, lyricsErr := getCachedLyrics(pm.Provider, pm.Store, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamResolvedMsg{
 			Lyrics:    lr,
 			LyricsErr: lyricsErr,

@@ -458,7 +458,7 @@ func saveLocalMetaCmd(p domain.MusicProvider, store *storage.DB, path string, t 
 		}
 
 		// Tác vụ mạng chạy ngầm, không block UI
-		lr, _ := getCachedLyrics(p, t.ID, t.Title, t.Artist, t.Duration)
+		lr, _ := getCachedLyrics(p, store, t.ID, t.Title, t.Artist, t.Duration)
 		lrJSON, _ := json.Marshal(lr)
 
 		err := store.UpsertLocalFileWithMeta(storage.LocalFile{
