@@ -130,3 +130,10 @@ type ToggleRandomMsg struct{}
 type QueueChangedMsg struct {
 	Queue []domain.Track
 }
+
+type OpenSettingsMsg struct{}
+type OpenHelpMsg struct{}
+type ApplySettingMsg struct {
+	Index int
+	Value bool
+}

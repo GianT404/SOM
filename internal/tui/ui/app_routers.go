@@ -206,6 +206,25 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 		}
+	case OpenSettingsMsg:
+
+		modal := NewSettingsModal(a.settingSwitches(), a.width)
+
+		a.modals = append(a.modals, modal)
+
+		cmds = append(cmds, modal.Init())
+
+	case OpenHelpMsg:
+
+		modal := NewHelpModal(a.width, a.height)
+
+		a.modals = append(a.modals, modal)
+
+		cmds = append(cmds, modal.Init())
+
+	case ApplySettingMsg:
+
+		a.applySetting(msg.Index, msg.Value)
 	case ExecuteCmdOptionMsg:
 		if c := a.runCmdOption(msg.Option); c != nil {
 			cmds = append(cmds, c)
@@ -287,68 +306,6 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		return tea.Quit
 	}
 
-	if a.showHelpPopup {
-		switch msg.String() {
-		case "?", "esc", "q":
-			a.showHelpPopup = false
-		}
-		return nil
-	}
-	if a.showEscMenu {
-		switch msg.String() {
-		case "esc", "q":
-			a.showEscMenu = false
-		case "up":
-			if a.escMenuCursor > 0 {
-				a.escMenuCursor--
-			}
-		case "down":
-			if a.escMenuCursor < len(escMenuItems)-1 {
-				a.escMenuCursor++
-			}
-		case "enter":
-			switch a.escMenuCursor {
-			case 0:
-				a.showEscMenu = false
-				a.showSettings = true
-				a.settingsCursor = 0
-			case 1:
-				a.showEscMenu = false
-				a.showHelpPopup = true
-			case 2:
-				a.showEscMenu = false
-				return tea.Quit
-			}
-		}
-		return nil
-	}
-	if a.showSettings {
-		items := a.settingSwitches()
-		switch msg.String() {
-		case "esc", "q":
-			a.showSettings = false
-		case "up":
-			if a.settingsCursor > 0 {
-				a.settingsCursor--
-			}
-		case "down":
-			if a.settingsCursor < len(items)-1 {
-				a.settingsCursor++
-			}
-		case "left":
-			if a.settingsCursor >= 0 && a.settingsCursor < len(items) {
-				items[a.settingsCursor].ToggleLeft()
-				a.applySetting(a.settingsCursor, items[a.settingsCursor].Value())
-			}
-		case "right":
-			if a.settingsCursor >= 0 && a.settingsCursor < len(items) {
-				items[a.settingsCursor].ToggleRight()
-				a.applySetting(a.settingsCursor, items[a.settingsCursor].Value())
-			}
-		}
-		return nil
-	}
-
 	switch msg.String() {
 	case "esc":
 		if a.moveSession != nil {
@@ -359,8 +316,9 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		} else if !a.left.input.Focused() && !a.left.plInput.Focused() && !a.left.showDeletePopup && !a.left.showPlInput {
 			if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
 			} else {
-				a.showEscMenu = true
-				a.escMenuCursor = 0
+				modal := NewEscMenuModal()
+				a.modals = append(a.modals, modal)
+				cmds = append(cmds, modal.Init())
 			}
 		}
 	case ".":
@@ -484,7 +442,9 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
-		a.showHelpPopup = true
+		modal := NewHelpModal(a.width, a.height)
+		a.modals = append(a.modals, modal)
+		cmds = append(cmds, modal.Init())
 	}
 	return tea.Batch(cmds...)
 }

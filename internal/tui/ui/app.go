@@ -53,17 +53,16 @@ type MoveSession struct {
 }
 
 type App struct {
-	provider      domain.MusicProvider
-	downloadDir   string
-	player        *player.Player
-	playback      *PlaybackManager
-	width         int
-	height        int
-	left          LeftPanel
-	right         RightPanel
-	statusMsg     string
-	statusAt      time.Time
-	showHelpPopup bool
+	provider    domain.MusicProvider
+	downloadDir string
+	player      *player.Player
+	playback    *PlaybackManager
+	width       int
+	height      int
+	left        LeftPanel
+	right       RightPanel
+	statusMsg   string
+	statusAt    time.Time
 
 	sidebarActive SidebarItem
 	sidebarAnim   sidebarAnimState
@@ -74,16 +73,11 @@ type App struct {
 	splashFrame   int
 	pendingKeys   []tea.KeyPressMsg
 
-	modals         []Overlay
-	showSettings   bool
-	settingsCursor int
-	settingsItems  []Switch
-	showEscMenu    bool
-	escMenuCursor  int
-	hideHint       bool
-	hideLogo       bool
-	mouseEnabled   bool
-	skipSilence    bool
+	modals       []Overlay
+	hideHint     bool
+	hideLogo     bool
+	mouseEnabled bool
+	skipSilence  bool
 
 	mouseLastClickAt  time.Time
 	mouseLastClickY   int
@@ -460,20 +454,11 @@ func (a *App) View() tea.View {
 	if len(a.modals) > 0 {
 		popup := a.modals[len(a.modals)-1].View()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.showHelpPopup {
-		popup := a.renderHelpPopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.showEscMenu {
-		popup := a.renderEscMenu()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.showSettings {
-		popup := a.renderSettingsPopup()
 		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 	} else if a.palette.Visible() {
 		popup := a.palette.View()

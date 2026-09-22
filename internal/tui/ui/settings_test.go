@@ -32,10 +32,12 @@ func TestSettingsDefaults(t *testing.T) {
 func TestRenderSettingsPopup(t *testing.T) {
 	setTheme(themeDefault)
 	defer setTheme(themeDefault)
-	a := &App{width: 110, height: 30, settingsCursor: 0}
+	a := &App{width: 110, height: 30}
 	a.applySetting(0, true)
 
-	out := a.renderSettingsPopup()
+	modal := NewSettingsModal(a.settingSwitches(), a.width)
+	out := modal.View()
+
 	if out == "" {
 		t.Fatal("settings popup should not be empty")
 	}
@@ -56,32 +58,71 @@ func TestSettingsToggleViaKeys(t *testing.T) {
 		palette:  NewCommandPalette(),
 	}
 
-	// Esc mở esc menu
-	if _, cmd := a.Update(kp(tea.KeyEsc)); cmd != nil || !a.showEscMenu {
+	// 1. Ấn esc mở menu
+	_, cmd := a.Update(kp(tea.KeyEsc))
+	if len(a.modals) == 0 { // Kiểm tra Modal stack
 		t.Fatal("esc should open the esc menu")
 	}
-	if _, cmd := a.Update(kp(tea.KeyEnter)); cmd != nil || !a.showSettings {
+
+	a.Update(OpenSettingsMsg{})
+
+	if len(a.modals) == 0 {
 		t.Fatal("enter on Settings should open settings popup")
 	}
-	a.Update(kp(tea.KeyRight)) // hide hint: ON
+
+	// Lấy SettingsModal ra khỏi stack để test phím
+	settingsModal, ok := a.modals[len(a.modals)-1].(*SettingsModal)
+	if !ok {
+		t.Fatal("Top modal is not SettingsModal")
+	}
+
+	// 3. Giả lập bấm phím trong Settings
+	// Dùng m.Update của Modal, KHÔNG dùng a.Update
+	_, cmd = settingsModal.Update(kp(tea.KeyRight))
+
+	// Khi ấn qua trái phải, nó trả về ApplySettingMsg
+	applyMsg, ok := cmd().(ApplySettingMsg)
+	if !ok {
+		t.Fatal("expected ApplySettingMsg")
+	}
+	a.Update(applyMsg) // Ép App áp dụng setting
+
 	if !a.hideHint {
 		t.Fatal("right on option 0 should enable hide hint")
 	}
-	a.Update(kp(tea.KeyDown))
-	a.Update(kp(tea.KeyRight)) // hide logo: ON
+
+	// Tương tự, gõ xuống và qua phải để đổi logo
+	settingsModal.Update(kp(tea.KeyDown))
+	_, cmd = settingsModal.Update(kp(tea.KeyRight))
+	applyMsg = cmd().(ApplySettingMsg)
+	a.Update(applyMsg)
+
 	if !a.hideLogo {
 		t.Fatal("right on option 1 should enable hide logo")
 	}
-	a.Update(kp(tea.KeyDown))
-	a.Update(kp(tea.KeyRight)) // theme: Mono
+
+	// Đổi theme
+	settingsModal.Update(kp(tea.KeyDown))
+	_, cmd = settingsModal.Update(kp(tea.KeyRight))
+	applyMsg = cmd().(ApplySettingMsg)
+	a.Update(applyMsg)
+
 	if !isMono() {
 		t.Fatal("right on option 2 should enable mono theme")
 	}
-	if _, cmd := a.Update(kp(tea.KeyEsc)); cmd != nil || a.showSettings {
+
+	// 4. Test thoát
+	_, cmd = settingsModal.Update(kp(tea.KeyEsc))
+	closeMsg, ok := cmd().(CloseModalMsg)
+	if !ok {
+		t.Fatal("esc should return CloseModalMsg")
+	}
+
+	a.Update(closeMsg) // Ép App đóng modal
+	if len(a.modals) != 0 {
 		t.Fatal("esc should close the settings popup")
 	}
 }
-
 func TestSettingsPersistAcrossRestart(t *testing.T) {
 	setTheme(themeDefault)
 	defer setTheme(themeDefault)

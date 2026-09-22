@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -13,6 +14,12 @@ type settingOpt struct {
 	apply   func(a *App, on bool)
 	offText string
 	onText  string
+}
+
+type SettingsModal struct {
+	cursor int
+	items  []Switch
+	width  int
 }
 
 func (a *App) settingOptions() []settingOpt {
@@ -35,25 +42,25 @@ func (a *App) loadSettings() {
 
 func (a *App) settingSwitches() []Switch {
 	opts := a.settingOptions()
-	if len(a.settingsItems) != len(opts) {
-		a.settingsItems = nil
-		for _, o := range opts {
-			if o.offText != "" || o.onText != "" {
-				on := o.onText
-				if on == "" {
-					on = "On"
-				}
-				off := o.offText
-				if off == "" {
-					off = "Off"
-				}
-				a.settingsItems = append(a.settingsItems, NewSwitchChoice(o.title, o.desc, o.on(a), off, on))
-				continue
+	var items []Switch
+
+	for _, o := range opts {
+		if o.offText != "" || o.onText != "" {
+			on := o.onText
+			if on == "" {
+				on = "On"
 			}
-			a.settingsItems = append(a.settingsItems, NewSwitch(o.title, o.desc, o.on(a)))
+			off := o.offText
+			if off == "" {
+				off = "Off"
+			}
+			items = append(items, NewSwitchChoice(o.title, o.desc, o.on(a), off, on))
+			continue
 		}
+		items = append(items, NewSwitch(o.title, o.desc, o.on(a)))
 	}
-	return a.settingsItems
+
+	return items
 }
 
 func (a *App) applySetting(i int, on bool) {
@@ -64,20 +71,43 @@ func (a *App) applySetting(i int, on bool) {
 	opts[i].apply(a, on)
 }
 
-// popup 2 cột: trái 40% danh sách Switch  phải 60% mô tả
-func (a *App) renderSettingsPopup() string {
-	items := a.settingSwitches()
-	if len(items) == 0 {
+func NewSettingsModal(items []Switch, w int) *SettingsModal {
+	return &SettingsModal{cursor: 0, items: items, width: w}
+}
+func (m *SettingsModal) Init() tea.Cmd { return nil }
+func (m *SettingsModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	if k, ok := msg.(tea.KeyPressMsg); ok {
+		switch k.String() {
+		case "esc", "q":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.items)-1 {
+				m.cursor++
+			}
+		case "left", "h":
+			m.items[m.cursor].ToggleLeft()
+			idx := m.cursor
+			val := m.items[idx].Value()
+			return m, func() tea.Msg { return ApplySettingMsg{Index: idx, Value: val} }
+		case "right", "l":
+			m.items[m.cursor].ToggleRight()
+			idx := m.cursor
+			val := m.items[idx].Value()
+			return m, func() tea.Msg { return ApplySettingMsg{Index: idx, Value: val} }
+		}
+	}
+	return m, nil
+}
+
+func (m *SettingsModal) View() string {
+	if len(m.items) == 0 {
 		return ""
 	}
-	if a.settingsCursor < 0 {
-		a.settingsCursor = 0
-	}
-	if a.settingsCursor >= len(items) {
-		a.settingsCursor = len(items) - 1
-	}
-
-	boxW := a.width - 2
+	boxW := m.width - 2
 	if boxW > 85 {
 		boxW = 85
 	}
@@ -94,25 +124,21 @@ func (a *App) renderSettingsPopup() string {
 		rightW = 8
 	}
 
-	// Mỗi Switch chiếm 3 dòng cột trái: 2 dòng của View + 1 dòng trống.
 	var leftLines []string
-	for i, sw := range items {
-		block := sw.View(leftW, i == a.settingsCursor)
+	for i, sw := range m.items {
+		block := sw.View(leftW, i == m.cursor)
 		leftLines = append(leftLines, block)
 		leftLines = append(leftLines, "")
 	}
-
 	rightLines := make([]string, len(leftLines))
-	descWrap := wordWrap(items[a.settingsCursor].Desc(), rightW-2)
+	descWrap := wordWrap(m.items[m.cursor].Desc(), rightW-2)
 	for j, l := range descWrap {
 		if j < len(rightLines) {
 			rightLines[j] = l
 		}
 	}
-
 	left := lipgloss.NewStyle().Width(leftW).Render(strings.Join(leftLines, "\n"))
 	right := lipgloss.NewStyle().Width(rightW).Render(strings.Join(rightLines, "\n"))
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, lipgloss.NewStyle().Width(3).Render("   "), right)
-
 	return renderBox(boxW, "Settings", body, colorAccent)
 }

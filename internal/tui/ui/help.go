@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -12,6 +13,10 @@ type helpBind [2]string
 type helpSection struct {
 	title string
 	binds []helpBind
+}
+type HelpModal struct {
+	width  int
+	height int
 }
 
 var helpSections = []helpSection{
@@ -234,5 +239,48 @@ func (a *App) renderHelpPopup() string {
 
 	content := "\n" + body + "\n\n" + footer
 
+	return renderBox(bodyW+6, "Keyboard Shortcuts", content, themeCol("#e8593c"))
+}
+
+func NewHelpModal(w, h int) *HelpModal { return &HelpModal{width: w, height: h} }
+func (m *HelpModal) Init() tea.Cmd     { return nil }
+func (m *HelpModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc", "q", "?":
+			return m, func() tea.Msg { return CloseModalMsg{} }
+		}
+	}
+	return m, nil
+}
+
+func (m *HelpModal) View() string {
+	availW := m.width - 2
+	if availW < 10 {
+		availW = 10
+	}
+	availH := m.height - 2
+	if availH < 6 {
+		availH = 6
+	}
+	body, bodyW, bodyH := flowHelpLayout(availW-6, 0)
+	if bodyW+6 > availW {
+		keyW := maxKeyWidth(helpSections)
+		maxDesc := availW - 6 - keyW - 2
+		if maxDesc < 3 {
+			maxDesc = 3
+		}
+		body, bodyW, bodyH = flowHelpLayout(availW-6, maxDesc)
+	}
+	if bodyH+6 > availH {
+		body, bodyH = truncateBodyHeight(body, availH-6)
+	}
+	bodyW = lipgloss.Width(body)
+	footer := lipgloss.NewStyle().Width(bodyW).Align(lipgloss.Center).Render(DimItemStyle.Render("Press ? or Esc to close"))
+	content := "\n" + body + "\n\n" + footer
 	return renderBox(bodyW+6, "Keyboard Shortcuts", content, themeCol("#e8593c"))
 }

@@ -51,6 +51,7 @@ func (a *App) listRowOrigin() (int, bool) {
 			return 0, false
 		}
 		return ct + 4, true
+
 	case SideDownloads:
 		if a.left.input.Focused() && len(a.left.suggestions) > 0 {
 			return 0, false
@@ -299,7 +300,7 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if !a.mouseEnabled {
 		return nil
 	}
-	if a.showSettings || a.showHelpPopup || len(a.modals) > 0 || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
+	if len(a.modals) > 0 || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
 		return nil
 	}
 
