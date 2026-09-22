@@ -207,3 +207,49 @@ func (db *DB) GetSetting(key string) string {
 func (db *DB) SetSetting(key, value string) {
 	_, _ = db.conn.Exec("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value)
 }
+
+const createLyricsCacheTable = `
+CREATE TABLE IF NOT EXISTS lyrics_cache (
+    cache_key TEXT PRIMARY KEY,
+    lyrics_json TEXT NOT NULL,
+    expires_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lyrics_cache_expires ON lyrics_cache(expires_at);
+`
+
+// Cleanup job: Chạy cái này mỗi khi khởi động app để dọn rác
+func (db *DB) CleanupExpiredLyrics() error {
+	_, err := db.conn.Exec(`DELETE FROM lyrics_cache WHERE expires_at < CURRENT_TIMESTAMP`)
+	return err
+}
+
+func (db *DB) GetLyricsCache(key string) (string, error) {
+	var jsonStr string
+	// Chỉ lấy nếu chưa hết hạn
+	err := db.conn.QueryRow(`
+        SELECT lyrics_json FROM lyrics_cache 
+        WHERE cache_key = ? AND expires_at > CURRENT_TIMESTAMP
+    `, key).Scan(&jsonStr)
+	if err != nil {
+		return "", err
+	}
+	return jsonStr, nil
+}
+
+func (db *DB) PutLyricsCache(key string, lyricsJSON string, isEmpty bool) error {
+	// Nếu có lời: cache 7 ngày. Nếu rỗng/lỗi: cache 1 giờ.
+	hours := 24 * 7
+	if isEmpty {
+		hours = 1
+	}
+	expiresAt := time.Now().Add(time.Duration(hours) * time.Hour).UTC().Format(time.RFC3339)
+
+	_, err := db.conn.Exec(`
+        INSERT INTO lyrics_cache (cache_key, lyrics_json, expires_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(cache_key) DO UPDATE SET 
+            lyrics_json = excluded.lyrics_json,
+            expires_at = excluded.expires_at
+    `, key, lyricsJSON, expiresAt)
+	return err
+}
