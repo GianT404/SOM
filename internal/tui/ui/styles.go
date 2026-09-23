@@ -17,18 +17,19 @@ const (
 )
 
 var (
-	colorAccent  color.Color
-	colorSubtle  color.Color
-	colorSubtle2 color.Color
-	colorWhite   color.Color
-	colorDark    color.Color
-	colorDark2   color.Color
-	colorGreen   color.Color
-	colorRed     color.Color
-	deleteColor  color.Color
-	colorYellow  color.Color
-	colorBorder  color.Color
-	ghostStrong  color.Color
+	colorAccent    color.Color
+	colorHighlight color.Color
+	colorSubtle    color.Color
+	colorSubtle2   color.Color
+	colorWhite     color.Color
+	colorDark      color.Color
+	colorDark2     color.Color
+	colorGreen     color.Color
+	colorRed       color.Color
+	deleteColor    color.Color
+	colorYellow    color.Color
+	colorBorder    color.Color
+	ghostStrong    color.Color
 
 	// ── Panel containers ────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ func selFg() color.Color {
 // hiện tại. Gọi lúc init và mỗi khi đổi theme (setTheme).
 func rebuildTheme() {
 	colorAccent = themeCol("#E8593C")
+	colorHighlight = themeCol("#87200d")
 	colorSubtle = themeCol("#4A4A4A")
 	colorWhite = themeCol("#7c7986")
 	colorDark = themeCol("#fff")
@@ -104,7 +106,7 @@ func rebuildTheme() {
 
 	SelectedItemStyle = lipgloss.NewStyle().
 		Foreground(selFg()).
-		Background(colorAccent).
+		Background(colorHighlight).
 		Bold(true)
 
 	NormalItemStyle = lipgloss.NewStyle().
