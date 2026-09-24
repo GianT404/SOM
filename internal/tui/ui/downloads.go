@@ -13,14 +13,18 @@ func (p *LeftPanel) scanLocalFiles() {
 	if p.plStore == nil {
 		return
 	}
+
 	files, err := p.plStore.ListAllLocalFilesSorted(p.sortPref)
 	if err != nil {
 		p.errMsg = "DB error: " + err.Error()
 		return
 	}
-	p.locals = make([]LocalFile, len(files))
-	for i, f := range files {
-		p.locals[i] = LocalFile{
+
+	var pinned []LocalFile
+	var unpinned []LocalFile
+	pinnedMap := make(map[string]LocalFile)
+	for _, f := range files {
+		lf := LocalFile{
 			Name:      f.Name,
 			Path:      f.Path,
 			Artist:    f.Artist,
@@ -31,7 +35,27 @@ func (p *LeftPanel) scanLocalFiles() {
 			FileMTime: f.FileMTime,
 			CreatedAt: f.CreatedAt,
 		}
+		if p.isPinned(f.Path) {
+			pinnedMap[f.Path] = lf
+		} else {
+			unpinned = append(unpinned, lf)
+		}
 	}
+
+	var validPinned []string
+	for _, path := range p.pinned {
+		if lf, ok := pinnedMap[path]; ok {
+			pinned = append(pinned, lf)
+			validPinned = append(validPinned, path)
+		}
+	}
+
+	if len(validPinned) != len(p.pinned) {
+		p.pinned = validPinned
+		p.savePinned()
+	}
+
+	p.locals = append(pinned, unpinned...)
 }
 func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
 	innerW := w - 4
@@ -93,6 +117,7 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 		p.visibleRows()+1,
 		func(i int, f LocalFile) (string, string, string, int, bool, bool, int) {
 			isPlaying := playingID == "local:"+f.Path
+
 			origIdx := i + 1
 			for j, lf := range p.locals {
 				if lf.Path == f.Path {
@@ -101,7 +126,12 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 				}
 			}
 
-			return f.Name, f.Artist, f.Path, f.Duration, false, isPlaying, origIdx
+			title := f.Name
+			if p.isPinned(f.Path) {
+				title = "[P] " + title
+			}
+
+			return title, f.Artist, f.Path, f.Duration, false, isPlaying, origIdx
 		},
 		selectMode, selected, alreadyIn,
 	)

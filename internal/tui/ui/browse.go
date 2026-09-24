@@ -60,6 +60,7 @@ type LeftPanel struct {
 	suggestCursor int
 	suggestOffset int
 	suggestFocus  bool
+	pinned        []string
 }
 
 const suggestMaxShow = 5
@@ -95,13 +96,17 @@ func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 		if pls, err := store.LoadAllPlaylists(); err == nil {
 			panel.playlists = pls
 		}
+
+		if pinnedStr := store.GetSetting("pinned_tracks"); pinnedStr != "" {
+			json.Unmarshal([]byte(pinnedStr), &panel.pinned)
+		}
+
 		panel.sortPref = store.GetSetting("sort_downloads")
 		if panel.sortPref == "" {
 			panel.sortPref = "name"
 		}
+		panel.scanLocalFiles()
 	}
-
-	panel.scanLocalFiles()
 	return panel
 }
 
@@ -506,7 +511,18 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			if focused && !p.input.Focused() && p.activeTab == SideQueue {
 				return p, func() tea.Msg { return RemoveFromQueueMsg{Index: p.qCursor} }
 			}
+		case "ctrl+p":
+			if focused && !p.input.Focused() && p.activeTab == SideDownloads {
+				locals := p.getFilteredLocals()
+				if len(locals) > 0 && p.dlCursor >= 0 && p.dlCursor < len(locals) {
+					targetPath := locals[p.dlCursor].Path
+					p.togglePin(targetPath)
 
+					p.scanLocalFiles()
+
+				}
+			}
+			return p, nil
 		case "d":
 			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.searchCursor]
@@ -998,5 +1014,40 @@ func (p *LeftPanel) FocusTrack(trackID string) {
 				break
 			}
 		}
+	}
+}
+func (p *LeftPanel) isPinned(path string) bool {
+	for _, pth := range p.pinned {
+		if pth == path {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *LeftPanel) togglePin(path string) {
+	for i, pth := range p.pinned {
+		if pth == path {
+			// Đã pin -> Thực hiện Unpin
+			p.pinned = append(p.pinned[:i], p.pinned[i+1:]...)
+			p.savePinned()
+			p.errMsg = ""
+			return
+		}
+	}
+	// Chưa pin -> Thực hiện Pin
+	if len(p.pinned) >= 5 {
+		p.errMsg = "Maximum 5 pinned tracks allowed."
+		return
+	}
+	p.pinned = append(p.pinned, path)
+	p.savePinned()
+	p.errMsg = ""
+}
+
+func (p *LeftPanel) savePinned() {
+	if p.plStore != nil {
+		data, _ := json.Marshal(p.pinned)
+		p.plStore.SetSetting("pinned_tracks", string(data))
 	}
 }
