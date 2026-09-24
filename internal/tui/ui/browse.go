@@ -357,38 +357,60 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				break
 			}
 			if focused && !p.input.Focused() {
-				if p.activeTab == SideSearch && p.searchCursor > 0 {
-					p.searchCursor--
-					if p.searchCursor < p.searchOffset {
-						p.searchOffset = p.searchCursor
+				items := p.itemCount()
+				if items == 0 {
+					break
+				}
+
+				switch p.activeTab {
+				case SideSearch:
+					if p.searchCursor > 0 {
+						p.searchCursor--
+						if p.searchCursor < p.searchOffset {
+							p.searchOffset = p.searchCursor
+						}
+					} else {
+						// Vòng từ đỉnh xuống đáy
+						p.searchCursor = items - 1
+						if p.searchCursor >= p.searchOffset+p.visibleRows() {
+							p.searchOffset = p.searchCursor - p.visibleRows() + 1
+						}
 					}
-				} else if p.activeTab == SideSearch {
-					p.searchCursor = p.itemCount() - 1
-					if p.searchCursor >= p.searchOffset+p.visibleRows() {
-						p.searchOffset = p.searchCursor - p.visibleRows() + 1
-					}
-				} else if p.activeTab == SideDownloads && p.dlCursor > 0 {
-					p.dlCursor--
-					if p.dlCursor < p.dlOffset {
-						p.dlOffset = p.dlCursor
-					}
-				} else if p.activeTab == SideDownloads {
-					items := p.itemCount()
-					if items > 0 {
+				case SideDownloads:
+					if p.dlCursor > 0 {
+						p.dlCursor--
+						if p.dlCursor < p.dlOffset {
+							p.dlOffset = p.dlCursor
+						}
+					} else {
 						p.dlCursor = items - 1
 						if p.dlCursor >= p.dlOffset+p.visibleRows()+1 {
 							p.dlOffset = p.dlCursor - p.visibleRows()
 						}
 					}
-				} else if p.activeTab == SideQueue && p.qCursor > 0 {
-					p.qCursor--
-					if p.qCursor < p.qOffset {
-						p.qOffset = p.qCursor
+				case SideQueue:
+					if p.qCursor > 0 {
+						p.qCursor--
+						if p.qCursor < p.qOffset {
+							p.qOffset = p.qCursor
+						}
+					} else {
+						p.qCursor = items - 1
+						if p.qCursor >= p.qOffset+p.visibleRows()+1 {
+							p.qOffset = p.qCursor - p.visibleRows()
+						}
 					}
-				} else if p.activeTab == SidePlaylists && p.plCursor > 0 {
-					p.plCursor--
-					if p.plCursor < p.plOffset {
-						p.plOffset = p.plCursor
+				case SidePlaylists:
+					if p.plCursor > 0 {
+						p.plCursor--
+						if p.plCursor < p.plOffset {
+							p.plOffset = p.plCursor
+						}
+					} else {
+						p.plCursor = items - 1
+						if p.plCursor >= p.plOffset+p.visibleRows()+1 {
+							p.plOffset = p.plCursor - p.visibleRows()
+						}
 					}
 				}
 			}
@@ -401,7 +423,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						p.suggestOffset++
 					}
 				} else {
-					// Hết danh sách gợi ý → chuyển focus xuống kết quả.
 					p.suggestFocus = false
 					p.suggestions = nil
 					p.suggestCursor = 0
@@ -421,40 +442,49 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 			if focused && !p.input.Focused() {
 				items := p.itemCount()
-				if p.activeTab == SideSearch {
+				if items == 0 {
+					break
+				}
+
+				switch p.activeTab {
+				case SideSearch:
 					if p.searchCursor < items-1 {
 						p.searchCursor++
 						if p.searchCursor >= p.searchOffset+p.visibleRows() {
 							p.searchOffset++
 						}
-					} else if items > 0 {
+					} else {
+						// Vòng từ đáy lên đỉnh
 						p.searchCursor = 0
 						p.searchOffset = 0
 					}
-				} else if p.activeTab == SideDownloads {
+				case SideDownloads:
 					if p.dlCursor < items-1 {
 						p.dlCursor++
 						if p.dlCursor >= p.dlOffset+p.visibleRows()+1 {
 							p.dlOffset++
 						}
-					} else if items > 0 {
+					} else {
 						p.dlCursor = 0
 						p.dlOffset = 0
 					}
-				} else if p.activeTab == SideQueue {
+				case SideQueue:
 					if p.qCursor < items-1 {
 						p.qCursor++
 						if p.qCursor >= p.qOffset+p.visibleRows()+1 {
 							p.qOffset++
 						}
+					} else {
+						p.qCursor = 0
+						p.qOffset = 0
 					}
-				} else if p.activeTab == SidePlaylists {
+				case SidePlaylists:
 					if p.plCursor < items-1 {
 						p.plCursor++
 						if p.plCursor >= p.plOffset+p.visibleRows()+1 {
 							p.plOffset++
 						}
-					} else if items > 0 {
+					} else {
 						p.plCursor = 0
 						p.plOffset = 0
 					}
@@ -803,7 +833,19 @@ func (p LeftPanel) itemCount() int {
 }
 
 func (p LeftPanel) visibleRows() int {
-	rows := p.height - 7
+	overhead := 8
+	switch p.activeTab {
+	case SideSearch, SideQueue:
+		overhead = 7
+	case SideDownloads, SidePlaylists:
+		if p.isSearchVisible() {
+			overhead = 7
+		} else {
+			overhead = 4
+		}
+	}
+
+	rows := p.height - overhead
 	if rows < 3 {
 		return 3
 	}
@@ -900,7 +942,9 @@ func saveInputForTab(p *LeftPanel, tab SidebarItem) {
 		p.inputPlaylist = p.input.Value()
 	}
 }
-
+func (p LeftPanel) isSearchVisible() bool {
+	return p.input.Focused() || strings.TrimSpace(p.input.Value()) != ""
+}
 func loadInputForTab(p *LeftPanel, tab SidebarItem) {
 	switch tab {
 	case SideSearch:

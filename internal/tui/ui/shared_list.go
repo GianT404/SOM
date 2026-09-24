@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -13,88 +14,91 @@ func renderSharedTrackList[T any](
 	cursor int,
 	offset int,
 	visibleRows int,
-	extract func(T) (title, artist, path string, duration int, showCheck bool), // Thêm showCheck
+	extract func(i int, item T) (title, artist, path string, duration int, showCheck bool, isPlaying bool, displayIdx int),
 	selectMode bool,
 	selected map[string]bool,
 	alreadyIn map[string]bool,
 ) string {
 	var b strings.Builder
+
 	end := offset + visibleRows
 	if end > len(items) {
 		end = len(items)
 	}
 
-	idxW := 3
-	if len(items) >= 1000 {
-		idxW = 4
-	}
-	durW := 6
-	artistW := 27
-	checkW := 3 // Dành 3 ký tự cho dấu check tải về
-
 	tickW := 0
+	headerTick := "  " // 2 ô lề trái
 	if selectMode {
-		tickW = 8
+		tickW = 4
+		headerTick = "      " // 2 ô lề trái + 4 ô tick
 	}
 
-	// Trừ thêm checkW khỏi độ rộng của Title
-	titleW := innerW - tickW - idxW - artistW - durW - checkW - 8
-	if titleW < 10 {
-		titleW = 10
-	}
-	artistW = innerW - tickW - idxW - titleW - durW - checkW - 8
-	if artistW < 0 {
-		artistW = 0
+	// Đặt kích thước CỐ ĐỊNH
+	checkW := 2
+	idxW := 3
+	timeW := 5
+
+	// Tổng các khoảng phân cách: prefix(2) + sau idx(2) + sau title(2) + sau artist(2) = 8
+	spacing := 8
+	availW := innerW - tickW - checkW - idxW - timeW - spacing
+	if availW < 10 {
+		availW = 10
 	}
 
-	headerTick := ""
-	if selectMode {
-		headerTick = "    "
-	}
+	// Title 70%, Artist 30%
+	titleW := int(float64(availW) * 0.75)
+	artistW := availW - titleW
 
-	// Thêm padding rỗng ở cuối header cho thẳng cột check
-	header := fmt.Sprintf("%s  %*s  %-*s  %-*s  %*s   ", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", durW-1, "Time")
-	b.WriteString(DimItemStyle.Width(innerW).Render(header))
+	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", checkW+timeW, "Time")
+
+	b.WriteString(DimItemStyle.Render(header))
+	b.WriteString("\n")
+
+	lineStyle := lipgloss.NewStyle().Foreground(themeCol("#7c7986"))
+	b.WriteString(lineStyle.Render(strings.Repeat("─", innerW)))
 
 	for i := offset; i < end; i++ {
-		title, artist, path, durSec, showCheck := extract(items[i])
-
-		mark := "  "
-		if i == cursor {
-			mark = " "
+		title, artist, path, durSec, showCheck, isPlaying, displayIdx := extract(i, items[i])
+		prefix := "  "
+		if i == cursor || isPlaying {
+			prefix = " "
 		}
 
 		tick := ""
 		if selectMode {
-			isAlreadyIn := alreadyIn[path]
-			isToggled := selected[path]
-			willBeIn := isAlreadyIn != isToggled
-
-			if willBeIn {
+			if alreadyIn[path] != selected[path] {
 				tick = "[+] "
 			} else {
 				tick = "[ ] "
 			}
 		}
 
-		checkStr := "   "
+		checkStr := ""
 		if showCheck {
-			checkStr = " " + IconCheck + " "
+			checkStr = IconCheck + " "
 		}
+		checkStr = runewidth.FillRight(checkStr, checkW)
 
-		idx := fmt.Sprintf("%*d", idxW, i+1)
+		idx := fmt.Sprintf("%-*d", idxW, displayIdx)
 		safeTitle := runewidth.FillRight(truncate(title, titleW), titleW)
 		safeArtist := runewidth.FillRight(truncate(artist, artistW), artistW)
-		dur := fmt.Sprintf("%*s", durW, FormatDuration(durSec))
+		dur := fmt.Sprintf("%*s", timeW, FormatDuration(durSec))
 
-		line := mark + tick + idx + "  " + safeTitle + "  " + safeArtist + "  " + dur + checkStr
+		line := prefix + tick + idx + "  " + safeTitle + "  " + safeArtist + "  " + checkStr + dur
 
 		b.WriteString("\n")
+
+		style := NormalItemStyle
 		if i == cursor {
-			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
-		} else {
-			b.WriteString(NormalItemStyle.Width(innerW).Render(line))
+			style = SelectedItemStyle
 		}
+
+		if isPlaying {
+			style = style.Foreground(themeCol("#fff")).Bold(true)
+		}
+
+		b.WriteString(style.Width(innerW).Render(line))
 	}
+
 	return b.String()
 }

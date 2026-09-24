@@ -50,7 +50,7 @@ func (a *App) listRowOrigin() (int, bool) {
 		if len(a.left.tracks) == 0 {
 			return 0, false
 		}
-		return ct + 4, true
+		return ct + 5, true
 
 	case SideDownloads:
 		if a.left.input.Focused() && len(a.left.suggestions) > 0 {
@@ -62,24 +62,32 @@ func (a *App) listRowOrigin() (int, bool) {
 		if len(a.left.getFilteredLocals()) == 0 {
 			return 0, false
 		}
-		return ct + 5, true
+		if a.left.isSearchVisible() {
+			return ct + 5, true
+		}
+		return ct + 3, true
 	case SideQueue:
 		if len(a.playback.Queue) == 0 {
 			return 0, false
 		}
-		return ct + 2, true
+		return ct + 5, true
 	case SidePlaylists:
 		if a.left.activePlaylist != nil {
 			if len(a.left.activePlaylist.Tracks) == 0 {
 				return 0, false
 			}
-			return ct + 5, true
+			if a.left.isSearchVisible() {
+				return ct + 5, true
+			}
+			return ct + 3, true
 		}
 		if len(a.left.playlists) == 0 {
 			return 0, false
 		}
-		return ct + 5, true
-	case SideLyrics:
+		if a.left.isSearchVisible() {
+			return ct + 5, true
+		}
+		return ct + 3, true
 		if a.right.showLangPopup || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return 0, false
 		}
@@ -204,14 +212,25 @@ func (a *App) tryFocusSearchInput(m tea.MouseClickMsg) bool {
 		return false
 	}
 	switch a.sidebarActive {
-	case SideSearch, SideDownloads, SidePlaylists:
+	case SideSearch:
 		if m.X < sidebarWidth {
 			return false
 		}
 		if !a.left.input.Focused() {
 			a.left.input.Focus()
+			return true
 		}
-		return true
+	case SideDownloads, SidePlaylists:
+		if !a.left.isSearchVisible() {
+			return false
+		}
+		if m.X < sidebarWidth {
+			return false
+		}
+		if !a.left.input.Focused() {
+			a.left.input.Focus()
+			return true
+		}
 	}
 	return false
 }

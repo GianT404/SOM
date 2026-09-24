@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"image/color"
 	"math"
 	"strings"
 	"time"
@@ -22,7 +21,7 @@ const (
 	sideCount
 )
 
-const sidebarWidth = 18
+const sidebarWidth = 19
 
 const sidebarGhostDuration = 120 * time.Millisecond
 
@@ -37,19 +36,19 @@ type sidebarAnimState struct {
 func (s SidebarItem) String() string {
 	switch s {
 	case SideSearch:
-		return "Search"
+		return "[1] SEARCH"
 	case SideDownloads:
-		return "Downloads"
+		return "[2] DOWNLOADS"
 	case SideImport:
-		return "Import"
+		return "[3] IMPORT"
 	case SideQueue:
-		return "Queue"
-	case SideLyrics:
-		return "Lyrics"
-	case SideLogs:
-		return "Logs"
+		return "[4] QUEUE"
 	case SidePlaylists:
-		return "Playlists"
+		return "[5] PLAYLISTS"
+	case SideLyrics:
+		return "[6] LYRICS"
+	case SideLogs:
+		return "[7] LOGS"
 	default:
 		return ""
 	}
@@ -119,8 +118,6 @@ func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState)
 		return 0
 	}
 
-	// Vệt chỉ nằm giữa tab cũ (from, bao gồm) và tab đích (to, loại trừ —
-	// tab đích vốn đã hiện con trỏ chính).
 	if anim.to > anim.from {
 		if item < anim.from || item >= anim.to {
 			return 0
@@ -162,46 +159,3 @@ func ghostStyle(gi float64) lipgloss.Style {
 	}
 	return lipgloss.NewStyle().Foreground(ghostStrong).Faint(true)
 }
-
-func renderSOMLogo() string {
-	var palette []color.Color
-	if isMono() {
-		palette = []color.Color{
-			lipgloss.Color("#ffffff"),
-			lipgloss.Color("#ffffff"),
-			lipgloss.Color("#ffffff"),
-			lipgloss.Color("#ffffff"),
-			lipgloss.Color("#ffffff"),
-			lipgloss.Color("#ffffff"),
-		}
-	} else {
-		palette = []color.Color{
-			lipgloss.Color("#FFE8DF"),
-			lipgloss.Color("#FFB9A7"),
-			lipgloss.Color("#E8593C"),
-			lipgloss.Color("#C84328"),
-			lipgloss.Color("#9D311A"),
-			lipgloss.Color("#6B1F0E"),
-		}
-	}
-	art := []string{
-		"     ███████╗   ██████╗   ███╗   ███╗",
-		"     ██╔════╝  ██╔═══██╗  ████╗ ████║",
-		"     ███████╗  ██║   ██║  ██╔████╔██║",
-		"     ╚════██║  ██║   ██║  ██║╚██╔╝██║",
-		"     ███████║  ╚██████╔╝  ██║ ╚═╝ ██║",
-		"     ╚══════╝   ╚═════╝   ╚═╝     ╚═╝",
-	}
-	var b strings.Builder
-	for i, line := range art {
-		style := lipgloss.NewStyle().Foreground(palette[i]).Bold(true)
-		if i > 0 {
-			b.WriteString("\n")
-		}
-		b.WriteString(style.Render(line))
-	}
-	return b.String()
-}
-
-// somLogoRows là số dòng banner SOM
-var somLogoRows = len(strings.Split(renderSOMLogo(), "\n"))

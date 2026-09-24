@@ -17,7 +17,7 @@ func renderLogsView(logOffset int, w, h int, focused bool) string {
 		borderColor = themeCol("#e8593c")
 	}
 	innerW := w - 4
-	innerH := h - 2
+	innerH := h - 3
 
 	lines := LogBuf.Lines()
 	if len(lines) == 0 {

@@ -232,7 +232,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
-
 	//  Modal Overlay (Highest Priority)
 	if len(a.modals) > 0 {
 		if _, ok := msg.(CloseAllModalsMsg); ok {
@@ -293,8 +292,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, c)
 		}
 	case tea.KeyPressMsg:
+		oldTab := a.sidebarActive
 		if c := a.handleKeys(msg); c != nil {
 			cmds = append(cmds, c)
+		}
+
+		if oldTab != a.sidebarActive {
+			return a, tea.Batch(cmds...)
 		}
 	default:
 		// Uỷ quyền cho 2 Sub-Routers
@@ -338,7 +342,7 @@ func (a *App) somRowHeight() int {
 	if a.hideLogo {
 		return 0
 	}
-	return somLogoRows
+	return 1
 }
 
 func (a *App) mainContentHeight() int {
@@ -374,8 +378,8 @@ func (a *App) View() tea.View {
 		mainW = 10
 	}
 
-	somLogo := renderSOMLogo()
-	somRow := a.renderSomRow(somLogo)
+	dashboard := renderDashboard(a.hideLogo, a.player.Volume(), a.activeSpeed, a.activePreset, a.playback.NowPlay)
+	somRow := a.renderSomRow(dashboard)
 
 	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
 
@@ -386,9 +390,15 @@ func (a *App) View() tea.View {
 
 	inputNotFocused := !a.left.input.Focused()
 	var mainView string
+
+	playingID := ""
+	if a.playback.NowPlay != nil {
+		playingID = a.playback.NowPlay.ID
+	}
+
 	switch a.sidebarActive {
 	case SideSearch:
-		mainView = a.left.ViewSearchContent(mainW, contentH)
+		mainView = a.left.ViewSearchContent(mainW, contentH, playingID)
 	case SideDownloads:
 		var alreadyInMove map[string]bool
 		var selected map[string]bool
@@ -405,14 +415,14 @@ func (a *App) View() tea.View {
 				alreadyInMove[path] = true
 			}
 		}
-		mainView = a.left.ViewDownloadsContent(mainW, contentH, selected, selectMode, alreadyInMove)
+		mainView = a.left.ViewDownloadsContent(mainW, contentH, selected, selectMode, alreadyInMove, playingID)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
 	case SideQueue:
-		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue)
+		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue, playingID)
 	case SidePlaylists:
-		mainView = a.left.ViewPlaylistsContent(mainW, contentH)
+		mainView = a.left.ViewPlaylistsContent(mainW, contentH, playingID)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
@@ -480,23 +490,23 @@ func (a *App) View() tea.View {
 	return v
 }
 
-// renderSomRow ghép logo SOM với hint lyrics hoặc import
-func (a *App) renderSomRow(somLogo string) string {
+// render lyrics hoặc import
+func (a *App) renderSomRow(dashboard string) string {
 	var hint string
 	switch a.sidebarActive {
 	case SideLyrics:
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
-			return somLogo
+			return dashboard
 		}
 		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
 	case SideImport:
 		if a.importPanel.importing {
-			return somLogo
+			return dashboard
 		}
 		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
 	case SideDownloads:
 		if a.moveSession == nil {
-			return somLogo
+			return dashboard
 		}
 		plName := ""
 		if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
@@ -505,22 +515,19 @@ func (a *App) renderSomRow(somLogo string) string {
 		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
 	case SidePlaylists:
 		if a.left.showPlInput {
-			return somLogo
+			return dashboard
 		}
 		hint = DimItemStyle.Render("enter: open  ,: new playlist   delete: Deletes things. As intended. :)")
 	default:
-		return somLogo
+		return dashboard
 	}
 
-	lines := strings.Split(somLogo, "\n")
+	lines := strings.Split(dashboard, "\n")
 	if len(lines) == 0 {
-		return somLogo
+		return dashboard
 	}
 
-	hintLine := 5
-	if hintLine >= len(lines) {
-		return somLogo
-	}
+	hintLine := len(lines) - 1
 
 	logoW := lipgloss.Width(lines[hintLine])
 	hintW := lipgloss.Width(hint)
@@ -528,10 +535,10 @@ func (a *App) renderSomRow(somLogo string) string {
 	if gap < 1 {
 		gap = 1
 	}
+
 	lines[hintLine] = lines[hintLine] + strings.Repeat(" ", gap) + hint
 	return strings.Join(lines, "\n")
 }
-
 func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
 	if a.playback.NowPlay == nil {
 		return lipgloss.NewStyle().

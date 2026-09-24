@@ -116,7 +116,7 @@ func (ip ImportPanel) ViewImportContent(w, h int) string {
 		if i == ip.cursor {
 			line := fmt.Sprintf("   [%s] %s", tick, f.Name)
 			b.WriteString("\n")
-			b.WriteString(LocalFileSelectedStyle.Width(innerW).Render(line))
+			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
 		} else {
 			line := fmt.Sprintf("   [%s] %s", tick, f.Name)
 			b.WriteString("\n")

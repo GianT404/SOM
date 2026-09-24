@@ -4,8 +4,8 @@ const hideLogoSettingKey = "hide_logo"
 
 func logoOption() settingOpt {
 	return settingOpt{
-		title: "Hide SOM logo",
-		desc:  "Hide the SOM banner at the top to free up its terminal rows for the current tab's content (like search or the playlist list).",
+		title: "Hide header",
+		desc:  "Hide the header banner at the top to free up its terminal rows for the current tab's content.",
 		on:    func(a *App) bool { return a.hideLogo },
 		apply: func(a *App, on bool) {
 			a.hideLogo = on

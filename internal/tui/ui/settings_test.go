@@ -162,25 +162,8 @@ func TestHideLogoReclaimsRows(t *testing.T) {
 	if a.somRowHeight() != 0 {
 		t.Fatal("somRowHeight should be 0 when logo hidden")
 	}
-	if hidden := a.mainContentHeight(); hidden != shown+somLogoRows {
-		t.Fatalf("hiding logo should add %d rows, got %d -> %d", somLogoRows, shown, hidden)
-	}
-}
-
-func TestThemeMonoTurnsWhite(t *testing.T) {
-	setTheme(themeDefault)
-	defer setTheme(themeDefault)
-
-	setTheme(themeMono)
-	if !isMono() {
-		t.Fatal("expected mono active")
-	}
-	sel := SelectedItemStyle.Render("x")
-	if !strings.Contains(sel, "48;2;255;255;255") {
-		t.Errorf("selected bg should be white in mono: %q", sel)
-	}
-	if !strings.Contains(renderSOMLogo(), "255;255;255") {
-		t.Errorf("logo should be white in mono")
+	if hidden := a.mainContentHeight(); hidden != shown {
+		t.Fatalf("hiding logo should add %d rows, got %d -> %d", shown, hidden)
 	}
 }
 

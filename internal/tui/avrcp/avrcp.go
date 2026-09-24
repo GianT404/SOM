@@ -76,7 +76,6 @@ func New() *Server {
 		return nil
 	}
 
-	log.Printf("[avrcp] MPRIS2 registered as %s", dbusDest)
 	return s
 }
 

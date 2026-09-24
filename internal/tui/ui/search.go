@@ -8,16 +8,13 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-func (p LeftPanel) ViewSearchContent(w, h int) string {
+func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 	innerW := w - 4
 
 	inputFocused := p.input.Focused()
 	searchBorder := themeCol("#7c7986")
-	contentBorder := themeCol("#7c7986")
 	if inputFocused {
 		searchBorder = themeCol("#e8593c")
-	} else {
-		contentBorder = themeCol("#e8593c")
 	}
 
 	inputRow := " " + p.input.View()
@@ -46,10 +43,13 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 
 		// Gọi hàm dùng chung
 		list := renderSharedTrackList(
-			innerW, p.tracks, p.searchCursor, p.searchOffset, p.visibleRows(),
-			func(t domain.Track) (string, string, string, int, bool) {
-				// Check xem bài này đã down chưa để trả về true/false cho showCheck
-				return t.Title, t.Artist, t.ID, t.Duration, p.isDownloaded(t)
+			innerW,
+			p.tracks,
+			p.searchCursor,
+			p.searchOffset,
+			p.visibleRows(),
+			func(i int, t domain.Track) (string, string, string, int, bool, bool, int) {
+				return t.Title, t.Artist, t.ID, t.Duration, p.isDownloaded(t), t.ID == playingID && playingID != "", i + 1
 			},
 			false, nil, nil,
 		)
@@ -63,12 +63,13 @@ func (p LeftPanel) ViewSearchContent(w, h int) string {
 	} else {
 		resultContent = DimItemStyle.Render(" No results.") + "\n"
 	}
-	resultsBox := renderBox(w, "", resultContent, contentBorder)
+
+	resultsPadded := lipgloss.NewStyle().PaddingLeft(2).Render(resultContent)
 
 	if suggestionBox != "" {
-		return searchBox + "\n" + suggestionBox + "\n" + resultsBox
+		return searchBox + "\n" + suggestionBox + "\n" + resultsPadded
 	}
-	return searchBox + "\n" + resultsBox
+	return searchBox + "\n" + resultsPadded
 }
 
 func (p LeftPanel) renderSuggestions(innerW int) string {
@@ -99,5 +100,5 @@ func (p LeftPanel) renderSuggestions(innerW int) string {
 		}
 		b.WriteString("\n")
 	}
-	return b.String()
+	return strings.TrimSuffix(b.String(), "\n")
 }

@@ -61,28 +61,8 @@ func (p LeftPanel) getFilteredPlaylistTracks() []storage.PlaylistTrack {
 	return filtered
 }
 
-func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
+func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 	innerW := w - 4
-	inputFocused := p.input.Focused()
-
-	searchBorder := themeCol("#7c7986")
-	contentBorder := themeCol("#7c7986")
-	if inputFocused {
-		searchBorder = themeCol("#e8593c")
-	} else {
-		contentBorder = themeCol("#e8593c")
-	}
-
-	var searchContent strings.Builder
-	inputRow := " " + p.input.View()
-	if p.loading {
-		inputRow += " " + p.spinner.View()
-	}
-	searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
-	if p.errMsg != "" {
-		searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
-	}
-	searchBox := renderBox(w, "Search", searchContent.String(), searchBorder)
 
 	var listContent string
 	var title string
@@ -90,18 +70,38 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int) string {
 	if p.activePlaylist != nil {
 		filtered := p.getFilteredPlaylistTracks()
 		title = fmt.Sprintf("Playlist: %s (%d)", p.activePlaylist.Name, len(filtered))
-		listContent = p.renderPlaylistDetail(innerW, filtered)
+		listContent = lipgloss.NewStyle().PaddingLeft(2).Render(p.renderPlaylistDetail(innerW, filtered, playingID))
 	} else {
 		filtered := p.getFilteredPlaylists()
 		title = fmt.Sprintf("Playlists (%d)", len(filtered))
-		listContent = p.renderPlaylistList(innerW, filtered)
+		listContent = lipgloss.NewStyle().PaddingLeft(2).Render(p.renderPlaylistList(innerW, filtered, playingID))
 	}
 
-	contentBox := renderBox(w, title, listContent, contentBorder)
-	return searchBox + "\n" + contentBox
+	if p.isSearchVisible() {
+		inputFocused := p.input.Focused()
+		searchBorder := themeCol("#7c7986")
+		if inputFocused {
+			searchBorder = themeCol("#e8593c")
+		}
+
+		var searchContent strings.Builder
+		inputRow := " " + p.input.View()
+		if p.loading {
+			inputRow += " " + p.spinner.View()
+		}
+		searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
+		if p.errMsg != "" {
+			searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
+		}
+
+		searchBox := renderBox(w, title, searchContent.String(), searchBorder)
+		return searchBox + "\n" + listContent
+	}
+
+	return listContent
 }
 
-func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist) string {
+func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist, playingId string) string {
 	if len(filtered) == 0 {
 		if p.input.Value() != "" {
 			return DimItemStyle.Render(" No matching playlists.")
@@ -118,29 +118,39 @@ func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist) s
 
 	idxW := 3
 	countW := 10
-	nameW := innerW - idxW - countW - 6
+
+	// spacing cố định: prefix(2) + "  "(2) + "  "(2) = 6
+	spacing := 6
+	nameW := innerW - idxW - countW - spacing
 	if nameW < 10 {
 		nameW = 10
 	}
 
-	header := fmt.Sprintf("  %*s  %-*s  %*s", idxW, "#", nameW, "Name", countW, "Tracks")
-	b.WriteString(DimItemStyle.Width(innerW).Render(header))
-	// Đã xóa ký tự b.WriteString("\n") thừa ở vị trí này
+	// Header
+	header := fmt.Sprintf("  %-*s  %-*s  %*s", idxW, "#", nameW, "Name", countW, "Tracks")
+
+	b.WriteString(DimItemStyle.Render(header))
+	b.WriteString("\n")
+
+	// Vẽ line
+	lineStyle := lipgloss.NewStyle().Foreground(themeCol("#7c7986"))
+	b.WriteString(lineStyle.Render(strings.Repeat("─", innerW)))
 
 	for i := p.plOffset; i < end; i++ {
 		pl := filtered[i]
-		mark := "  "
+
+		prefix := "  "
 		if i == p.plCursor {
-			mark = " "
+			prefix = " "
 		}
 
-		idx := fmt.Sprintf("%*d", idxW, i+1)
+		idx := fmt.Sprintf("%-*d", idxW, i+1)
 		name := runewidth.FillRight(truncate(pl.Name, nameW), nameW)
-		count := fmt.Sprintf("%*s", countW, fmt.Sprintf("%d songs", len(pl.Tracks)))
+		countStr := fmt.Sprintf("%d songs", len(pl.Tracks))
+		count := fmt.Sprintf("%*s", countW, countStr) // Ép lề phải
 
-		line := mark + idx + "  " + name + "  " + count
+		line := prefix + idx + "  " + name + "  " + count
 
-		// Ghi ký tự xuống dòng TRƯỚC khi vẽ item, để không bị dư 1 dòng rỗng ở cuối danh sách
 		b.WriteString("\n")
 		if i == p.plCursor {
 			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
@@ -151,8 +161,7 @@ func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist) s
 
 	return b.String()
 }
-
-func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistTrack) string {
+func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistTrack, playingID string) string {
 	if len(filtered) == 0 {
 		if len(p.activePlaylist.Tracks) == 0 {
 			return DimItemStyle.Render(" This playlist is empty. Press ':' on a track to move it here.")
@@ -161,11 +170,25 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 	}
 
 	return renderSharedTrackList(
-		innerW, filtered, p.plCursor, p.plOffset, p.visibleRows()+1,
-		func(t storage.PlaylistTrack) (string, string, string, int, bool) {
-			return t.Title, t.Artist, t.Path, t.Duration, false
+		innerW,
+		filtered,
+		p.plCursor,
+		p.plOffset,
+		p.visibleRows()+1,
+		func(i int, t storage.PlaylistTrack) (string, string, string, int, bool, bool, int) {
+			isPlaying := playingID != "" && (playingID == t.ID || playingID == "local:"+t.Path)
+
+			origIdx := i + 1
+			for j, pt := range p.activePlaylist.Tracks {
+				if pt.ID == t.ID {
+					origIdx = j + 1
+					break
+				}
+			}
+
+			return t.Title, t.Artist, t.Path, t.Duration, false, isPlaying, origIdx
 		},
-		false, nil, nil, // Playlists không có select mode
+		false, nil, nil,
 	)
 }
 

@@ -33,45 +33,39 @@ func (p *LeftPanel) scanLocalFiles() {
 		}
 	}
 }
-
-func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool) string {
+func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
 	innerW := w - 4
+	listContent := lipgloss.NewStyle().PaddingLeft(2).Render(p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID))
 
-	inputFocused := p.input.Focused()
-	searchBorder := themeCol("#7c7986")
-	contentBorder := themeCol("#7c7986")
-	if inputFocused {
-		searchBorder = themeCol("#e8593c")
-	} else {
-		contentBorder = themeCol("#e8593c")
+	if p.isSearchVisible() {
+		inputFocused := p.input.Focused()
+		searchBorder := themeCol("#7c7986")
+		if inputFocused {
+			searchBorder = themeCol("#e8593c")
+		}
+
+		var searchContent strings.Builder
+		inputRow := " " + p.input.View()
+		if p.loading {
+			inputRow += " " + p.spinner.View()
+		}
+		searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
+		if p.errMsg != "" {
+			searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
+		}
+
+		count := len(p.getFilteredLocals())
+		title := fmt.Sprintf("Search (%d)", count)
+		if selectMode {
+			title = fmt.Sprintf("Move to playlist (%d) -  %d", count, countSelected(selected))
+		}
+		searchBox := renderBox(w, title, searchContent.String(), searchBorder)
+
+		return searchBox + "\n" + listContent
 	}
 
-	// ─── Search box ───────────────────────────
-	var searchContent strings.Builder
-	inputRow := " " + p.input.View()
-	if p.loading {
-		inputRow += " " + p.spinner.View()
-	}
-	searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
-
-	if p.errMsg != "" {
-		searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
-	}
-
-	searchBox := renderBox(w, "Search", searchContent.String(), searchBorder)
-
-	// ─── Playlist box ─────────────────────────
-	count := len(p.getFilteredLocals())
-	listContent := p.renderLocalList(innerW, selected, selectMode, alreadyIn)
-	title := fmt.Sprintf("Playlist (%d)", count)
-	if selectMode {
-		title = fmt.Sprintf("Move to playlist (%d) -  %d", count, countSelected(selected))
-	}
-	playlistBox := renderBox(w, title, listContent, contentBorder)
-
-	return searchBox + "\n" + playlistBox
+	return listContent
 }
-
 func countSelected(m map[string]bool) int {
 	n := 0
 	for _, v := range m {
@@ -82,7 +76,7 @@ func countSelected(m map[string]bool) int {
 	return n
 }
 
-func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool) string {
+func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
 	locals := p.getFilteredLocals()
 	if len(locals) == 0 {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
@@ -92,9 +86,22 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 	}
 
 	return renderSharedTrackList(
-		innerW, locals, p.dlCursor, p.dlOffset, p.visibleRows()+1,
-		func(f LocalFile) (string, string, string, int, bool) {
-			return f.Name, f.Artist, f.Path, f.Duration, false
+		innerW,
+		locals,
+		p.dlCursor,
+		p.dlOffset,
+		p.visibleRows()+1,
+		func(i int, f LocalFile) (string, string, string, int, bool, bool, int) {
+			isPlaying := playingID == "local:"+f.Path
+			origIdx := i + 1
+			for j, lf := range p.locals {
+				if lf.Path == f.Path {
+					origIdx = j + 1
+					break
+				}
+			}
+
+			return f.Name, f.Artist, f.Path, f.Duration, false, isPlaying, origIdx
 		},
 		selectMode, selected, alreadyIn,
 	)
