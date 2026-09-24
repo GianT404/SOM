@@ -3,7 +3,6 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 
 	"som/internal/domain"
@@ -426,18 +425,13 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		v := a.player.Volume() + 0.05
 		a.player.SetVolume(v)
-		a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
 	case "-", "_":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
 		v := a.player.Volume() - 0.05
 		a.player.SetVolume(v)
-		if v <= 0.01 {
-			a.setStatus(StatusMsgStyle.Render("Volume: MUTE"))
-		} else {
-			a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("Volume: %d%%", int(math.Round(v*100)))))
-		}
+
 	case "?":
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break

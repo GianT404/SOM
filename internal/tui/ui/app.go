@@ -347,7 +347,7 @@ func (a *App) somRowHeight() int {
 
 func (a *App) mainContentHeight() int {
 	statusH := 0
-	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
+	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
 		statusH = 1
 	}
 	helpH := 0
@@ -431,7 +431,7 @@ func (a *App) View() tea.View {
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
 	status := ""
-	if a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second {
+	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
 		status = "  " + a.statusMsg
 	}
 
@@ -439,9 +439,9 @@ func (a *App) View() tea.View {
 	if a.playback.Random {
 		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
-	help := HelpStyle.Render("  tab:nav  enter:play  ]:next  [:prev ") +
+	help := HelpStyle.Render(" tab:nav  enter:play  ]:next  [:prev ") +
 		rStyle.Render("r") +
-		HelpStyle.Render(":random  d:download  space:pause  /:search  ?:help  esc:settings  alt + q:quit")
+		HelpStyle.Render(":random  space:pause  /:search  esc:settings  alt + q:quit")
 
 	progressBar := a.renderProgressBar(a.width)
 
@@ -494,30 +494,37 @@ func (a *App) View() tea.View {
 func (a *App) renderSomRow(dashboard string) string {
 	var hint string
 	switch a.sidebarActive {
+	case SideSearch:
+		if a.left.showPlInput {
+			return dashboard
+		}
+		hint = DimItemStyle.Render("d: download   ")
 	case SideLyrics:
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language ")
+		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language  ")
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
 		}
-		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan")
+		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan  ")
 	case SideDownloads:
-		if a.moveSession == nil {
-			return dashboard
+		if a.moveSession != nil {
+			plName := ""
+			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
+				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
+			}
+			hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
+		} else {
+			hint = DimItemStyle.Render("ctrl+p: pin/unpin  \\: visualizer  : Command  ")
 		}
-		plName := ""
-		if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
-			plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
-		}
-		hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = DimItemStyle.Render("enter: open  ,: new playlist   delete: Deletes things. As intended. :)")
+		hint = DimItemStyle.Render("enter: open  ,: new playlist   delete: its deletes :)  ")
+
 	default:
 		return dashboard
 	}
