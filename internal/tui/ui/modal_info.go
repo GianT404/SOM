@@ -32,14 +32,17 @@ func (m *InfoModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 
 func (m *InfoModal) View() string {
 	var b strings.Builder
+
 	name := m.target.Name
 	artist := m.target.Artist
 	if artist == "" {
 		artist = "-"
 	}
+
 	durStr := FormatDuration(m.target.Duration)
 	var sizeStr, bitrateStr string
 	var pathStr string
+
 	if fi, err := os.Stat(m.target.Path); err == nil {
 		sizeStr = formatBytes(fi.Size())
 		if m.target.Duration > 0 {
@@ -55,17 +58,17 @@ func (m *InfoModal) View() string {
 		pathStr = m.target.Path
 	}
 
-	b.WriteString("\n " + DimItemStyle.Render(" Title:") + LocalFileStyle.Render(" "+name))
-	b.WriteString("\n " + DimItemStyle.Render(" Artist:") + LocalFileStyle.Render(" "+artist))
-	b.WriteString("\n " + DimItemStyle.Render(" Duration: ") + LocalFileStyle.Render(durStr))
-	b.WriteString("\n " + DimItemStyle.Render(" Size: ") + LocalFileStyle.Render(sizeStr))
-	b.WriteString("\n " + DimItemStyle.Render(" Bitrate: ") + LocalFileStyle.Render(bitrateStr))
-	b.WriteString("\n " + DimItemStyle.Render(" Video ID: ") + LocalFileStyle.Render(" "+m.target.VideoID))
-	b.WriteString("\n " + DimItemStyle.Render(" Modified: ") + LocalFileStyle.Render(" "+formatDBTime(m.target.FileMTime)))
-	b.WriteString("\n " + DimItemStyle.Render(" Created: ") + LocalFileStyle.Render(" "+formatDBTime(m.target.CreatedAt)))
-	b.WriteString("\n " + DimItemStyle.Render(" Path: ") + LocalFileStyle.Render(pathStr))
+	b.WriteString("\n  " + styleHint("Title", name))
+	b.WriteString("\n  " + styleHint("Artist", artist))
+	b.WriteString("\n  " + styleHint("Duration", durStr))
+	b.WriteString("\n  " + styleHint("Size", sizeStr))
+	b.WriteString("\n  " + styleHint("Bitrate", bitrateStr))
+	b.WriteString("\n  " + styleHint("Video ID", m.target.VideoID))
+	b.WriteString("\n  " + styleHint("Modified", formatDBTime(m.target.FileMTime)))
+	b.WriteString("\n  " + styleHint("Created", formatDBTime(m.target.CreatedAt)))
+	b.WriteString("\n  " + styleHint("Path", pathStr))
+
 	b.WriteString("\n\n")
-	b.WriteString(DimItemStyle.Render(" (esc: close)"))
 
 	return renderBox(64, "File Info", b.String(), themeCol("#E8593C"))
 }
