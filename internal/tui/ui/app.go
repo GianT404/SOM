@@ -119,6 +119,12 @@ func (a *App) Init() tea.Cmd {
 	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
 }
 
+func styleHint(key, desc string) string {
+	k := lipgloss.NewStyle().Foreground(colorDark).Render(key + ":")
+	d := lipgloss.NewStyle().Foreground(colorWhite).Render(desc)
+	return k + d
+}
+
 func (a *App) selectedMoveCount() int {
 	n := 0
 	if a.moveSession != nil {
@@ -435,13 +441,22 @@ func (a *App) View() tea.View {
 		status = "  " + a.statusMsg
 	}
 
-	rStyle := HelpStyle
+	rKeyStyle := lipgloss.NewStyle().Foreground(colorDark)
 	if a.playback.Random {
-		rStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
+		rKeyStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	}
-	help := HelpStyle.Render(" tab:nav  enter:play  ]:next  [:prev ") +
-		rStyle.Render("r") +
-		HelpStyle.Render(":random  space:pause  /:search  esc:settings  alt + q:quit")
+
+	help := "  " +
+		styleHint("tab", "nav") + "  " +
+		styleHint("enter", "play") + "  " +
+		styleHint("]", "next") + "  " +
+		styleHint("[", "prev") + "  " +
+		rKeyStyle.Render("r:") + lipgloss.NewStyle().Foreground(colorWhite).Render("random") + "  " +
+		styleHint("space", "pause") + "  " +
+		styleHint("/", "search") + "  " +
+		styleHint("?", "help") + "  " +
+		styleHint("esc", "settings") + "  " +
+		styleHint("alt+q", "quit")
 
 	progressBar := a.renderProgressBar(a.width)
 
@@ -498,32 +513,32 @@ func (a *App) renderSomRow(dashboard string) string {
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = DimItemStyle.Render("d: download   ")
+		hint = styleHint("d", "download") + "  "
 	case SideLyrics:
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = DimItemStyle.Render("up/down: select  enter: seek  l: lyric language  ")
+		hint = styleHint("up/down", "select") + "  " + styleHint("enter", "seek") + "  " + styleHint("l", "lyric language") + "  "
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
 		}
-		hint = DimItemStyle.Render(".: select  enter: preview  i: import  r: rescan  ")
+		hint = styleHint(".", "select") + "  " + styleHint("enter", "preview") + "  " + styleHint("i", "import") + "  " + styleHint("r", "rescan") + "  "
 	case SideDownloads:
 		if a.moveSession != nil {
 			plName := ""
 			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
 				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
 			}
-			hint = DimItemStyle.Render(fmt.Sprintf(".: select  i: move to \"%s\" (%d)  +: already in playlist  esc: cancel", plName, a.selectedMoveCount()))
+			hint = styleHint(".", "select") + "  " + styleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + styleHint("+", "already in playlist") + "  " + styleHint("esc", "cancel")
 		} else {
-			hint = DimItemStyle.Render("ctrl+p: pin/unpin  \\: visualizer  : Command  ")
+			hint = styleHint("ctrl+p", "pin/unpin") + "  " + styleHint("\\", "visualizer") + "  " + styleHint(":", "Command") + "  "
 		}
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = DimItemStyle.Render("enter: open  ,: new playlist   delete: its deletes :)  ")
+		hint = styleHint("enter", "open") + "  " + styleHint(",", "new playlist") + "  " + styleHint("delete", "its deletes :)") + "  "
 
 	default:
 		return dashboard
