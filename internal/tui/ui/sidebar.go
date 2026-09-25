@@ -66,14 +66,20 @@ var (
 	sidebarNumStyle  = lipgloss.NewStyle().Foreground(colorAccent)
 )
 
-func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string {
+func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, borderHeight int) string {
 	var b strings.Builder
+	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
 
 	items := []SidebarItem{SideSearch, SideDownloads, SideImport, SideQueue, SidePlaylists, SideLyrics, SideLogs}
+
+	currentRow := 0
+
 	for i, item := range items {
 		if i > 0 {
 			b.WriteString("\n")
 		}
+		currentRow++
+
 		label := item.String()
 		padding := sidebarWidth - 4 - lipgloss.Width(label)
 		if padding < 0 {
@@ -84,7 +90,6 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string
 			b.WriteString(" ")
 			b.WriteString(sidebarActiveStyle.Render("| " + label))
 			b.WriteString(strings.Repeat(" ", padding+1))
-
 		default:
 			if gi := ghostIntensity(item, active, anim); gi > 0 {
 				b.WriteString("  ")
@@ -96,20 +101,34 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string
 				b.WriteString(strings.Repeat(" ", padding))
 			}
 		}
+
+		if currentRow <= borderHeight {
+			b.WriteString(borderStyle.Render("│"))
+		} else {
+			b.WriteString(" ")
+		}
 	}
 
 	remaining := height - len(items)
 	if remaining < 0 {
 		remaining = 0
 	}
+
 	for i := 0; i < remaining; i++ {
 		b.WriteString("\n")
+		currentRow++
+
 		b.WriteString(strings.Repeat(" ", sidebarWidth))
+
+		if currentRow <= borderHeight {
+			b.WriteString(borderStyle.Render("│"))
+		} else {
+			b.WriteString(" ")
+		}
 	}
 
 	return b.String()
 }
-
 func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
 	if !anim.on {
 		return 0

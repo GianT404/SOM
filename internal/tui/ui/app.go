@@ -372,24 +372,25 @@ func (a *App) View() tea.View {
 
 	contentH := a.mainContentHeight()
 	sideH := contentH
-	mainW := a.width - sidebarWidth
+	mainW := a.width - sidebarWidth - 1
 	frame := a.splashFrame
 	if mainW < 10 {
 		mainW = 10
 	}
-
+	var mainView string
 	dashboard := renderDashboard(a.hideLogo, a.player.Volume(), a.activeSpeed, a.activePreset, a.playback.NowPlay)
 	somRow := a.renderSomRow(dashboard)
 
-	sep := lipgloss.NewStyle().Foreground(colorBorder).Render(strings.Repeat("─", a.width))
-
-	// Hàng content bắt đầu (đã cộng logo + đường phân cách) — dùng cho con trỏ.
+	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
+	sepLeft := strings.Repeat("─", sidebarWidth)
+	sepRight := ""
+	if a.width > sidebarWidth+1 {
+		sepRight = strings.Repeat("─", a.width-sidebarWidth-1)
+	}
+	sep := borderStyle.Render(sepLeft + "┬" + sepRight)
 	contentTop := a.somRowHeight() + 1
 
-	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH)
-
 	inputNotFocused := !a.left.input.Focused()
-	var mainView string
 
 	playingID := ""
 	if a.playback.NowPlay != nil {
@@ -428,6 +429,13 @@ func (a *App) View() tea.View {
 	default:
 		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused, frame)
 	}
+
+	mainViewHeight := lipgloss.Height(mainView)
+	borderH := mainViewHeight
+	if borderH < 7 {
+		borderH = 7
+	}
+	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH, borderH)
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
 	status := ""
@@ -489,7 +497,7 @@ func (a *App) View() tea.View {
 
 	if a.left.input.Focused() {
 		if c := a.left.input.Cursor(); c != nil {
-			c.Position.X += sidebarWidth + 2 + 1
+			c.Position.X += sidebarWidth + 3
 			c.Position.Y = contentTop + 1
 			v.Cursor = c
 		}
@@ -744,7 +752,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 }
 
 func (a *App) resizePanels() {
-	mainW := a.width - sidebarWidth
+	mainW := a.width - sidebarWidth - 1
 	if mainW < 10 {
 		mainW = 10
 	}
