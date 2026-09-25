@@ -81,9 +81,10 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string
 		}
 		switch {
 		case item == active:
-			b.WriteString("  ")
+			b.WriteString(" ")
 			b.WriteString(sidebarActiveStyle.Render("| " + label))
-			b.WriteString(strings.Repeat(" ", padding))
+			b.WriteString(strings.Repeat(" ", padding+1))
+
 		default:
 			if gi := ghostIntensity(item, active, anim); gi > 0 {
 				b.WriteString("  ")
