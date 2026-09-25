@@ -448,7 +448,6 @@ func (a *App) View() tea.View {
 		rKeyStyle.Render("r:") + lipgloss.NewStyle().Foreground(colorWhite).Render("random") + "  " +
 		styleHint("space", "pause") + "  " +
 		styleHint("/", "search") + "  " +
-		styleHint("?", "help") + "  " +
 		styleHint("esc", "settings") + "  " +
 		styleHint("alt+q", "quit")
 
@@ -512,12 +511,12 @@ func (a *App) renderSomRow(dashboard string) string {
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = styleHint("up/down", "select") + "  " + styleHint("enter", "seek") + "  " + styleHint("l", "lyric language") + "  "
+		hint = styleHint("up/down", "select") + "  " + styleHint("l", "lyric language") + "  "
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
 		}
-		hint = styleHint(".", "select") + "  " + styleHint("enter", "preview") + "  " + styleHint("i", "import") + "  " + styleHint("r", "rescan") + "  "
+		hint = styleHint(".", "select") + "  " + styleHint("i", "import") + "  " + styleHint("r", "rescan") + "  "
 	case SideDownloads:
 		if a.moveSession != nil {
 			plName := ""
@@ -532,7 +531,7 @@ func (a *App) renderSomRow(dashboard string) string {
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = styleHint("enter", "open") + "  " + styleHint(",", "new playlist") + "  " + styleHint("delete", "its deletes :)") + "  "
+		hint = styleHint(",", "new playlist") + "  " + styleHint("delete", "its deletes :)") + "  "
 
 	default:
 		return dashboard
