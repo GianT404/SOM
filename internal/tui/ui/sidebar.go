@@ -22,7 +22,6 @@ const (
 )
 
 const sidebarWidth = 19
-
 const sidebarGhostDuration = 120 * time.Millisecond
 
 type sidebarAnimState struct {
@@ -33,37 +32,57 @@ type sidebarAnimState struct {
 	end   time.Time
 }
 
-func (s SidebarItem) String() string {
+func (s SidebarItem) Num() string {
 	switch s {
 	case SideSearch:
-		return sidebarNumStyle.Render("¹") + "Search"
+		return "¹ "
 	case SideDownloads:
-		return sidebarNumStyle.Render("²") + "Downloads"
+		return "² "
 	case SideImport:
-		return sidebarNumStyle.Render("³") + "Import"
+		return "³ "
 	case SideQueue:
-		return sidebarNumStyle.Render("⁴") + "Queue"
+		return "⁴ "
 	case SidePlaylists:
-		return sidebarNumStyle.Render("⁵") + "Playlists"
+		return "⁵ "
 	case SideLyrics:
-		return sidebarNumStyle.Render("⁶") + "Lyrics"
+		return "⁶ "
 	case SideLogs:
-		return sidebarNumStyle.Render("⁷") + "Logs"
+		return "⁷ "
 	default:
 		return ""
 	}
 }
 
+func (s SidebarItem) Title() string {
+	switch s {
+	case SideSearch:
+		return "Search"
+	case SideDownloads:
+		return "Downloads"
+	case SideImport:
+		return "Import"
+	case SideQueue:
+		return "Queue"
+	case SidePlaylists:
+		return "Playlists"
+	case SideLyrics:
+		return "Lyrics"
+	case SideLogs:
+		return "Logs"
+	default:
+		return ""
+	}
+}
+
+func (s SidebarItem) String() string {
+	return s.Num() + s.Title()
+}
+
 var (
-	sidebarActiveStyle = lipgloss.NewStyle().
-				Foreground(colorAccent).
-				Bold(true)
-
-	sidebarInactiveStyle = lipgloss.NewStyle().
-				Foreground(colorSubtle2)
-
-	ghostStrongStyle = lipgloss.NewStyle().Foreground(ghostStrong)
-	sidebarNumStyle  = lipgloss.NewStyle().Foreground(colorAccent)
+	sidebarActiveStyle   lipgloss.Style
+	sidebarInactiveStyle lipgloss.Style
+	ghostStrongStyle     lipgloss.Style
+	sidebarNumStyle      lipgloss.Style
 )
 
 func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, borderHeight int) string {
@@ -97,7 +116,9 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 				b.WriteString(strings.Repeat(" ", padding))
 			} else {
 				b.WriteString("  ")
-				b.WriteString(sidebarInactiveStyle.Render("  " + label))
+				b.WriteString(sidebarInactiveStyle.Render("  "))
+				b.WriteString(sidebarNumStyle.Render(item.Num()))
+				b.WriteString(sidebarInactiveStyle.Render(item.Title()))
 				b.WriteString(strings.Repeat(" ", padding))
 			}
 		}
@@ -129,6 +150,7 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 
 	return b.String()
 }
+
 func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
 	if !anim.on {
 		return 0

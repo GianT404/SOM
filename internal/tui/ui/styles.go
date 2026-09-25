@@ -77,8 +77,6 @@ func selFg() color.Color {
 	return lipgloss.Color("#ffffff")
 }
 
-// rebuildTheme gán màu gốc + dựng lại toàn bộ style package-level theo theme
-// hiện tại. Gọi lúc init và mỗi khi đổi theme (setTheme).
 func rebuildTheme() {
 	colorAccent = themeCol("#E8593C")
 	colorHighlight = themeCol("#87200d")
@@ -159,13 +157,16 @@ func rebuildTheme() {
 	ProgressDimStyle = lipgloss.NewStyle().
 		Foreground(colorWhite)
 
-	// Sidebar (khai báo ở sidebar.go).
+	// Sidebar
 	sidebarActiveStyle = lipgloss.NewStyle().
 		Foreground(colorAccent).
 		Bold(true)
+
 	sidebarInactiveStyle = lipgloss.NewStyle().
-		Foreground(colorSubtle2)
+		Foreground(colorDark)
+
 	ghostStrongStyle = lipgloss.NewStyle().Foreground(ghostStrong)
+	sidebarNumStyle = lipgloss.NewStyle().Foreground(colorAccent)
 }
 
 func init() {
@@ -263,6 +264,7 @@ func wordWrap(text string, maxW int) []string {
 	}
 	return lines
 }
+
 func styleHint(key, val string) string {
 	k := lipgloss.NewStyle().Foreground(colorDark).Bold(true).Render(key + ":")
 	v := lipgloss.NewStyle().Foreground(colorWhite).Render(val)
