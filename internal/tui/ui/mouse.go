@@ -332,8 +332,8 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	// Sidebar: đổi tab.
 	if m.X < sidebarWidth {
 		tabRow := m.Y - contentTop
-		if tabRow >= 0 && SidebarItem(tabRow) < sideCount {
-			return a.switchSidebar(SidebarItem(tabRow))
+		if item, ok := RowToSidebarItem(tabRow); ok {
+			return a.switchSidebar(item)
 		}
 		return nil
 	}

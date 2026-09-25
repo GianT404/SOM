@@ -432,9 +432,6 @@ func (a *App) View() tea.View {
 
 	mainViewHeight := lipgloss.Height(mainView)
 	borderH := mainViewHeight
-	if borderH < 7 {
-		borderH = 7
-	}
 	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH, borderH)
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 

@@ -12,10 +12,10 @@ type SidebarItem int
 
 const (
 	SideSearch SidebarItem = iota
-	SideDownloads
 	SideImport
-	SideQueue
+	SideDownloads
 	SidePlaylists
+	SideQueue
 	SideLyrics
 	SideLogs
 	sideCount
@@ -35,19 +35,19 @@ type sidebarAnimState struct {
 func (s SidebarItem) Num() string {
 	switch s {
 	case SideSearch:
-		return "¹ "
-	case SideDownloads:
-		return "² "
+		return "¹"
 	case SideImport:
-		return "³ "
-	case SideQueue:
-		return "⁴ "
+		return "²"
+	case SideDownloads:
+		return "³"
 	case SidePlaylists:
-		return "⁵ "
+		return "⁴"
+	case SideQueue:
+		return "⁵"
 	case SideLyrics:
-		return "⁶ "
+		return "⁶"
 	case SideLogs:
-		return "⁷ "
+		return "⁷"
 	default:
 		return ""
 	}
@@ -57,14 +57,14 @@ func (s SidebarItem) Title() string {
 	switch s {
 	case SideSearch:
 		return "Search"
-	case SideDownloads:
-		return "Downloads"
 	case SideImport:
 		return "Import"
-	case SideQueue:
-		return "Queue"
+	case SideDownloads:
+		return "Downloads"
 	case SidePlaylists:
 		return "Playlists"
+	case SideQueue:
+		return "Queue"
 	case SideLyrics:
 		return "Lyrics"
 	case SideLogs:
@@ -78,6 +78,27 @@ func (s SidebarItem) String() string {
 	return s.Num() + s.Title()
 }
 
+func RowToSidebarItem(row int) (SidebarItem, bool) {
+	switch row {
+	case 0:
+		return SideSearch, true
+	case 1:
+		return SideImport, true
+	case 3:
+		return SideDownloads, true
+	case 4:
+		return SidePlaylists, true
+	case 6:
+		return SideQueue, true
+	case 7:
+		return SideLyrics, true
+	case 8:
+		return SideLogs, true
+	default:
+		return 0, false
+	}
+}
+
 var (
 	sidebarActiveStyle   lipgloss.Style
 	sidebarInactiveStyle lipgloss.Style
@@ -89,14 +110,32 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 	var b strings.Builder
 	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
 
-	items := []SidebarItem{SideSearch, SideDownloads, SideImport, SideQueue, SidePlaylists, SideLyrics, SideLogs}
+	items := []SidebarItem{SideSearch, SideImport, SideDownloads, SidePlaylists, SideQueue, SideLyrics, SideLogs}
 
 	currentRow := 0
+
+	renderEmptyLine := func() {
+		currentRow++
+		if currentRow < height {
+			b.WriteString(strings.Repeat(" ", sidebarWidth))
+			b.WriteString(borderStyle.Render("│"))
+		} else if currentRow == height {
+			b.WriteString(borderStyle.Render(strings.Repeat("─", sidebarWidth) + "┘"))
+		} else {
+			b.WriteString(strings.Repeat(" ", sidebarWidth+1))
+		}
+	}
 
 	for i, item := range items {
 		if i > 0 {
 			b.WriteString("\n")
 		}
+
+		if item == SideDownloads || item == SideQueue {
+			renderEmptyLine()
+			b.WriteString("\n")
+		}
+
 		currentRow++
 
 		label := item.String()
@@ -104,6 +143,7 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 		if padding < 0 {
 			padding = 0
 		}
+
 		switch {
 		case item == active:
 			b.WriteString(" ")
@@ -123,34 +163,38 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 			}
 		}
 
-		if currentRow <= borderHeight {
+		if currentRow < height {
 			b.WriteString(borderStyle.Render("│"))
+		} else if currentRow == height {
+			b.WriteString(borderStyle.Render("┘"))
 		} else {
 			b.WriteString(" ")
 		}
 	}
 
-	remaining := height - len(items)
+	remaining := height - currentRow
 	if remaining < 0 {
 		remaining = 0
 	}
 
+	// Kéo dài viền xuống tận đáy
 	for i := 0; i < remaining; i++ {
 		b.WriteString("\n")
 		currentRow++
 
-		b.WriteString(strings.Repeat(" ", sidebarWidth))
-
-		if currentRow <= borderHeight {
+		if currentRow < height {
+			// Kéo thẳng viền dọc xuống
+			b.WriteString(strings.Repeat(" ", sidebarWidth))
 			b.WriteString(borderStyle.Render("│"))
+		} else if currentRow == height {
+			b.WriteString(borderStyle.Render(strings.Repeat("─", sidebarWidth) + "┘"))
 		} else {
-			b.WriteString(" ")
+			b.WriteString(strings.Repeat(" ", sidebarWidth+1))
 		}
 	}
 
 	return b.String()
 }
-
 func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
 	if !anim.on {
 		return 0
