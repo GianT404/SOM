@@ -68,8 +68,6 @@ var helpSections = []helpSection{
 
 func renderHelpSection(sec helpSection, keyWidth int, maxDesc int) string {
 	headerStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	keyStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	descStyle := lipgloss.NewStyle().Foreground(colorWhite)
 	dividerStyle := lipgloss.NewStyle().Foreground(colorBorder)
 
 	var b strings.Builder
@@ -81,8 +79,10 @@ func renderHelpSection(sec helpSection, keyWidth int, maxDesc int) string {
 		if maxDesc > 0 {
 			desc = truncateRunes(desc, maxDesc)
 		}
+
 		key := fmt.Sprintf("%*s", keyWidth, bind[0])
-		line := keyStyle.Render(key) + descStyle.Render("  "+desc)
+		line := styleHint(key, desc)
+
 		if i > 0 {
 			b.WriteString("\n")
 		}
@@ -133,13 +133,8 @@ func truncateBodyHeight(body string, maxLines int) (string, int) {
 	return strings.Join(lines, "\n"), len(lines)
 }
 
-const helpGapW = 4 // khoảng cách ngang giữa 2 section trên cùng 1 hàng
+const helpGapW = 4
 
-// flowHelpLayout xếp từng section như flexbox "flex-wrap": trái→phải theo
-// đúng thứ tự khai báo trong helpSections, hết chỗ ngang (availW) thì tự
-// xuống hàng mới. Không có khái niệm "cột cố định" hay ghép 2 section
-// chung 1 cột — nên thêm section/flag mới sau này tự động chạy đúng, khỏi
-// phải sửa lại helpMaxColumns hay logic chia cột nào cả.
 func flowHelpLayout(availW int, maxDesc int) (body string, w int, h int) {
 	type block struct {
 		text string
