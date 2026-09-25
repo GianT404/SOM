@@ -68,7 +68,7 @@ func (m *InfoModal) View() string {
 	b.WriteString("\n  " + styleHint("Created", formatDBTime(m.target.CreatedAt)))
 	b.WriteString("\n  " + styleHint("Path", pathStr))
 
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	return renderBox(64, "File Info", b.String(), themeCol("#E8593C"))
 }

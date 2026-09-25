@@ -116,8 +116,6 @@ func (m *CmdMenuModal) View() string {
 			b.WriteString(NormalItemStyle.Render(line) + "\n")
 		}
 	}
-	b.WriteString("\n")
-	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: close)"))
 	return renderBox(40, "Commands", b.String(), themeCol("#e8593c"))
 }
 

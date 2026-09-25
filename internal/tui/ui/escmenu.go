@@ -65,8 +65,7 @@ func (m *EscMenuModal) View() string {
 			lines = append(lines, NormalItemStyle.Render(line+strings.Repeat(" ", pad)))
 		}
 	}
-	body := "\n" + strings.Join(lines, "\n") + "\n"
-	footer := DimItemStyle.Render(" (enter: select  | esc: close)")
-	content := body + "\n" + footer
+	body := "\n" + strings.Join(lines, "\n")
+	content := body + "\n"
 	return renderBox(boxW, "Menu", content, colorAccent)
 }
