@@ -14,7 +14,7 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 		return ""
 	}
 
-	sep := StatusOKStyle.Render("  |  ")
+	sep := StatusOKStyle.Render("  ")
 
 	var parts []string
 
