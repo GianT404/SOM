@@ -36,19 +36,19 @@ type sidebarAnimState struct {
 func (s SidebarItem) String() string {
 	switch s {
 	case SideSearch:
-		return "[1] SEARCH"
+		return sidebarNumStyle.Render("¹") + "Search"
 	case SideDownloads:
-		return "[2] DOWNLOADS"
+		return sidebarNumStyle.Render("²") + "Downloads"
 	case SideImport:
-		return "[3] IMPORT"
+		return sidebarNumStyle.Render("³") + "Import"
 	case SideQueue:
-		return "[4] QUEUE"
+		return sidebarNumStyle.Render("⁴") + "Queue"
 	case SidePlaylists:
-		return "[5] PLAYLISTS"
+		return sidebarNumStyle.Render("⁵") + "Playlists"
 	case SideLyrics:
-		return "[6] LYRICS"
+		return sidebarNumStyle.Render("⁶") + "Lyrics"
 	case SideLogs:
-		return "[7] LOGS"
+		return sidebarNumStyle.Render("⁷") + "Logs"
 	default:
 		return ""
 	}
@@ -63,6 +63,7 @@ var (
 				Foreground(colorSubtle2)
 
 	ghostStrongStyle = lipgloss.NewStyle().Foreground(ghostStrong)
+	sidebarNumStyle  = lipgloss.NewStyle().Foreground(colorAccent)
 )
 
 func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string {
@@ -74,13 +75,12 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int) string
 			b.WriteString("\n")
 		}
 		label := item.String()
-		padding := sidebarWidth - 4 - len(label)
+		padding := sidebarWidth - 4 - lipgloss.Width(label)
 		if padding < 0 {
 			padding = 0
 		}
 		switch {
 		case item == active:
-			// Con trỏ chính: hiện ngay ở tab mới.
 			b.WriteString("  ")
 			b.WriteString(sidebarActiveStyle.Render("| " + label))
 			b.WriteString(strings.Repeat(" ", padding))
