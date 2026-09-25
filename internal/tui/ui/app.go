@@ -119,12 +119,6 @@ func (a *App) Init() tea.Cmd {
 	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
 }
 
-func styleHint(key, desc string) string {
-	k := lipgloss.NewStyle().Foreground(colorDark).Render(key + ":")
-	d := lipgloss.NewStyle().Foreground(colorWhite).Render(desc)
-	return k + d
-}
-
 func (a *App) selectedMoveCount() int {
 	n := 0
 	if a.moveSession != nil {

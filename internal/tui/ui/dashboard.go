@@ -20,21 +20,21 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 
 	// 1. Volume
 	volPercent := int(math.Round(vol * 100))
-	parts = append(parts, LocalFileStyle.Render("VOL:")+" "+StatusOKStyle.Render(fmt.Sprintf("%d%%", volPercent)))
+	parts = append(parts, styleHint("VOL", fmt.Sprintf("%d%%", volPercent)))
 
 	// 2. Speed
 	speedLabel := "1.0x"
 	if speedIdx >= 0 && speedIdx < len(playbackSpeeds) {
 		speedLabel = playbackSpeeds[speedIdx].Label
 	}
-	parts = append(parts, LocalFileStyle.Render("SPD:")+" "+StatusOKStyle.Render(speedLabel))
+	parts = append(parts, styleHint("SPD", speedLabel))
 
 	// 3. Audio Setting (Preset)
 	presetName := "Normal"
 	if presetIdx >= 0 && presetIdx < len(audioPresets) {
 		presetName = audioPresets[presetIdx].Name
 	}
-	parts = append(parts, LocalFileStyle.Render("EQ:")+" "+StatusOKStyle.Render(presetName))
+	parts = append(parts, styleHint("EQ", presetName))
 
 	// 4. Bitrate
 	bitrateStr := "___ kbps"
@@ -49,9 +49,6 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 			bitrateStr = "Stream"
 		}
 	}
-	parts = append(parts, LocalFileStyle.Render("BR:")+" "+StatusOKStyle.Render(bitrateStr))
-
-	dashboardText := strings.Join(parts, sep)
-
-	return "  " + dashboardText
+	parts = append(parts, styleHint("BR", bitrateStr))
+	return "  " + strings.Join(parts, sep)
 }

@@ -263,3 +263,8 @@ func wordWrap(text string, maxW int) []string {
 	}
 	return lines
 }
+func styleHint(key, val string) string {
+	k := lipgloss.NewStyle().Foreground(colorDark).Bold(true).Render(key + ":")
+	v := lipgloss.NewStyle().Foreground(colorWhite).Render(val)
+	return k + " " + v
+}
