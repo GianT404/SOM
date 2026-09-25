@@ -184,19 +184,6 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		pm.Random = !pm.Random
 		pm.ShuffleHist = nil
 		pm.History = nil
-		if pm.NowPlay != nil {
-			// Báo cho UI biết để cập nhật biểu tượng Random [r]
-			cmds = append(cmds, func() tea.Msg {
-				return TrackChangedMsg{
-					Track:       *pm.NowPlay,
-					IsLocal:     strings.HasPrefix(pm.NowPlay.ID, "local:"),
-					Gen:         pm.PlayerGen,
-					PlaylistPos: pm.CurrentIdx,
-					PlaylistLen: len(pm.Playlist),
-					IsRandom:    pm.Random,
-				}
-			})
-		}
 
 	case PlayQueueMsg:
 		if msg.Index >= 0 && msg.Index < len(pm.Queue) {

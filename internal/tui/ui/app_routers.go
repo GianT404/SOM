@@ -406,6 +406,9 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.left.input.Focused() || a.left.plInput.Focused() {
 			break
 		}
+		if a.sidebarActive == SideImport {
+			break
+		}
 		cmds = append(cmds, func() tea.Msg { return ToggleRandomMsg{} })
 	case "up":
 		if a.sidebarActive == SideLogs {
