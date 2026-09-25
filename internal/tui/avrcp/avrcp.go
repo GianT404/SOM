@@ -33,7 +33,6 @@ func New() *Server {
 		return nil
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		log.Printf("[avrcp] D-Bus name %s already taken", dbusDest)
 		conn.Close()
 		return nil
 	}
