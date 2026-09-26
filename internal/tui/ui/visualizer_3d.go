@@ -73,7 +73,7 @@ func draw3DLine(dots, zBuffer [][]float64, x0, y0, z0, x1, y1, z1, cx, cy float6
 
 type vec3 struct{ x, y, z float64 }
 
-func (m CommandPalette) Render3DVisualizer() string {
+func (m CommandPalette) Render3DVisualizer(subAppW, subAppH int) string {
 	if m.width < 10 || m.height < 5 {
 		return DimItemStyle.Render("")
 	}

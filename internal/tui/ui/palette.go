@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"log"
 	"math"
 	"math/rand"
 	"strings"
@@ -57,33 +56,28 @@ type CommandPalette struct {
 }
 
 func NewCommandPalette() CommandPalette {
-	return CommandPalette{
-		capture: audio.New(),
-		amps:    make([]float64, paletteVisBands),
+	cp := CommandPalette{
+		capture:  audio.New(),
+		amps:     make([]float64, paletteVisBands),
+		peaks:    make([]float64, paletteVisBands),
+		peakHold: make([]int, paletteVisBands),
 	}
+	if err := cp.capture.Start(paletteVisBands); err == nil {
+		cp.captureOK = true
+	} else {
+		cp.captureOK = false
+	}
+	return cp
 }
 
 func (m *CommandPalette) Open() tea.Cmd {
 	m.visible = true
-	m.amps = make([]float64, paletteVisBands)
-	m.peaks = make([]float64, paletteVisBands)
-	m.peakHold = make([]int, paletteVisBands)
-	m.phase = 0
-
-	if err := m.capture.Start(paletteVisBands); err == nil {
-		m.captureOK = true
-	} else {
-		m.captureOK = false
-		log.Printf("visualizer: capture unavailable: %v", err)
-	}
 
 	return visTick()
 }
 
 func (m *CommandPalette) Close() {
 	m.visible = false
-	m.capture.Stop()
-	m.captureOK = false
 }
 
 func (m CommandPalette) Visible() bool { return m.visible }
@@ -94,9 +88,6 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		m.height = msg.Height
 	}
 
-	if !m.visible {
-		return m, nil
-	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "l", "L":
@@ -151,9 +142,9 @@ func (m CommandPalette) View() string {
 	}
 
 	if m.is3D {
-		return m.Render3DVisualizer()
+		return m.Render3DVisualizer(m.width, m.height)
 	} else {
-		return m.renderVisualizer()
+		return m.RenderVisualizer(m.width, m.height)
 	}
 }
 
@@ -162,14 +153,13 @@ var brailleBit = [2][4]uint8{
 	{3, 4, 5, 7},
 }
 
-func (m CommandPalette) renderVisualizer() string {
+func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
-	if m.width < 10 || m.height < 5 {
+	if subAppW < 10 || subAppH < 5 {
 		return DimItemStyle.Render("")
 	}
-
-	subW := m.width * 2
-	subH := m.height * 4
+	subW := subAppW * 2
+	subH := subAppH * 4
 
 	dots := make([][]float64, subW)
 	for i := range dots {
@@ -364,8 +354,8 @@ func (m CommandPalette) renderVisualizer() string {
 	}
 
 	var out strings.Builder
-	for row := 0; row < m.height; row++ {
-		for col := 0; col < m.width; col++ {
+	for row := 0; row < subAppH; row++ {
+		for col := 0; col < subAppW; col++ {
 			var mask uint8
 			any := false
 			sumR := 0.0
@@ -428,10 +418,34 @@ func (m CommandPalette) renderVisualizer() string {
 				out.WriteByte(' ')
 			}
 		}
-		if row < m.height-1 {
+		if row < subAppH-1 {
 			out.WriteByte('\n')
 		}
 	}
 
 	return out.String()
+}
+
+func (m *CommandPalette) Resume() tea.Cmd {
+	if m.captureOK {
+		return nil
+	}
+	if err := m.capture.Start(paletteVisBands); err == nil {
+		m.captureOK = true
+		return visTick()
+	}
+	return nil
+}
+
+func (m *CommandPalette) Pause() {
+	if !m.captureOK {
+		return
+	}
+	m.capture.Stop()
+	m.captureOK = false
+	for i := range m.amps {
+		m.amps[i] = 0
+		m.peaks[i] = 0
+		m.peakHold[i] = 0
+	}
 }

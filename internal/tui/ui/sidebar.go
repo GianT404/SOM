@@ -21,7 +21,7 @@ const (
 	sideCount
 )
 
-const sidebarWidth = 19
+const sidebarWidth = 14
 const sidebarGhostDuration = 120 * time.Millisecond
 
 type sidebarAnimState struct {

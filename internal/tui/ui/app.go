@@ -53,17 +53,17 @@ type MoveSession struct {
 }
 
 type App struct {
-	provider    domain.MusicProvider
-	downloadDir string
-	player      *player.Player
-	playback    *PlaybackManager
-	width       int
-	height      int
-	left        LeftPanel
-	right       RightPanel
-	statusMsg   string
-	statusAt    time.Time
-
+	provider      domain.MusicProvider
+	downloadDir   string
+	player        *player.Player
+	playback      *PlaybackManager
+	width         int
+	height        int
+	left          LeftPanel
+	right         RightPanel
+	statusMsg     string
+	statusAt      time.Time
+	sessionStart  time.Time
 	sidebarActive SidebarItem
 	sidebarAnim   sidebarAnimState
 	logOffset     int
@@ -116,7 +116,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 }
 
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
+	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir), visTick())
 }
 
 func (a *App) selectedMoveCount() int {
@@ -692,60 +692,65 @@ func (a *App) renderProgressBar(w int) string {
 func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	oldTab := a.sidebarActive
 	if oldTab != item {
-		// Giữ value input riêng cho từng tab.
 		saveInputForTab(&a.left, oldTab)
-	}
-	a.sidebarActive = item
-	a.left.activeTab = item
-	loadInputForTab(&a.left, item)
+		a.sidebarActive = item
+		a.left.activeTab = item
+		loadInputForTab(&a.left, item)
 
-	var cmds []tea.Cmd
+		var cmds []tea.Cmd
 
-	if item == SideSearch {
-		a.left.searchOnEnter = true
-		if len(a.left.tracks) > 0 {
-			// Đã có kết quả hiển thị  focus thẳng vào list kết quả
-			a.left.input.Blur()
+		//  LOGIC MỚI: QUẢN LÝ CPU
+		if item == SideDownloads || item == SidePlaylists {
+			cmds = append(cmds, a.palette.Resume())
+		} else if !a.palette.Visible() {
+			a.palette.Pause()
+		}
+		if item == SideSearch {
+			a.left.searchOnEnter = true
+			if len(a.left.tracks) > 0 {
+				a.left.input.Blur()
+				a.left.suggestions = nil
+				a.left.suggestCursor = 0
+				a.left.suggestOffset = 0
+				a.left.suggestFocus = false
+			} else {
+				cmds = append(cmds, a.left.input.Focus())
+			}
+		} else {
+			a.left.searchOnEnter = false
 			a.left.suggestions = nil
 			a.left.suggestCursor = 0
 			a.left.suggestOffset = 0
 			a.left.suggestFocus = false
-		} else {
-			cmds = append(cmds, a.left.input.Focus())
 		}
-	} else {
-		a.left.searchOnEnter = false
-		a.left.suggestions = nil
-		a.left.suggestCursor = 0
-		a.left.suggestOffset = 0
-		a.left.suggestFocus = false
-	}
 
-	if item == SideDownloads && oldTab != SideDownloads {
-		cmds = append(cmds, animTick())
-	}
-
-	if item == SideImport && oldTab != SideImport {
-		a.importPanel.ScanImportDirs(a.downloadDir, a.left.plStore)
-		a.importPanel.cursor = 0
-		a.importPanel.offset = 0
-	}
-
-	if item != oldTab {
-		a.sidebarAnim = sidebarAnimState{
-			on:    true,
-			from:  oldTab,
-			to:    item,
-			start: time.Now(),
-			end:   time.Now().Add(sidebarGhostDuration),
+		if item == SideDownloads && oldTab != SideDownloads {
+			cmds = append(cmds, animTick())
 		}
-		cmds = append(cmds, sidebarAnimTick())
-	}
 
-	if len(cmds) == 0 {
-		return nil
+		if item == SideImport && oldTab != SideImport {
+			a.importPanel.ScanImportDirs(a.downloadDir, a.left.plStore)
+			a.importPanel.cursor = 0
+			a.importPanel.offset = 0
+		}
+
+		if item != oldTab {
+			a.sidebarAnim = sidebarAnimState{
+				on:    true,
+				from:  oldTab,
+				to:    item,
+				start: time.Now(),
+				end:   time.Now().Add(sidebarGhostDuration),
+			}
+			cmds = append(cmds, sidebarAnimTick())
+		}
+
+		if len(cmds) == 0 {
+			return nil
+		}
+		return tea.Batch(cmds...)
 	}
-	return tea.Batch(cmds...)
+	return nil
 }
 
 func (a *App) resizePanels() {

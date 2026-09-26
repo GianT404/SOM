@@ -321,3 +321,11 @@ func (r *RightPanel) GetLyricIndexAt(innerW, targetY int) int {
 	}
 	return -1
 }
+
+// Lấy dòng lyric đang hát để ném sang Cột 3
+func (r *RightPanel) GetCurrentLyricLine() string {
+	if !r.loaded || len(r.lyrics.Synced) == 0 || r.curLine < 0 || r.curLine >= len(r.lyrics.Synced) {
+		return ""
+	}
+	return r.lyrics.Synced[r.curLine].Text
+}
