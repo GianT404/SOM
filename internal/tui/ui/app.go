@@ -406,7 +406,7 @@ func (a *App) View() tea.View {
 	if a.width > sidebarWidth+1 {
 		sepRight = strings.Repeat("─", a.width-sidebarWidth-1)
 	}
-	sep := borderStyle.Render(sepLeft + "┬" + sepRight)
+	sep := borderStyle.Render(sepLeft + "─" + sepRight)
 	contentTop := a.somRowHeight() + 1
 
 	inputNotFocused := !a.left.input.Focused()
@@ -447,7 +447,6 @@ func (a *App) View() tea.View {
 		col3View := a.renderThirdColumn(col3W, contentH)
 		sep := borderStyle.Render("│")
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, sep, col3View)
-		mainView = a.left.ViewDownloadsContent(mainW, contentH, selected, selectMode, alreadyInMove, playingID)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -466,7 +465,7 @@ func (a *App) View() tea.View {
 
 	mainViewHeight := lipgloss.Height(mainView)
 	borderH := mainViewHeight
-	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH, borderH)
+	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH-1, borderH)
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
 	status := ""

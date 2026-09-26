@@ -107,93 +107,66 @@ var (
 )
 
 func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, borderHeight int) string {
-	var b strings.Builder
-	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
+	var lines []string
+	innerW := sidebarWidth - 4
+	if innerW < 1 {
+		innerW = 1
+	}
 
 	items := []SidebarItem{SideSearch, SideImport, SideDownloads, SidePlaylists, SideQueue, SideLyrics, SideLogs}
 
-	currentRow := 0
-
-	renderEmptyLine := func() {
-		currentRow++
-		if currentRow < height {
-			b.WriteString(strings.Repeat(" ", sidebarWidth))
-			b.WriteString(borderStyle.Render("│"))
-		} else if currentRow == height {
-			b.WriteString(borderStyle.Render(strings.Repeat("─", sidebarWidth) + "┘"))
-		} else {
-			b.WriteString(strings.Repeat(" ", sidebarWidth+1))
-		}
-	}
-
 	for i, item := range items {
-		if i > 0 {
-			b.WriteString("\n")
+		if i > 0 && (item == SideDownloads || item == SideQueue) {
+			lines = append(lines, "")
 		}
-
-		if item == SideDownloads || item == SideQueue {
-			renderEmptyLine()
-			b.WriteString("\n")
-		}
-
-		currentRow++
 
 		label := item.String()
-		padding := sidebarWidth - 4 - lipgloss.Width(label)
-		if padding < 0 {
-			padding = 0
+
+		// Cắt bớt chữ nếu quá dài
+		if lipgloss.Width(label) > innerW {
+			runes := []rune(label)
+			label = string(runes[:innerW])
+		}
+
+		pad := innerW - lipgloss.Width(label)
+		if pad < 0 {
+			pad = 0
 		}
 
 		switch {
 		case item == active:
-			b.WriteString(" ")
-			b.WriteString(sidebarActiveStyle.Render("| " + label))
-			b.WriteString(strings.Repeat(" ", padding+1))
+			lines = append(lines, sidebarActiveStyle.Render(label+strings.Repeat(" ", pad)))
 		default:
 			if gi := ghostIntensity(item, active, anim); gi > 0 {
-				b.WriteString("  ")
-				b.WriteString(ghostStyle(gi).Render("| " + label))
-				b.WriteString(strings.Repeat(" ", padding))
+				lines = append(lines, ghostStyle(gi).Render(label+strings.Repeat(" ", pad)))
 			} else {
-				b.WriteString("  ")
-				b.WriteString(sidebarInactiveStyle.Render("  "))
-				b.WriteString(sidebarNumStyle.Render(item.Num()))
-				b.WriteString(sidebarInactiveStyle.Render(item.Title()))
-				b.WriteString(strings.Repeat(" ", padding))
+				num := item.Num()
+				title := item.Title()
+
+				if lipgloss.Width(num)+lipgloss.Width(title) > innerW {
+					runes := []rune(title)
+					title = string(runes[:innerW-lipgloss.Width(num)])
+				}
+
+				var b strings.Builder
+				b.WriteString(sidebarNumStyle.Render(num))
+				b.WriteString(sidebarInactiveStyle.Render(title))
+				if pad > 0 {
+					b.WriteString(strings.Repeat(" ", pad))
+				}
+				lines = append(lines, b.String())
 			}
 		}
-
-		if currentRow < height {
-			b.WriteString(borderStyle.Render("│"))
-		} else if currentRow == height {
-			b.WriteString(borderStyle.Render("┘"))
-		} else {
-			b.WriteString(" ")
-		}
 	}
 
-	remaining := height - currentRow
-	if remaining < 0 {
-		remaining = 0
+	// Bơm thêm các dòng trắng để chiều cao Box khớp với Panel bên cạnh
+	targetH := height - 2
+	for len(lines) < targetH {
+		lines = append(lines, "")
 	}
 
-	// Kéo dài viền xuống tận đáy
-	for i := 0; i < remaining; i++ {
-		b.WriteString("\n")
-		currentRow++
-
-		if currentRow < height {
-			// Kéo thẳng viền dọc xuống
-			b.WriteString(strings.Repeat(" ", sidebarWidth))
-			b.WriteString(borderStyle.Render("│"))
-		} else if currentRow == height {
-			b.WriteString(borderStyle.Render(strings.Repeat("─", sidebarWidth) + "┘"))
-		} else {
-			b.WriteString(strings.Repeat(" ", sidebarWidth+1))
-		}
-	}
-
-	return b.String()
+	contentStr := strings.Join(lines, "\n")
+	return renderBox(sidebarWidth, "Menu", contentStr, themeCol("#7c7986"))
 }
 func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
 	if !anim.on {
