@@ -135,13 +135,9 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 
 		switch {
 		case item == active:
-			// Match the track-list selection affordance: the active item shifts
-			// one cell to the left without changing the sidebar row width.
-			activeLabel := label
-			if len(activeLabel) > 0 {
-				activeLabel = activeLabel[1:]
-			}
-			lines = append(lines, " "+sidebarActiveStyle.Render(activeLabel+strings.Repeat(" ", pad)))
+			// Match the track-list selection affordance: inactive rows reserve
+			// one leading cell, while the active row uses that cell.
+			lines = append(lines, sidebarActiveStyle.Render(label+strings.Repeat(" ", pad)))
 		default:
 			if gi := ghostIntensity(item, active, anim); gi > 0 {
 				lines = append(lines, ghostStyle(gi).Render(label+strings.Repeat(" ", pad)))
@@ -155,6 +151,7 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 				}
 
 				var b strings.Builder
+				b.WriteString(" ")
 				b.WriteString(sidebarNumStyle.Render(num))
 				b.WriteString(sidebarInactiveStyle.Render(title))
 				if pad > 0 {
