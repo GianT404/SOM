@@ -68,7 +68,6 @@ const suggestMaxShow = 5
 func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 	ti := textinput.New()
 	ti.CharLimit = 120
-	ti.SetVirtualCursor(false)
 	ti.Focus()
 
 	sp := spinner.New()
