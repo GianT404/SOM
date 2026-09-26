@@ -341,6 +341,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.handleImportKeys(km)...)
 		}
 	}
+
+	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
 
 	var paletteCmd tea.Cmd
@@ -443,8 +445,7 @@ func (a *App) View() tea.View {
 		}
 		tracklistView := a.left.ViewDownloadsContent(tracklistW, contentH, selected, selectMode, alreadyInMove, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		sep := borderStyle.Render("│")
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, sep, col3View)
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -453,8 +454,7 @@ func (a *App) View() tea.View {
 	case SidePlaylists:
 		tracklistView := a.left.ViewPlaylistsContent(tracklistW, contentH, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		sep := borderStyle.Render("│")
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, sep, col3View)
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
