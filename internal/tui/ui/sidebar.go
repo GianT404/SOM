@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"math"
 	"strings"
 	"time"
@@ -169,7 +170,7 @@ func renderSidebar(active SidebarItem, anim sidebarAnimState, height int, border
 	}
 
 	contentStr := strings.Join(lines, "\n")
-	return renderBox(sidebarWidth, "Menu", contentStr, themeCol("#7c7986"))
+	return renderSidebarBox(sidebarWidth, "Menu", contentStr, themeCol("#7c7986"))
 }
 func ghostIntensity(item SidebarItem, active SidebarItem, anim sidebarAnimState) float64 {
 	if !anim.on {
@@ -220,4 +221,30 @@ func ghostStyle(gi float64) lipgloss.Style {
 		return ghostStrongStyle
 	}
 	return lipgloss.NewStyle().Foreground(ghostStrong).Faint(true)
+}
+
+func renderSidebarBox(w int, title string, content string, borderColor color.Color) string {
+	box := renderBox(w, "", content, borderColor)
+
+	lines := strings.Split(box, "\n")
+	if len(lines) == 0 {
+		return box
+	}
+
+	borderChar := lipgloss.NewStyle().Foreground(borderColor)
+	titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
+
+	titleW := lipgloss.Width(titleRendered)
+	remain := w - 2 - titleW
+
+	if remain < 0 {
+		remain = 0
+	}
+
+	lines[0] =
+		borderChar.Render("╭─") +
+			titleRendered +
+			borderChar.Render(strings.Repeat("─", remain)+"╮")
+
+	return strings.Join(lines, "\n")
 }
