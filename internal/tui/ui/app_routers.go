@@ -311,7 +311,7 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 			a.moveSession = nil
 			a.setStatus(StatusMsgStyle.Render("> No changes to playlist"))
 		} else if a.palette.Visible() {
-			a.palette.Close()
+			a.palette = a.palette.Close(a.sidebarActive)
 		} else if !a.left.input.Focused() && !a.left.plInput.Focused() && !a.left.showDeletePopup && !a.left.showPlInput {
 			if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
 			} else {
@@ -346,9 +346,11 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 			break
 		}
 		if a.palette.Visible() {
-			a.palette.Close()
+			a.palette = a.palette.Close(a.sidebarActive)
 		} else {
-			cmds = append(cmds, a.palette.Open())
+			var cmd tea.Cmd
+			a.palette, cmd = a.palette.Open()
+			cmds = append(cmds, cmd)
 		}
 	case ":":
 		if a.left.input.Focused() || a.left.plInput.Focused() {

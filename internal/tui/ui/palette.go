@@ -56,30 +56,26 @@ type CommandPalette struct {
 }
 
 func NewCommandPalette() CommandPalette {
-	cp := CommandPalette{
+	return CommandPalette{
 		capture:  audio.New(),
 		amps:     make([]float64, paletteVisBands),
 		peaks:    make([]float64, paletteVisBands),
 		peakHold: make([]int, paletteVisBands),
 	}
-	if err := cp.capture.Start(paletteVisBands); err == nil {
-		cp.captureOK = true
-	} else {
-		cp.captureOK = false
-	}
-	return cp
 }
 
-func (m *CommandPalette) Open() tea.Cmd {
+func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.visible = true
-
-	return visTick()
+	return m.Resume()
 }
 
-func (m *CommandPalette) Close() {
+func (m CommandPalette) Close(activeTab SidebarItem) CommandPalette {
 	m.visible = false
+	if activeTab != SideDownloads && activeTab != SidePlaylists {
+		return m.Pause()
+	}
+	return m
 }
-
 func (m CommandPalette) Visible() bool { return m.visible }
 
 func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
@@ -155,11 +151,12 @@ var brailleBit = [2][4]uint8{
 
 func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
-	if subAppW < 10 || subAppH < 5 {
+	if m.width < 10 || m.height < 5 {
 		return DimItemStyle.Render("")
 	}
-	subW := subAppW * 2
-	subH := subAppH * 4
+
+	subW := m.width * 2
+	subH := m.height * 4
 
 	dots := make([][]float64, subW)
 	for i := range dots {
@@ -355,7 +352,7 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
 	var out strings.Builder
 	for row := 0; row < subAppH; row++ {
-		for col := 0; col < subAppW; col++ {
+		for col := 0; col < subAppH; col++ {
 			var mask uint8
 			any := false
 			sumR := 0.0
@@ -426,20 +423,20 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 	return out.String()
 }
 
-func (m *CommandPalette) Resume() tea.Cmd {
+func (m CommandPalette) Resume() (CommandPalette, tea.Cmd) {
 	if m.captureOK {
-		return nil
+		return m, nil
 	}
 	if err := m.capture.Start(paletteVisBands); err == nil {
 		m.captureOK = true
-		return visTick()
+		return m, visTick()
 	}
-	return nil
+	return m, nil
 }
 
-func (m *CommandPalette) Pause() {
+func (m CommandPalette) Pause() CommandPalette {
 	if !m.captureOK {
-		return
+		return m
 	}
 	m.capture.Stop()
 	m.captureOK = false
@@ -448,4 +445,72 @@ func (m *CommandPalette) Pause() {
 		m.peaks[i] = 0
 		m.peakHold[i] = 0
 	}
+	return m
+}
+
+func (m CommandPalette) RenderEQColumn(w, h int) string {
+	if w < 1 || h < 1 || len(m.amps) == 0 {
+		return ""
+	}
+
+	subW := w * 2
+	subH := h * 4
+
+	cols := make([]float64, subW)
+	for i := 0; i < subW; i++ {
+		idx := int(float64(i) / float64(subW) * float64(len(m.amps)))
+		if idx < len(m.amps) {
+			cols[i] = m.amps[idx]
+		}
+	}
+
+	var b strings.Builder
+	for row := 0; row < h; row++ {
+		norm := 1.0 - (float64(row) / float64(h))
+		colorIdx := int(norm * float64(len(visStylesOut)-1))
+		if colorIdx < 0 {
+			colorIdx = 0
+		} else if colorIdx >= len(visStylesOut) {
+			colorIdx = len(visStylesOut) - 1
+		}
+		rowStyle := visStylesOut[colorIdx]
+
+		for col := 0; col < w; col++ {
+			var mask uint8
+			any := false
+
+			for dc := 0; dc < 2; dc++ {
+				for dr := 0; dr < 4; dr++ {
+					subCol := col*2 + dc
+					subRow := row*4 + dr
+
+					val := cols[subCol]
+
+					// Tính chiều cao cột sóng bằng số lượng sub-pixel
+					filledSubPixels := int(math.Round(val * float64(subH)))
+
+					// Khoảng cách từ đáy của đồ thị lên đến sub-pixel hiện tại
+					fromBottom := subH - 1 - subRow
+
+					// Nếu sub-pixel nằm trong vùng sóng -> bật bit tương ứng
+					if fromBottom < filledSubPixels {
+						mask |= 1 << brailleBit[dc][dr] // brailleBit đã có sẵn trong file
+						any = true
+					}
+				}
+			}
+
+			if any {
+				// Dịch chuyển bit mask vào dải ký tự Braille Unicode
+				runeStr := string(rune(0x2800 + int(mask)))
+				b.WriteString(rowStyle.Render(runeStr))
+			} else {
+				b.WriteString(" ")
+			}
+		}
+		if row < h-1 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
 }

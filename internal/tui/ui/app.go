@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -88,6 +89,9 @@ type App struct {
 	activeSort        string
 	importPanel       ImportPanel
 	moveSession       *MoveSession
+	prevLyric         string
+	currLyric         string
+	lyricAnimStart    time.Time
 }
 type Overlay interface {
 	Init() tea.Cmd
@@ -106,6 +110,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		downloadDir:   downloadDir,
 		sidebarActive: SideDownloads,
 		activeContext: SideDownloads,
+		sessionStart:  time.Now(),
 		palette:       NewCommandPalette(),
 		booting:       true,
 		activeSpeed:   3,
@@ -116,7 +121,7 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 }
 
 func (a *App) Init() tea.Cmd {
-	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir), visTick())
+	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
 }
 
 func (a *App) selectedMoveCount() int {
@@ -206,7 +211,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.loadSettings()
 			a.resizePanels()
 			a.avrcp = avrcp.New()
-			cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick()}
+			var resumeCmd tea.Cmd
+			a.palette, resumeCmd = a.palette.Resume()
+			cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick(), resumeCmd}
 			if a.avrcp != nil {
 				cmds = append(cmds, a.avrcp.WatchCommands())
 			}
@@ -313,8 +320,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	//  Update Component Con
 	focusedContent := a.sidebarActive != SideImport && (a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists)
 	var leftCmd tea.Cmd
+
 	a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
 	cmds = append(cmds, leftCmd)
+
+	oldLyric := a.right.GetCurrentLyricLine()
+	var rightCmd tea.Cmd
+	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
+	cmds = append(cmds, rightCmd)
+
+	newLyric := a.right.GetCurrentLyricLine()
+	if oldLyric != newLyric {
+		a.prevLyric = oldLyric
+		a.currLyric = newLyric
+		a.lyricAnimStart = time.Now()
+	}
 
 	if a.sidebarActive == SideImport {
 		if km, ok := msg.(tea.KeyMsg); ok {
@@ -322,7 +342,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	var rightCmd tea.Cmd
 	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
 
@@ -715,9 +734,11 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 		var cmds []tea.Cmd
 
 		if item == SideDownloads || item == SidePlaylists {
-			cmds = append(cmds, a.palette.Resume())
+			var cmd tea.Cmd
+			a.palette, cmd = a.palette.Resume()
+			cmds = append(cmds, cmd)
 		} else if !a.palette.Visible() {
-			a.palette.Pause()
+			a.palette = a.palette.Pause()
 		}
 		if item == SideSearch {
 			a.left.searchOnEnter = true
@@ -778,52 +799,95 @@ func (a *App) resizePanels() {
 	a.palette.width = a.width
 	a.palette.height = a.height
 }
+
 func (a *App) renderThirdColumn(w, h int) string {
 	if w < 10 || h < 10 {
 		return ""
 	}
 
-	// Chia tỷ lệ: 40% Visualizer, 40% Lyrics, 20% Stats
-	visH := int(float64(h) * 0.4)
-	lyricH := int(float64(h) * 0.4)
-	statsH := h - visH - lyricH
+	statsH := 1 // App Time  chiếm đúng 1 dòng
+	lyricH := int(float64(h) * 0.45)
+	visH := h - lyricH - statsH - 1
 
-	//  Visualizer
-	var visView string
-	if a.palette.is3D {
-		visView = a.palette.Render3DVisualizer(w, visH)
-	} else {
-		visView = a.palette.RenderVisualizer(w, visH)
+	if visH < 1 {
+		visH = 1
 	}
 
-	// Lyrics Preview
-	var lyricContent string
-	if a.playback.NowPlay != nil {
-		currentLine := a.right.GetCurrentLyricLine()
-		if currentLine == "" {
-			lyricContent = DimItemStyle.Render("( Instrumental )")
-		} else {
-			lyricContent = LyricHighlightStyle.Width(w - 4).Align(lipgloss.Center).Render(currentLine)
-		}
-	} else {
-		lyricContent = DimItemStyle.Render("Play a track...")
-	}
-	lyricBox := renderBox(w, "Lyrics Preview", lipgloss.Place(w-4, lyricH-2, lipgloss.Center, lipgloss.Center, lyricContent), themeCol("#7c7986"))
+	// 2. Spectrum
+	visRaw := a.palette.RenderEQColumn(w-2, visH)
+	visView := lipgloss.NewStyle().
+		Width(w).
+		Height(visH).
+		Padding(0, 1).
+		Render(visRaw)
 
-	//  Stats (App Session Time)
+	lyricInnerW := w - 4
+	lyricInnerH := lyricH - 2
+	if lyricInnerH < 1 {
+		lyricInnerH = 1
+	}
+	lyricContent := a.renderLyricAnim(lyricInnerW, lyricInnerH)
+	lyricBox := renderBox(w, "Lyrics", lyricContent, themeCol("#7c7986"))
+
+	// App Time
 	duration := time.Since(a.sessionStart)
 	hTime := int(duration.Hours())
 	mTime := int(duration.Minutes()) % 60
 	sTime := int(duration.Seconds()) % 60
 	statsContent := fmt.Sprintf("Session: %02dh %02dm %02ds", hTime, mTime, sTime)
 
-	statsBox := renderBox(w, "App Time", lipgloss.Place(w-4, statsH-2, lipgloss.Center, lipgloss.Center, statsContent), themeCol("#7c7986"))
-
-	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsBox)
+	// Canh giữa text và làm mờ màu
+	statsView := lipgloss.NewStyle().
+		Width(w).
+		Align(lipgloss.Center).
+		Render(DimItemStyle.Render(statsContent))
+	return lipgloss.JoinVertical(lipgloss.Top, visView, "", lyricBox, statsView)
 }
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
 	a.statusAt = time.Now()
+}
+
+func (a *App) renderLyricAnim(innerW, innerH int) string {
+	if innerH < 1 {
+		return ""
+	}
+
+	if a.playback.NowPlay == nil {
+		return lipgloss.Place(innerW, innerH, lipgloss.Center, lipgloss.Center, DimItemStyle.Render("Play a track to see lyrics..."))
+	}
+
+	progress := float64(time.Since(a.lyricAnimStart)) / float64(350*time.Millisecond)
+	if progress >= 1.0 || a.prevLyric == "" {
+		return lipgloss.Place(innerW, innerH, lipgloss.Center, lipgloss.Center, LyricHighlightStyle.Width(innerW).Align(lipgloss.Center).Render(a.currLyric))
+	}
+
+	gap := 2
+	offset := int(math.Round(progress * float64(gap)))
+
+	cY := innerH / 2
+	oldY := cY - offset
+	newY := cY + gap - offset
+
+	lines := make([]string, innerH)
+
+	putLine := func(y int, text string, style lipgloss.Style) {
+		if y >= 0 && y < innerH && text != "" {
+			lines[y] = style.Width(innerW).Align(lipgloss.Center).Render(text)
+		}
+	}
+
+	oldStyle := LyricHighlightStyle
+	newStyle := DimItemStyle
+	if progress > 0.5 {
+		oldStyle = DimItemStyle
+		newStyle = LyricHighlightStyle
+	}
+
+	putLine(oldY, a.prevLyric, oldStyle)
+	putLine(newY, a.currLyric, newStyle)
+
+	return strings.Join(lines, "\n")
 }
 
 func init() {

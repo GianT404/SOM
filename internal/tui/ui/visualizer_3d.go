@@ -165,8 +165,8 @@ func (m CommandPalette) Render3DVisualizer(subAppW, subAppH int) string {
 	}
 
 	var out strings.Builder
-	for row := 0; row < m.height; row++ {
-		for col := 0; col < m.width; col++ {
+	for row := 0; row < subAppW; row++ {
+		for col := 0; col < subAppW; col++ {
 			var mask uint8
 			any := false
 			sumZ := 0.0
@@ -213,7 +213,7 @@ func (m CommandPalette) Render3DVisualizer(subAppW, subAppH int) string {
 				out.WriteByte(' ')
 			}
 		}
-		if row < m.height-1 {
+		if row < subAppH-1 {
 			out.WriteByte('\n')
 		}
 	}
