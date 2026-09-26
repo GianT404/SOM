@@ -391,7 +391,7 @@ func (a *App) View() tea.View {
 
 	contentH := a.mainContentHeight()
 	sideH := contentH
-	mainW := a.width - sidebarWidth - 1
+	mainW := a.width - sidebarWidth + 1
 	frame := a.splashFrame
 	if mainW < 10 {
 		mainW = 10
@@ -445,7 +445,8 @@ func (a *App) View() tea.View {
 		}
 		tracklistView := a.left.ViewDownloadsContent(tracklistW, contentH, selected, selectMode, alreadyInMove, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
+		gap := lipgloss.NewStyle().Width(1).Render(" ")
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, gap, col3View)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -454,7 +455,8 @@ func (a *App) View() tea.View {
 	case SidePlaylists:
 		tracklistView := a.left.ViewPlaylistsContent(tracklistW, contentH, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
+		gap := lipgloss.NewStyle().Width(1).Render(" ")
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, gap, col3View)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
@@ -786,7 +788,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 }
 
 func (a *App) resizePanels() {
-	mainW := a.width - sidebarWidth - 1
+	mainW := a.width - sidebarWidth + 1
 	if mainW < 10 {
 		mainW = 10
 	}
