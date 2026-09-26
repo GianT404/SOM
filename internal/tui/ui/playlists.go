@@ -89,18 +89,32 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 		if p.loading {
 			inputRow += " " + p.spinner.View()
 		}
-		searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
+
+		searchContent.WriteString(
+			lipgloss.NewStyle().
+				Width(w - 7).
+				Render(inputRow),
+		)
+
 		if p.errMsg != "" {
-			searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
+			searchContent.WriteString(
+				StatusErrStyle.Render("X " + p.errMsg),
+			)
 		}
 
-		searchBox := renderBox(w, title, searchContent.String(), searchBorder)
+		searchBox := lipgloss.NewStyle().
+			PaddingLeft(1).
+			Render(
+				renderBox(w-3, title, searchContent.String(), searchBorder),
+			)
+
 		return searchBox + "\n" + listContent
 	}
 
-	return listContent
+	return lipgloss.NewStyle().
+		Width(w).
+		Render(listContent)
 }
-
 func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist, playingId string) string {
 	if len(filtered) == 0 {
 		if p.input.Value() != "" {
