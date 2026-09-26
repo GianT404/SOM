@@ -423,9 +423,6 @@ func (a *App) View() tea.View {
 	if tracklistW < 1 {
 		tracklistW = 1
 	}
-	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
-		tracklistW = mainW - col3W - 1
-	}
 	switch a.sidebarActive {
 
 	case SideSearch:
@@ -448,8 +445,7 @@ func (a *App) View() tea.View {
 		}
 		tracklistView := a.left.ViewDownloadsContent(tracklistW, contentH, selected, selectMode, alreadyInMove, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		gap := lipgloss.NewStyle().Width(1).Render(" ")
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, gap, col3View)
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
@@ -458,8 +454,7 @@ func (a *App) View() tea.View {
 	case SidePlaylists:
 		tracklistView := a.left.ViewPlaylistsContent(tracklistW, contentH, playingID)
 		col3View := a.renderThirdColumn(col3W, contentH)
-		gap := lipgloss.NewStyle().Width(1).Render(" ")
-		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, gap, col3View)
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
@@ -804,10 +799,6 @@ func (a *App) resizePanels() {
 }
 
 func (a *App) renderThirdColumn(w, h int) string {
-	if w < 10 || h < 10 {
-		return ""
-	}
-
 	statsH := 1 // App Time  chiếm đúng 1 dòng
 	lyricH := int(float64(h) * 0.45)
 	visH := h - lyricH - statsH - 1
