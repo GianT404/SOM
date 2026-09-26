@@ -59,7 +59,7 @@ func (p *LeftPanel) scanLocalFiles() {
 }
 func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
 	innerW := w - 4
-	listContent := lipgloss.NewStyle().PaddingLeft(2).Render(p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID))
+	listContent := lipgloss.NewStyle().PaddingLeft(1).Render(p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID))
 
 	if p.isSearchVisible() {
 		inputFocused := p.input.Focused()

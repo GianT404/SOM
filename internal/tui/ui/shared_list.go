@@ -46,7 +46,7 @@ func renderSharedTrackList[T any](
 	}
 
 	// Title 70%, Artist 30%
-	titleW := int(float64(availW) * 0.75)
+	titleW := int(float64(availW) * 0.70)
 	artistW := availW - titleW
 
 	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", checkW+timeW, "Time")
