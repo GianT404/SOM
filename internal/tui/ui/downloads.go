@@ -59,7 +59,11 @@ func (p *LeftPanel) scanLocalFiles() {
 }
 func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
 	innerW := w - 4
-	listContent := lipgloss.NewStyle().PaddingLeft(1).Render(p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID))
+	listContent := lipgloss.NewStyle().
+		PaddingLeft(1).
+		Render(
+			p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID),
+		)
 
 	if p.isSearchVisible() {
 		inputFocused := p.input.Focused()
@@ -73,22 +77,41 @@ func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, sele
 		if p.loading {
 			inputRow += " " + p.spinner.View()
 		}
-		searchContent.WriteString(lipgloss.NewStyle().Width(innerW).Render(inputRow))
+
+		searchContent.WriteString(
+			lipgloss.NewStyle().
+				Width(w - 7).
+				Render(inputRow),
+		)
+
 		if p.errMsg != "" {
-			searchContent.WriteString(StatusErrStyle.Render("X " + p.errMsg))
+			searchContent.WriteString(
+				StatusErrStyle.Render("X " + p.errMsg),
+			)
 		}
 
 		count := len(p.getFilteredLocals())
 		title := fmt.Sprintf("Search (%d)", count)
 		if selectMode {
-			title = fmt.Sprintf("Move to playlist (%d) -  %d", count, countSelected(selected))
+			title = fmt.Sprintf(
+				"Move to playlist (%d) -  %d",
+				count,
+				countSelected(selected),
+			)
 		}
-		searchBox := renderBox(w, title, searchContent.String(), searchBorder)
+
+		searchBox := lipgloss.NewStyle().
+			PaddingLeft(0).
+			Render(
+				renderBox(w-3, title, searchContent.String(), searchBorder),
+			)
 
 		return searchBox + "\n" + listContent
 	}
 
-	return listContent
+	return lipgloss.NewStyle().
+		Width(w).
+		Render(listContent)
 }
 func countSelected(m map[string]bool) int {
 	n := 0
