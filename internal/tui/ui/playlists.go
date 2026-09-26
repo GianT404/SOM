@@ -70,11 +70,15 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 	if p.activePlaylist != nil {
 		filtered := p.getFilteredPlaylistTracks()
 		title = fmt.Sprintf("Playlist: %s (%d)", p.activePlaylist.Name, len(filtered))
-		listContent = lipgloss.NewStyle().PaddingLeft(1).Render(p.renderPlaylistDetail(innerW, filtered, playingID))
+		listContent = lipgloss.NewStyle().
+			PaddingLeft(1).
+			Render(p.renderPlaylistDetail(innerW, filtered, playingID))
 	} else {
 		filtered := p.getFilteredPlaylists()
 		title = fmt.Sprintf("Playlists (%d)", len(filtered))
-		listContent = lipgloss.NewStyle().PaddingLeft(1).Render(p.renderPlaylistList(innerW, filtered, playingID))
+		listContent = lipgloss.NewStyle().
+			PaddingLeft(1).
+			Render(p.renderPlaylistList(innerW, filtered, playingID))
 	}
 
 	if p.isSearchVisible() {
@@ -103,7 +107,7 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 		}
 
 		searchBox := lipgloss.NewStyle().
-			PaddingLeft(1).
+			PaddingLeft(0).
 			Render(
 				renderBox(w-3, title, searchContent.String(), searchBorder),
 			)
