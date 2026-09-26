@@ -112,7 +112,9 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 				renderBox(w-3, title, searchContent.String(), searchBorder),
 			)
 
-		return searchBox + "\n" + listContent
+		return lipgloss.NewStyle().
+			Width(w).
+			Render(searchBox + "\n" + listContent)
 	}
 
 	return lipgloss.NewStyle().

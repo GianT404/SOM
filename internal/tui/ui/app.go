@@ -419,7 +419,10 @@ func (a *App) View() tea.View {
 	if col3W < 25 {
 		col3W = 25
 	}
-	tracklistW := mainW
+	tracklistW := mainW - col3W - 1
+	if tracklistW < 1 {
+		tracklistW = 1
+	}
 	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
 		tracklistW = mainW - col3W - 1
 	}
@@ -792,6 +795,7 @@ func (a *App) resizePanels() {
 	if mainW < 10 {
 		mainW = 10
 	}
+
 	contentH := a.mainContentHeight()
 	a.left.SetSize(mainW, contentH)
 	a.right.SetSize(mainW, contentH)
@@ -815,7 +819,7 @@ func (a *App) renderThirdColumn(w, h int) string {
 	// 2. Spectrum
 	visRaw := a.palette.RenderEQColumn(w-2, visH)
 	visView := lipgloss.NewStyle().
-		Width(w).
+		Width(w-2).
 		Height(visH).
 		Padding(0, 1).
 		Render(visRaw)

@@ -106,7 +106,9 @@ func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, sele
 				renderBox(w-3, title, searchContent.String(), searchBorder),
 			)
 
-		return searchBox + "\n" + listContent
+		return lipgloss.NewStyle().
+			Width(w).
+			Render(searchBox + "\n" + listContent)
 	}
 
 	return lipgloss.NewStyle().
