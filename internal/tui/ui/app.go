@@ -419,7 +419,7 @@ func (a *App) View() tea.View {
 	if col3W < 25 {
 		col3W = 25
 	}
-	tracklistW := mainW - col3W - 1
+	tracklistW := mainW - col3W
 	if tracklistW < 1 {
 		tracklistW = 1
 	}
