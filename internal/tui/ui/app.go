@@ -396,8 +396,16 @@ func (a *App) View() tea.View {
 	if a.playback.NowPlay != nil {
 		playingID = a.playback.NowPlay.ID
 	}
-
+	col3W := int(float64(mainW) * 0.3)
+	if col3W < 25 {
+		col3W = 25
+	}
+	tracklistW := mainW
+	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
+		tracklistW = mainW - col3W - 1
+	}
 	switch a.sidebarActive {
+
 	case SideSearch:
 		mainView = a.left.ViewSearchContent(mainW, contentH, playingID)
 	case SideDownloads:
@@ -416,6 +424,10 @@ func (a *App) View() tea.View {
 				alreadyInMove[path] = true
 			}
 		}
+		tracklistView := a.left.ViewDownloadsContent(tracklistW, contentH, selected, selectMode, alreadyInMove, playingID)
+		col3View := a.renderThirdColumn(col3W, contentH)
+		sep := borderStyle.Render("│")
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, sep, col3View)
 		mainView = a.left.ViewDownloadsContent(mainW, contentH, selected, selectMode, alreadyInMove, playingID)
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
@@ -423,7 +435,10 @@ func (a *App) View() tea.View {
 	case SideQueue:
 		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue, playingID)
 	case SidePlaylists:
-		mainView = a.left.ViewPlaylistsContent(mainW, contentH, playingID)
+		tracklistView := a.left.ViewPlaylistsContent(tracklistW, contentH, playingID)
+		col3View := a.renderThirdColumn(col3W, contentH)
+		sep := borderStyle.Render("│")
+		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, sep, col3View)
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
 	default:
@@ -699,7 +714,6 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 
 		var cmds []tea.Cmd
 
-		//  LOGIC MỚI: QUẢN LÝ CPU
 		if item == SideDownloads || item == SidePlaylists {
 			cmds = append(cmds, a.palette.Resume())
 		} else if !a.palette.Visible() {
@@ -764,7 +778,49 @@ func (a *App) resizePanels() {
 	a.palette.width = a.width
 	a.palette.height = a.height
 }
+func (a *App) renderThirdColumn(w, h int) string {
+	if w < 10 || h < 10 {
+		return ""
+	}
 
+	// Chia tỷ lệ: 40% Visualizer, 40% Lyrics, 20% Stats
+	visH := int(float64(h) * 0.4)
+	lyricH := int(float64(h) * 0.4)
+	statsH := h - visH - lyricH
+
+	//  Visualizer
+	var visView string
+	if a.palette.is3D {
+		visView = a.palette.Render3DVisualizer(w, visH)
+	} else {
+		visView = a.palette.RenderVisualizer(w, visH)
+	}
+
+	// Lyrics Preview
+	var lyricContent string
+	if a.playback.NowPlay != nil {
+		currentLine := a.right.GetCurrentLyricLine()
+		if currentLine == "" {
+			lyricContent = DimItemStyle.Render("( Instrumental )")
+		} else {
+			lyricContent = LyricHighlightStyle.Width(w - 4).Align(lipgloss.Center).Render(currentLine)
+		}
+	} else {
+		lyricContent = DimItemStyle.Render("Play a track...")
+	}
+	lyricBox := renderBox(w, "Lyrics Preview", lipgloss.Place(w-4, lyricH-2, lipgloss.Center, lipgloss.Center, lyricContent), themeCol("#7c7986"))
+
+	//  Stats (App Session Time)
+	duration := time.Since(a.sessionStart)
+	hTime := int(duration.Hours())
+	mTime := int(duration.Minutes()) % 60
+	sTime := int(duration.Seconds()) % 60
+	statsContent := fmt.Sprintf("Session: %02dh %02dm %02ds", hTime, mTime, sTime)
+
+	statsBox := renderBox(w, "App Time", lipgloss.Place(w-4, statsH-2, lipgloss.Center, lipgloss.Center, statsContent), themeCol("#7c7986"))
+
+	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsBox)
+}
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
 	a.statusAt = time.Now()
