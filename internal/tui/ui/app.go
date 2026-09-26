@@ -341,8 +341,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, a.handleImportKeys(km)...)
 		}
 	}
-
-	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
 
 	var paletteCmd tea.Cmd

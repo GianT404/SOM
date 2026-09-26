@@ -359,7 +359,6 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		modal := NewCmdMenuModal(a.cmdOptionList())
 		a.modals = []Overlay{modal}
 		cmds = append(cmds, modal.Init())
-		cmds = append(cmds, modal.Init())
 	case "tab":
 		if a.left.input.Focused() {
 			a.left.input.Blur()
