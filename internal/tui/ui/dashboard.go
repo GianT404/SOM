@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"som/internal/domain"
+
+	"charm.land/lipgloss/v2"
 )
 
 func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPlay *domain.Track) string {
@@ -14,27 +16,23 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 		return ""
 	}
 
-	sep := StatusOKStyle.Render("  ")
-
-	var parts []string
-
 	// 1. Volume
 	volPercent := int(math.Round(vol * 100))
-	parts = append(parts, styleHint("VOL", fmt.Sprintf("%d%%", volPercent)))
+	volStr := styleHint("VOL", fmt.Sprintf("%d%%", volPercent))
 
 	// 2. Speed
 	speedLabel := "1.0x"
 	if speedIdx >= 0 && speedIdx < len(playbackSpeeds) {
 		speedLabel = playbackSpeeds[speedIdx].Label
 	}
-	parts = append(parts, styleHint("SPD", speedLabel))
+	spdStr := styleHint("SPD", speedLabel)
 
 	// 3. Audio Setting (Preset)
 	presetName := "Normal"
 	if presetIdx >= 0 && presetIdx < len(audioPresets) {
 		presetName = audioPresets[presetIdx].Name
 	}
-	parts = append(parts, styleHint("EQ", presetName))
+	eqStr := styleHint("EQ", presetName)
 
 	// 4. Bitrate
 	bitrateStr := "___ kbps"
@@ -49,6 +47,12 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 			bitrateStr = "Stream"
 		}
 	}
-	parts = append(parts, styleHint("BR", bitrateStr))
-	return "  " + strings.Join(parts, sep)
+	brStr := styleHint("BR", bitrateStr)
+
+	leftColStyle := lipgloss.NewStyle().Width(18)
+
+	row1 := "  " + leftColStyle.Render(volStr) + spdStr
+	row2 := "  " + leftColStyle.Render(eqStr) + brStr
+
+	return row1 + "\n" + row2
 }

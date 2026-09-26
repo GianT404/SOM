@@ -342,7 +342,7 @@ func (a *App) somRowHeight() int {
 	if a.hideLogo {
 		return 0
 	}
-	return 1
+	return 2
 }
 
 func (a *App) mainContentHeight() int {
