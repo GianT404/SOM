@@ -391,7 +391,7 @@ func (a *App) View() tea.View {
 
 	contentH := a.mainContentHeight()
 	sideH := contentH
-	mainW := a.width - sidebarWidth + 1
+	mainW := a.width - sidebarWidth + 2
 	frame := a.splashFrame
 	if mainW < 10 {
 		mainW = 10
@@ -788,7 +788,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 }
 
 func (a *App) resizePanels() {
-	mainW := a.width - sidebarWidth + 1
+	mainW := a.width - sidebarWidth + 2
 	if mainW < 10 {
 		mainW = 10
 	}
