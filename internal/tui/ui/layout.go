@@ -42,14 +42,18 @@ func NewUILayout(width, height, sidebarWidth, headerHeight int, hideHint bool) U
 	}
 
 	thirdColumnWidth := int(float64(mainWidth) * layoutThirdColRatio)
-	if thirdColumnWidth < layoutThirdColMinW {
+	maxThirdColumnWidth := mainWidth - layoutTracklistGap - 1
+	if maxThirdColumnWidth < 1 {
+		maxThirdColumnWidth = 1
+	}
+	if thirdColumnWidth < layoutThirdColMinW && maxThirdColumnWidth >= layoutThirdColMinW {
 		thirdColumnWidth = layoutThirdColMinW
+	}
+	if thirdColumnWidth > maxThirdColumnWidth {
+		thirdColumnWidth = maxThirdColumnWidth
 	}
 
 	tracklistWidth := mainWidth - thirdColumnWidth - layoutTracklistGap
-	if tracklistWidth < 1 {
-		tracklistWidth = 1
-	}
 
 	mainViewHeight := height -
 		headerHeight -
