@@ -13,6 +13,7 @@ func TestNormalizePlaybackStateClampsCoreState(t *testing.T) {
 		{ID: "b"},
 	}
 	pm.CurrentIdx = 99
+	pm.NowPlay = &pm.Playlist[0]
 	pm.SongStarted = true
 	pm.ShuffleHist = []int{-1, 0, 7, 1}
 
