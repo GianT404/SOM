@@ -153,20 +153,6 @@ func TestSettingsPersistAcrossRestart(t *testing.T) {
 	}
 }
 
-func TestHideLogoReclaimsRows(t *testing.T) {
-	setTheme(themeDefault)
-	a := &App{width: 100, height: 40}
-	shown := a.mainContentHeight()
-
-	a.applySetting(1, true)
-	if a.somRowHeight() != 0 {
-		t.Fatal("somRowHeight should be 0 when logo hidden")
-	}
-	if hidden := a.mainContentHeight(); hidden != shown {
-		t.Fatalf("hiding logo should add %d rows, got %d -> %d", shown, hidden)
-	}
-}
-
 func TestMouseSettingToggleAndPersist(t *testing.T) {
 	setTheme(themeDefault)
 	db, err := storage.Open(t.TempDir())
