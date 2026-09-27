@@ -115,6 +115,7 @@ type TrackChangedMsg struct {
 
 type LocalLyricsLoadedMsg struct {
 	Lyrics domain.LyricsResp
+	Gen    uint64
 }
 
 type PlaybackTickMsg struct{}
