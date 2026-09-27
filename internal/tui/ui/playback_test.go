@@ -34,6 +34,7 @@ func TestPlayTrackCmdRecordsPreviousTrackOnceInRandomMode(t *testing.T) {
 
 func TestPrevRandomDoesNotGrowHistory(t *testing.T) {
 	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
 	pm.Random = true
 	pm.Playlist = []domain.Track{
 		{ID: "a", Title: "A"},
@@ -70,6 +71,7 @@ func TestPrevRandomDoesNotGrowHistory(t *testing.T) {
 
 func TestQueuePlaybackPreservesPlaylistCursor(t *testing.T) {
 	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
 	pm.Playlist = []domain.Track{
 		{ID: "a", Title: "A"},
 		{ID: "b", Title: "B"},
