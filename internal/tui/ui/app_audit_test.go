@@ -126,6 +126,7 @@ func TestHandleAudioEventsIgnoresStaleGeneration(t *testing.T) {
 	}
 }
 
+// Filesystem lỗi phải được trả về cho UI.
 func TestDeleteCmdReportsFilesystemFailure(t *testing.T) {
 	dir := t.TempDir()
 	nested := filepath.Join(dir, "nested")
