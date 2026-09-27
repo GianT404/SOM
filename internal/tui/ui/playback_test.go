@@ -202,7 +202,6 @@ func TestNewPlayRequestInvalidatesPreviousGeneration(t *testing.T) {
 func TestPlaybackStopClearsState(t *testing.T) {
 	pm := NewPlaybackManager()
 	pm.Player = &player.Player{}
-	pm.PlayerGen = 3
 	pm.NowPlay = &domain.Track{ID: "current"}
 	pm.NextPlay = &domain.Track{ID: "next"}
 	pm.SongStarted = true
