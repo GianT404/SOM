@@ -217,7 +217,6 @@ func TestPlaybackStopClearsState(t *testing.T) {
 	}
 }
 
-
 func TestStreamResolvedMarksRemotePlaybackStarted(t *testing.T) {
 	pm := NewPlaybackManager()
 	pm.Player = &player.Player{}
