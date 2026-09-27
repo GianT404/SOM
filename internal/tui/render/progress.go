@@ -7,12 +7,12 @@ import (
 )
 
 type ProgressBarStyles struct {
-	Border    lipgloss.Style
-	Title     lipgloss.Style
-	Filled    lipgloss.Style
-	Time      lipgloss.Style
+	Border     lipgloss.Style
+	Title      lipgloss.Style
+	Filled     lipgloss.Style
+	Time       lipgloss.Style
 	TimeFilled lipgloss.Style
-	Controls  lipgloss.Style
+	Controls   lipgloss.Style
 }
 
 func ProgressBar(w, elapsedSec, totalSec int, title, timeLabel string, styles ProgressBarStyles) string {
