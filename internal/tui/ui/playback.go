@@ -337,15 +337,14 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 func (pm *PlaybackManager) playTrackCmd(idx int, t domain.Track) tea.Cmd {
 	pm.CancelResolve()
 
+	if pm.Random && pm.NowPlay != nil {
+		pm.RecordHistory()
+	}
+
 	pm.NowPlay = &t
 	pm.CurrentIdx = idx
 	pm.SongStarted = false
 	pm.NextPlay = nil
-
-	if pm.Random {
-		pm.History = append(pm.History, t)
-		pm.RecordHistory()
-	}
 
 	trackChangedMsg := TrackChangedMsg{
 		Track:       t,
