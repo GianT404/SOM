@@ -9,81 +9,59 @@ import (
 )
 
 func renderBox(w int, title string, content string, borderColor color.Color) string {
+	if w < 4 {
+		w = 4
+	}
 
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 
 	lines := strings.Split(content, "\n")
 
-	maxLineW := 0
-
-	for _, line := range lines {
-
-		if lw := lipgloss.Width(line); lw > maxLineW {
-
-			maxLineW = lw
-
-		}
-
-	}
-
-	if need := maxLineW + 4; need > w {
-
-		w = need
-
-	}
-
 	// Top border
-
 	var topBorder string
 
 	if title == "" {
-
 		topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
-
 	} else {
-
-		titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
-
-		titleW := lipgloss.Width(titleRendered)
-
 		prefix := "╭── "
+		prefixW := lipgloss.Width(prefix)
+		maxTitleW := w - prefixW - 1
 
-		prefixStyled := borderChar.Render(prefix)
-
-		prefixW := lipgloss.Width(prefixStyled)
-
-		remain := w - prefixW - titleW - 1
-
-		if remain < 0 {
-
-			remain = 0
-
+		if maxTitleW < 1 {
+			title = ""
 		}
 
-		topBorder = prefixStyled + titleRendered + borderChar.Render(strings.Repeat("─", remain)+"╮")
+		if title == "" {
+			topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
+		} else {
+			titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
+			titleRendered = lipgloss.NewStyle().Inline(true).MaxWidth(maxTitleW).Render(titleRendered)
 
+			titleW := lipgloss.Width(titleRendered)
+			prefixStyled := borderChar.Render(prefix)
+			remain := w - prefixW - titleW - 1
+
+			if remain < 0 {
+				remain = 0
+			}
+
+			topBorder = prefixStyled + titleRendered + borderChar.Render(strings.Repeat("─", remain)+"╮")
+		}
 	}
 
-	// Content lines: wrap each with │ ... │
-
+	// Content lines: keep every line inside the requested width.
 	innerW := w - 4
-
 	var bodyLines []string
 
 	for _, line := range lines {
-
-		padded := lipgloss.NewStyle().Width(innerW).Render(line)
-
+		padded := lipgloss.NewStyle().Width(innerW).MaxWidth(innerW).Render(line)
 		bodyLines = append(bodyLines, borderChar.Render("│ ")+padded+borderChar.Render(" │"))
-
 	}
 
 	body := strings.Join(bodyLines, "\n")
 
 	// Bottom border
-
 	bottomBorder := borderChar.Render("╰" + strings.Repeat("─", w-2) + "╯")
 
 	return topBorder + "\n" + body + "\n" + bottomBorder
-
 }
