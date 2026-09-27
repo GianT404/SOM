@@ -3,7 +3,6 @@ package ui
 import (
 	"image/color"
 
-	"charm.land/lipgloss/v2"
 	"som/internal/tui/render"
 )
 
