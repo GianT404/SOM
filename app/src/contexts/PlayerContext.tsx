@@ -347,6 +347,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const stop = useCallback(async () => {
+        currentPlayIdRef.current++;
         await soundRef.current?.stopAsync();
         await soundRef.current?.unloadAsync();
         soundRef.current = null;
