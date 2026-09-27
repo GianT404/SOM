@@ -62,10 +62,14 @@ func TestMouseClickFocusesSearchInput(t *testing.T) {
 	if a.left.input.Focused() {
 		t.Fatal("precondition: input should be blurred")
 	}
-	// Downloads: the search input is the first body row inside the box.
+
+	// A non-empty value keeps the search box rendered while the input is blurred,
+	// so the click targets a visible search row.
+	a.left.input.SetValue("song")
+
 	a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: 4, Button: tea.MouseLeft})
 	if !a.left.input.Focused() {
-		t.Fatal("clicking the search row should focus the input")
+		t.Fatal("clicking the visible search row should focus the input")
 	}
 }
 
