@@ -400,9 +400,6 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 		}
 	}
 
-	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
-	cmds = append(cmds, rightCmd)
-
 	var paletteCmd tea.Cmd
 	a.palette, paletteCmd = a.palette.Update(msg)
 	cmds = append(cmds, paletteCmd)
