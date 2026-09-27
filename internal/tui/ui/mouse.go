@@ -88,10 +88,6 @@ func (a *App) listRowOrigin() (int, bool) {
 			return ct + 5, true
 		}
 		return ct + 2, true
-		if a.right.showLangPopup || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
-			return 0, false
-		}
-		return ct + 1, true
 	default:
 		return 0, false
 	}
