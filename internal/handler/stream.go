@@ -163,17 +163,8 @@ func serveAudioFile(w http.ResponseWriter, r *http.Request, path, filename strin
 const cleanWorkTimeout = 15 * time.Minute
 
 func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, videoID, filename string) {
-	ctx, cancel := context.WithTimeout(context.Background(), cleanWorkTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), cleanWorkTimeout)
 	defer cancel()
-	go func() {
-		select {
-		case <-r.Context().Done():
-			if r.Context().Err() == context.Canceled {
-				cancel()
-			}
-		case <-ctx.Done():
-		}
-	}()
 
 	cleanPath := filepath.Join(os.TempDir(), fmt.Sprintf("dopus-clean-%s.ogg", videoID))
 
