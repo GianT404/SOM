@@ -3,7 +3,7 @@ import { Audio } from 'expo-av';
 import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPlaylist, OfflineTrack } from '../services/playlistStore';
-import { getAudioSettings, AudioSettings, getBufferSamples, getSampleRateHz } from '../services/audioSettings';
+import { getAudioSettings, AudioSettings } from '../services/audioSettings';
 import {
     initMediaControls,
     updateNowPlaying,
