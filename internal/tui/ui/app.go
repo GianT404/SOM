@@ -365,23 +365,20 @@ func (a *App) somRowHeight() int {
 }
 
 func (a *App) mainContentHeight() int {
-	statusH := 0
-	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
-		statusH = 1
-	}
 	helpH := 0
 	if !a.hideHint {
 		helpH = 1
 	}
-	// somRow(somRowHeight) + sep(1) + progressBar(3) + help(helpH) + status
-	overhead := a.somRowHeight() + 1 + 3 + helpH + statusH
+
+	// somRow + sep + progressBar + help
+	overhead := a.somRowHeight() + 1 + 3 + helpH
+
 	contentH := a.height - overhead
 	if contentH < 5 {
 		contentH = 5
 	}
 	return contentH
 }
-
 func (a *App) View() tea.View {
 	if a.booting || a.width == 0 {
 		v := tea.NewView(renderSplash(a.width, a.height, a.splashFrame))
@@ -463,7 +460,7 @@ func (a *App) View() tea.View {
 
 	mainViewHeight := lipgloss.Height(mainView)
 	borderH := mainViewHeight
-	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH-1, borderH)
+	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH, borderH)
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
 	status := ""
@@ -495,9 +492,7 @@ func (a *App) View() tea.View {
 	}
 	b.WriteString(sep + "\n")
 	b.WriteString(contentRow + "\n")
-	if status != "" {
-		b.WriteString(status + "\n")
-	}
+	b.WriteString(status + "\n")
 	b.WriteString(progressBar + "\n")
 	if !a.hideHint {
 		b.WriteString(help)
