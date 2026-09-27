@@ -78,6 +78,9 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		)
 
 	case StreamResolvedMsg:
+		if a.playback != nil && msg.Gen != a.playback.PlayerGen {
+			break
+		}
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X Error stream: " + msg.Err.Error()))
 			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
@@ -102,6 +105,9 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 
 	case TrackChangedMsg:
+		if a.playback != nil && msg.Gen < a.playback.PlayerGen {
+			break
+		}
 		t := msg.Track
 		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
 
