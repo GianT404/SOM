@@ -1,9 +1,7 @@
 package ui
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"som/internal/domain"
 	"som/internal/storage"
