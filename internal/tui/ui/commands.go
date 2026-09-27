@@ -54,13 +54,21 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 					safe = t.ID
 				}
 				imgPath := filepath.Join(destDir, safe+".jpg")
-				if resp, errImg := http.Get(t.Thumbnail); errImg == nil {
-					defer resp.Body.Close()
-					if f, errF := os.Create(imgPath); errF == nil {
-						_, _ = io.Copy(f, resp.Body)
-						f.Close()
+				thumbCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				req, reqErr := http.NewRequestWithContext(thumbCtx, http.MethodGet, t.Thumbnail, nil)
+				if reqErr == nil {
+					resp, errImg := http.DefaultClient.Do(req)
+					if errImg == nil {
+						if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+							if f, errF := os.Create(imgPath); errF == nil {
+								_, _ = io.Copy(f, resp.Body)
+								_ = f.Close()
+							}
+						}
+						_ = resp.Body.Close()
 					}
 				}
+				cancel()
 			}
 
 			return DownloadDoneMsg{Path: path, Err: err, Track: t}
