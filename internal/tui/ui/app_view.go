@@ -109,7 +109,7 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		Render(mainView)
 }
 
-func (a *App) renderBaseView(layout UILayout, contentRow string) string {
+func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) string {
 	dashboard := renderDashboard(
 		a.hideLogo,
 		a.player.Volume(),
