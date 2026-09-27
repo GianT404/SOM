@@ -159,9 +159,9 @@ func (a *App) applyMoveToPlaylist() {
 		if !a.moveSession.Selected[lf.Path] {
 			continue
 		}
-		id := "local:" + lf.Path
+		id := lf.Path
 		if existing[id] {
-			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, lf.Path); err == nil {
+			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, id); err == nil {
 				var newTracks []storage.PlaylistTrack
 				for _, t := range pl.Tracks {
 					if t.ID != id {
@@ -173,9 +173,9 @@ func (a *App) applyMoveToPlaylist() {
 				removed++
 			}
 		} else {
-			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, lf.Path); err == nil {
+			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, id); err == nil {
 				pl.Tracks = append(pl.Tracks, storage.PlaylistTrack{
-					ID: lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, Thumbnail: lf.Thumbnail, Path: lf.Path,
+					ID: id, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, Thumbnail: lf.Thumbnail, Path: lf.Path,
 				})
 				existing[id] = true
 				added++
