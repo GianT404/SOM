@@ -175,10 +175,23 @@ func (p *Player) PlayWithHeaders(filePath string, headers map[string]string) err
 	return p.playFrom(filePath, 0, headers)
 }
 
+// PlayWithHeadersIfGeneration chỉ phát nếu generation vẫn còn hiệu lực.
+func (p *Player) PlayWithHeadersIfGeneration(filePath string, headers map[string]string, expected uint64) (bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.generation != expected {
+		return false, nil
+	}
+	return true, p.playFromLocked(filePath, 0, headers)
+}
+
 func (p *Player) playFrom(filePath string, startSec float64, headers map[string]string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.playFromLocked(filePath, startSec, headers)
+}
 
+func (p *Player) playFromLocked(filePath string, startSec float64, headers map[string]string) error {
 	p.stopLocked()
 
 	if p.otoCtx == nil {
@@ -259,8 +272,9 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 func (p *Player) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// Tăng generation để hủy mọi resolve/predecode cũ.
+	p.generation++
 	p.stopLocked()
-
 }
 func (p *Player) stopLocked() {
 	if p.state != Stopped {
