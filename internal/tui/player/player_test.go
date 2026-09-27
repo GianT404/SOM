@@ -60,3 +60,35 @@ func TestPlayer_PlayFrom_CallsStopLockedBeforeOtoCtxCheck(t *testing.T) {
 		t.Fatalf("state không hợp lệ : %v", p.State())
 	}
 }
+
+
+func TestPlayer_StopInvalidatesGeneration(t *testing.T) {
+	p := newTestPlayer()
+	before := p.Generation()
+
+	p.Stop()
+	if got := p.Generation(); got <= before {
+		t.Fatalf("generation=%d, want > %d", got, before)
+	}
+
+	p.Stop()
+	if got := p.Generation(); got <= before+1 {
+		t.Fatalf("generation=%d, want > %d", got, before+1)
+	}
+}
+
+func TestPlayer_PlayWithHeadersIfGenerationRejectsStaleRequest(t *testing.T) {
+	p := newTestPlayer()
+	p.generation = 4
+
+	started, err := p.PlayWithHeadersIfGeneration("fake.opus", nil, 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if started {
+		t.Fatal("stale generation should not start playback")
+	}
+	if p.Generation() != 4 {
+		t.Fatalf("generation=%d, want 4", p.Generation())
+	}
+}
