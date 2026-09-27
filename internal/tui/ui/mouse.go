@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"time"
-
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -235,16 +233,8 @@ func (a *App) tryFocusSearchInput(m tea.MouseClickMsg) bool {
 	return false
 }
 
-func (a *App) statusRowVisible() bool {
-	return a.statusMsg != "" && time.Since(a.statusAt) < 5*time.Second
-}
-
 func (a *App) progressBarTop() int {
-	statusH := 0
-	if a.statusRowVisible() {
-		statusH = 1
-	}
-	return a.somRowHeight() + 1 + a.mainContentHeight() + statusH
+	return a.uiLayout().ProgressBarTop()
 }
 
 func (a *App) seekFromProgressClick(m tea.MouseClickMsg) bool {

@@ -364,20 +364,18 @@ func (a *App) somRowHeight() int {
 	return 2
 }
 
+func (a *App) uiLayout() UILayout {
+	return NewUILayout(
+		a.width,
+		a.height,
+		sidebarWidth,
+		a.somRowHeight(),
+		a.hideHint,
+	)
+}
+
 func (a *App) mainContentHeight() int {
-	helpH := 0
-	if !a.hideHint {
-		helpH = 1
-	}
-
-	// somRow + sep + progressBar + help
-	overhead := a.somRowHeight() + 1 + 3 + helpH
-
-	contentH := a.height - overhead
-	if contentH < 5 {
-		contentH = 5
-	}
-	return contentH
+	return a.uiLayout().MainViewHeight
 }
 func (a *App) View() tea.View {
 	if a.booting || a.width == 0 {
@@ -386,13 +384,10 @@ func (a *App) View() tea.View {
 		return v
 	}
 
-	contentH := a.mainContentHeight()
-	sideH := contentH
-	mainW := a.width - sidebarWidth
+	layout := a.uiLayout()
+	contentH := layout.MainViewHeight
+	mainW := layout.MainWidth
 	frame := a.splashFrame
-	if mainW < 10 {
-		mainW = 10
-	}
 	var mainView string
 	dashboard := renderDashboard(a.hideLogo, a.player.Volume(), a.activeSpeed, a.activePreset, a.playback.NowPlay)
 	somRow := a.renderSomRow(dashboard)
@@ -404,7 +399,7 @@ func (a *App) View() tea.View {
 		sepRight = strings.Repeat("─", a.width-sidebarWidth-1)
 	}
 	sep := borderStyle.Render(sepLeft + "─" + sepRight)
-	contentTop := a.somRowHeight() + 1
+	contentTop := layout.HeaderHeight + layout.SeparatorHeight
 
 	inputNotFocused := !a.left.input.Focused()
 
@@ -412,14 +407,8 @@ func (a *App) View() tea.View {
 	if a.playback.NowPlay != nil {
 		playingID = a.playback.NowPlay.ID
 	}
-	col3W := int(float64(mainW) * 0.3)
-	if col3W < 25 {
-		col3W = 25
-	}
-	tracklistW := mainW - col3W - 1
-	if tracklistW < 1 {
-		tracklistW = 1
-	}
+	col3W := layout.ThirdColumnWidth
+	tracklistW := layout.TracklistWidth
 	switch a.sidebarActive {
 
 	case SideSearch:
@@ -458,9 +447,17 @@ func (a *App) View() tea.View {
 		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused, frame)
 	}
 
-	mainViewHeight := lipgloss.Height(mainView)
-	borderH := mainViewHeight
-	sideView := renderSidebar(a.sidebarActive, a.sidebarAnim, sideH, borderH)
+	mainView = lipgloss.NewStyle().
+		Width(layout.MainWidth).
+		Height(layout.MainViewHeight).
+		Render(mainView)
+
+	sideView := renderSidebar(
+		a.sidebarActive,
+		a.sidebarAnim,
+		layout.MainViewHeight,
+		layout.MainViewHeight,
+	)
 	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
 
 	status := ""
@@ -781,14 +778,10 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 }
 
 func (a *App) resizePanels() {
-	mainW := a.width - sidebarWidth
-	if mainW < 10 {
-		mainW = 10
-	}
+	layout := a.uiLayout()
 
-	contentH := a.mainContentHeight()
-	a.left.SetSize(mainW, contentH)
-	a.right.SetSize(mainW, contentH)
+	a.left.SetSize(layout.MainWidth, layout.MainViewHeight)
+	a.right.SetSize(layout.MainWidth, layout.MainViewHeight)
 	a.palette.width = a.width
 	a.palette.height = a.height
 }
