@@ -202,6 +202,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				if name != "" && p.plStore != nil {
 					if pl, err := p.plStore.CreatePlaylist(name); err == nil {
 						p.playlists = append(p.playlists, pl)
+						p.rebindActivePlaylist()
 					}
 				}
 				p.showPlInput = false
@@ -226,7 +227,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		switch msg.String() {
 		case "enter":
 			if p.input.Focused() && p.suggestFocus && len(p.suggestions) > 0 {
-				// Chọn gợi ý đang highlight trong danh sách gợi ý.
+				// Giữ cursor trong danh sách gợi ý.
+				if p.suggestCursor < 0 || p.suggestCursor >= len(p.suggestions) {
+					p.suggestCursor = 0
+				}
+				
 				q := strings.TrimSpace(p.suggestions[p.suggestCursor])
 				p.input.SetValue(q)
 				p.input.CursorEnd()
@@ -310,6 +315,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 								break
 							}
 						}
+						p.plPreFilterID = ""
 						p.plCursor = 0
 						p.plOffset = 0
 						p.input.SetValue("")
@@ -338,8 +344,59 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 				break
 			}
+	if p.activeTab == SidePlaylists && p.activePlaylist == nil {
+		if p.input.Focused() && newVal != oldVal {
+			switch {
+			case oldVal == "" && newVal != "":
+				// Lưu playlist đang chọn trước khi lọc.
+				playlists := p.getFilteredPlaylists()
+				if p.plCursor >= 0 && p.plCursor < len(playlists) {
+					p.plPreFilterID = playlists[p.plCursor].ID
+				}
+				p.plCursor = 0
+				p.plOffset = 0
+
+			case newVal == "":
+				restored := false
+				if p.plPreFilterID != "" {
+					for i, pl := range p.playlists {
+						if pl.ID == p.plPreFilterID {
+							p.plCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored {
+					p.plCursor = 0
+				}
+				p.scrollPlIntoView()
+				p.plPreFilterID = ""
+
+			default:
+				p.plCursor = 0
+				p.plOffset = 0
+			}
+		} else {
+			count := len(p.getFilteredPlaylists())
+			if count == 0 {
+				p.plCursor = 0
+				p.plOffset = 0
+			} else {
+				if p.plCursor >= count {
+					p.plCursor = count - 1
+				}
+				if p.plCursor < 0 {
+					p.plCursor = 0
+				}
+				p.scrollPlIntoView()
+			}
+		}
+	}
+
 			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 				p.activePlaylist = nil
+				p.plPreFilterID = ""
 				p.plCursor = 0
 				p.plOffset = 0
 			}
@@ -605,14 +662,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			if p.plStore != nil {
 				if pls, err := p.plStore.LoadAllPlaylists(); err == nil {
 					p.playlists = pls
-					if p.activePlaylist != nil {
-						for i := range p.playlists {
-							if p.playlists[i].ID == p.activePlaylist.ID {
-								p.activePlaylist = &p.playlists[i]
-								break
-							}
-						}
-					}
+					p.rebindActivePlaylist()
 				}
 			}
 		}
@@ -632,14 +682,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			if p.plStore != nil {
 				if pls, err := p.plStore.LoadAllPlaylists(); err == nil {
 					p.playlists = pls
-					if p.activePlaylist != nil {
-						for i := range p.playlists {
-							if p.playlists[i].ID == p.activePlaylist.ID {
-								p.activePlaylist = &p.playlists[i]
-								break
-							}
-						}
-					}
+					p.rebindActivePlaylist()
 				}
 			}
 		}
