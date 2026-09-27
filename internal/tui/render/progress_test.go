@@ -10,7 +10,11 @@ import (
 func TestProgressBarEmpty(t *testing.T) {
 	style := lipgloss.NewStyle()
 	got := ProgressBar(20, 0, 120, "", "00:00", ProgressBarStyles{
-		Border: style, Filled: style, Time: style, TimeFilled: style, Controls: style,
+		Border:     style,
+		Filled:     style,
+		Time:       style,
+		TimeFilled: style,
+		Controls:   style,
 	})
 	if !strings.Contains(got, "00:00") {
 		t.Fatalf("missing time label: %q", got)
@@ -23,7 +27,12 @@ func TestProgressBarEmpty(t *testing.T) {
 func TestProgressBarClampsInput(t *testing.T) {
 	style := lipgloss.NewStyle()
 	got := ProgressBar(2, 999, 120, "Track", "20:00", ProgressBarStyles{
-		Border: style, Title: style, Filled: style, Time: style, TimeFilled: style, Controls: style,
+		Border:     style,
+		Title:      style,
+		Filled:     style,
+		Time:       style,
+		TimeFilled: style,
+		Controls:   style,
 	})
 	if !strings.Contains(got, "Track") || !strings.Contains(got, "20:00") {
 		t.Fatalf("unexpected output: %q", got)
@@ -33,7 +42,11 @@ func TestProgressBarClampsInput(t *testing.T) {
 func TestProgressBarDoesNotFillWithoutDuration(t *testing.T) {
 	style := lipgloss.NewStyle()
 	got := ProgressBar(20, 30, 0, "", "00:30", ProgressBarStyles{
-		Border: style, Filled: style, Time: style, TimeFilled: style, Controls: style,
+		Border:     style,
+		Filled:     style,
+		Time:       style,
+		TimeFilled: style,
+		Controls:   style,
 	})
 	if strings.Contains(got, "█") {
 		t.Fatalf("expected no fill without total duration: %q", got)
