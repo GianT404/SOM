@@ -344,57 +344,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 				break
 			}
-			if p.activeTab == SidePlaylists && p.activePlaylist == nil {
-			if p.input.Focused() && newVal != oldVal {
-				switch {
-				case oldVal == "" && newVal != "":
-					// Lưu playlist đang chọn trước khi lọc.
-					playlists := p.getFilteredPlaylists()
-					if p.plCursor >= 0 && p.plCursor < len(playlists) {
-						p.plPreFilterID = playlists[p.plCursor].ID
-					}
-					p.plCursor = 0
-					p.plOffset = 0
-
-				case newVal == "":
-					restored := false
-					if p.plPreFilterID != "" {
-						for i, pl := range p.playlists {
-							if pl.ID == p.plPreFilterID {
-								p.plCursor = i
-								restored = true
-								break
-							}
-						}
-					}
-					if !restored {
-						p.plCursor = 0
-					}
-					p.scrollPlIntoView()
-					p.plPreFilterID = ""
-
-				default:
-					p.plCursor = 0
-					p.plOffset = 0
-				}
-			} else {
-				count := len(p.getFilteredPlaylists())
-				if count == 0 {
-					p.plCursor = 0
-					p.plOffset = 0
-				} else {
-					if p.plCursor >= count {
-						p.plCursor = count - 1
-					}
-					if p.plCursor < 0 {
-						p.plCursor = 0
-					}
-					p.scrollPlIntoView()
-				}
-			}
-		}
-
-		if p.activeTab == SidePlaylists && p.activePlaylist != nil {
+				if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 				p.activePlaylist = nil
 				p.plPreFilterID = ""
 				p.plCursor = 0
@@ -814,6 +764,56 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 		}
 	}
+	if p.activeTab == SidePlaylists && p.activePlaylist == nil {
+		if p.input.Focused() && newVal != oldVal {
+			switch {
+			case oldVal == "" && newVal != "":
+				// Lưu playlist đang chọn trước khi lọc.
+				playlists := p.getFilteredPlaylists()
+				if p.plCursor >= 0 && p.plCursor < len(playlists) {
+					p.plPreFilterID = playlists[p.plCursor].ID
+				}
+				p.plCursor = 0
+				p.plOffset = 0
+
+			case newVal == "":
+				restored := false
+				if p.plPreFilterID != "" {
+					for i, pl := range p.playlists {
+						if pl.ID == p.plPreFilterID {
+							p.plCursor = i
+							restored = true
+							break
+						}
+					}
+				}
+				if !restored {
+					p.plCursor = 0
+				}
+				p.scrollPlIntoView()
+				p.plPreFilterID = ""
+
+			default:
+				p.plCursor = 0
+				p.plOffset = 0
+			}
+		} else {
+			count := len(p.getFilteredPlaylists())
+			if count == 0 {
+				p.plCursor = 0
+				p.plOffset = 0
+			} else {
+				if p.plCursor >= count {
+					p.plCursor = count - 1
+				}
+				if p.plCursor < 0 {
+					p.plCursor = 0
+				}
+				p.scrollPlIntoView()
+			}
+		}
+	}
+
 
 	if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 		if p.input.Focused() && newVal != oldVal {
