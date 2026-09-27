@@ -242,6 +242,7 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		if currentDeleted {
 			if pm.Player != nil {
 				pm.Player.Stop()
+				pm.PlayerGen = pm.Player.Generation()
 			}
 			pm.NowPlay = nil
 			pm.SongStarted = false
@@ -402,6 +403,10 @@ func (pm *PlaybackManager) playTrackCmdNoHistory(idx int, t domain.Track) tea.Cm
 
 func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, recordHistory bool) tea.Cmd {
 	pm.CancelResolve()
+	if pm.Player != nil {
+		pm.Player.Stop()
+		pm.PlayerGen = pm.Player.Generation()
+	}
 
 	if recordHistory && pm.Random && pm.NowPlay != nil {
 		pm.RecordHistory()
