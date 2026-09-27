@@ -128,6 +128,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         return () => {
+            currentPlayIdRef.current++;
             soundRef.current?.unloadAsync();
             removeListener();
             cleanupMediaControls();
