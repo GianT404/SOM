@@ -230,7 +230,7 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 			pm.NowPlay = nil
 			pm.SongStarted = false
 			pm.NextPlay = nil
-			cmds = append(cmds, func() tea.Msg { return TrackChangedMsg{Track: domain.Track{}, IsLocal: true} })
+			cmds = append(cmds, func() tea.Msg { return TrackChangedMsg{Track: domain.Track{}, IsLocal: true, Gen: pm.PlayerGen} })
 		} else if pm.NextPlay != nil && pm.NextPlay.ID == deletedID {
 			pm.NextPlay = nil
 			if pm.Player != nil {
