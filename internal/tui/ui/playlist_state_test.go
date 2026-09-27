@@ -86,7 +86,7 @@ func TestPlaylistFilterRestoresPreviousSelection(t *testing.T) {
 	p.input.SetValue("b")
 	p.plCursor = 0
 
-	p.Update(tea.KeyPressMsg{Code: tea.KeyBackspace}, true, nil)
+	p.Update(tea.KeyPressMsg{Code: 8}, true, nil)
 
 	if p.plCursor != 1 {
 		t.Fatalf("cursor=%d, want 1", p.plCursor)
