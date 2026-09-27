@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"som/internal/domain"
@@ -122,5 +124,26 @@ func TestHandleAudioEventsIgnoresStaleGeneration(t *testing.T) {
 	}
 	if a.statusMsg != "" {
 		t.Fatalf("status after stale stream=%q, want empty", a.statusMsg)
+	}
+}
+
+
+func TestDeleteCmdReportsFilesystemFailure(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "nested")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "keep"), []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := deleteCmd(nil, nested, "nested")()
+	res, ok := msg.(DeleteDoneMsg)
+	if !ok {
+		t.Fatalf("message=%T, want DeleteDoneMsg", msg)
+	}
+	if res.Err == nil {
+		t.Fatal("expected filesystem deletion error")
 	}
 }
