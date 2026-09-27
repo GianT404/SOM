@@ -794,54 +794,47 @@ func (a *App) resizePanels() {
 }
 
 func (a *App) renderThirdColumn(w, h int) string {
-	statsH := 1 // App Time  chiếm đúng 1 dòng
-	lyricH := int(float64(h) * 0.45)
-	visH := h - lyricH - statsH - 1
+	layout := NewThirdColumnLayout(w, h)
 
-	if visH < 1 {
-		visH = 1
-	}
-
-	// 2. Spectrum
-	visInnerW := w - 4
-	visInnerH := visH - 2
-
-	if visInnerW < 1 {
-		visInnerW = 1
-	}
-	if visInnerH < 1 {
-		visInnerH = 1
-	}
-
-	visRaw := a.palette.RenderEQColumn(visInnerW, visInnerH)
+	visRaw := a.palette.RenderEQColumn(
+		layout.SpectrumInnerWidth,
+		layout.SpectrumInnerHeight,
+	)
 	visView := renderBox(
-		w,
+		layout.Width,
 		"Spectrum",
 		visRaw,
 		themeCol("#7c7986"),
 	)
 
-	lyricInnerW := w - 4
-	lyricInnerH := lyricH - 2
-	if lyricInnerH < 1 {
-		lyricInnerH = 1
-	}
-	lyricContent := a.renderLyricAnim(lyricInnerW, lyricInnerH)
-	lyricBox := renderBox(w, "Lyrics", lyricContent, themeCol("#7c7986"))
+	lyricContent := a.renderLyricAnim(
+		layout.LyricsInnerWidth,
+		layout.LyricsInnerHeight,
+	)
+	lyricBox := renderBox(
+		layout.Width,
+		"Lyrics",
+		lyricContent,
+		themeCol("#7c7986"),
+	)
 
-	// App Time
 	duration := time.Since(a.sessionStart)
 	hTime := int(duration.Hours())
 	mTime := int(duration.Minutes()) % 60
 	sTime := int(duration.Seconds()) % 60
 	statsContent := fmt.Sprintf("Session: %02dh %02dm %02ds", hTime, mTime, sTime)
 
-	// Canh giữa text và làm mờ màu
 	statsView := lipgloss.NewStyle().
-		Width(w).
+		Width(layout.Width).
 		Align(lipgloss.Center).
 		Render(DimItemStyle.Render(statsContent))
-	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsView)
+
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		visView,
+		lyricBox,
+		statsView,
+	)
 }
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
