@@ -85,6 +85,9 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		}
 
 	case PlayPlaylistMsg:
+		if msg.Index < 0 || msg.Index >= len(msg.Tracks) {
+			return nil
+		}
 		a.activeContext = SidePlaylists
 		a.left.loadingStream = true
 		cmds = append(cmds,
@@ -241,7 +244,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, c)
 		}
 	case ExecuteRemovePlMsg:
-		if a.left.plStore != nil {
+		if a.left.plStore != nil && msg.PlIdx >= 0 && msg.PlIdx < len(a.left.playlists) {
 			pl := a.left.playlists[msg.PlIdx]
 			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, msg.Track.Path); err == nil {
 				for j := range pl.Tracks {
