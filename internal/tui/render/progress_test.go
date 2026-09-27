@@ -19,7 +19,7 @@ func TestProgressBarEmpty(t *testing.T) {
 	if !strings.Contains(got, "00:00") {
 		t.Fatalf("missing time label: %q", got)
 	}
-	if lines := strings.Count(got, "\n")+1; lines != 3 {
+	if lines := strings.Count(got, "\n") + 1; lines != 3 {
 		t.Fatalf("expected 3 lines, got %d", lines)
 	}
 }
