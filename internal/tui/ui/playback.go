@@ -53,9 +53,10 @@ func (pm *PlaybackManager) Stop() tea.Cmd {
 	pm.NowPlay = nil
 	pm.NextPlay = nil
 	pm.SongStarted = false
+	gen := pm.PlayerGen
 
 	return func() tea.Msg {
-		return TrackChangedMsg{Track: domain.Track{}, IsLocal: true, Gen: pm.PlayerGen}
+		return TrackChangedMsg{Track: domain.Track{}, IsLocal: true, Gen: gen}
 	}
 }
 
@@ -207,7 +208,8 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 
 	case EnqueueTrackMsg:
 		pm.Queue = append(pm.Queue, msg.Track)
-		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+		queue := cloneTracks(pm.Queue)
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: queue} })
 
 	case ToggleRandomMsg:
 		pm.Random = !pm.Random
@@ -218,14 +220,16 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		if msg.Index >= 0 && msg.Index < len(pm.Queue) {
 			t := pm.Queue[msg.Index]
 			pm.Queue = append(pm.Queue[:msg.Index], pm.Queue[msg.Index+1:]...)
+			queue := cloneTracks(pm.Queue)
 			cmds = append(cmds, pm.playTrackCmd(-1, t))
-			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: queue} })
 		}
 
 	case RemoveFromQueueMsg:
 		if msg.Index >= 0 && msg.Index < len(pm.Queue) {
 			pm.Queue = append(pm.Queue[:msg.Index], pm.Queue[msg.Index+1:]...)
-			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+			queue := cloneTracks(pm.Queue)
+			cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: queue} })
 		}
 
 	case DeleteDoneMsg:
@@ -267,7 +271,8 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		pm.Queue = filterTracksByID(pm.Queue, deletedID)
 		pm.History = filterTracksByID(pm.History, deletedID)
 		pm.ShuffleHist = nil
-		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+		queue := cloneTracks(pm.Queue)
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: queue} })
 
 	case RenameDoneMsg:
 		if msg.Err != nil {
@@ -301,11 +306,16 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 			pm.NowPlay.ID = newID
 			pm.NowPlay.Title = msg.NewTitle
 			track := *pm.NowPlay
+			gen := pm.PlayerGen
+			pos := pm.CurrentIdx
+			total := len(pm.Playlist)
+			random := pm.Random
 			cmds = append(cmds, func() tea.Msg {
-				return TrackChangedMsg{Track: track, IsLocal: true, Gen: pm.PlayerGen, PlaylistPos: pm.CurrentIdx, PlaylistLen: len(pm.Playlist), IsRandom: pm.Random}
+				return TrackChangedMsg{Track: track, IsLocal: true, Gen: gen, PlaylistPos: pos, PlaylistLen: total, IsRandom: random}
 			})
 		}
-		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: pm.Queue} })
+		queue := cloneTracks(pm.Queue)
+		cmds = append(cmds, func() tea.Msg { return QueueChangedMsg{Queue: queue} })
 
 	case PlayNextMsg:
 		t, idx, isQueue := pm.NextTrack()
@@ -364,14 +374,18 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 					pm.SongStarted = true
 
 					//  UI cập nhật
+					gen := pm.PlayerGen
+					pos := pm.CurrentIdx
+					total := len(pm.Playlist)
+					random := pm.Random
 					cmds = append(cmds, func() tea.Msg {
 						return TrackChangedMsg{
 							Track:       t,
 							IsLocal:     true,
-							Gen:         pm.PlayerGen,
-							PlaylistPos: pm.CurrentIdx,
-							PlaylistLen: len(pm.Playlist),
-							IsRandom:    pm.Random,
+							Gen:         gen,
+							PlaylistPos: pos,
+							PlaylistLen: total,
+							IsRandom:    random,
 						}
 					})
 				}
@@ -480,6 +494,10 @@ func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, reco
 		func() tea.Msg { return trackChangedMsg },
 		resolveStreamCmd,
 	)
+}
+
+func cloneTracks(tracks []domain.Track) []domain.Track {
+	return append([]domain.Track(nil), tracks...)
 }
 
 func filterTracksByID(tracks []domain.Track, id string) []domain.Track {
