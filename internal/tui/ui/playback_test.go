@@ -197,3 +197,24 @@ func TestNewPlayRequestInvalidatesPreviousGeneration(t *testing.T) {
 		t.Fatalf("playback generations=%d/%d, want monotonic increase", first, second)
 	}
 }
+
+
+func TestPlaybackStopClearsState(t *testing.T) {
+	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
+	pm.PlayerGen = 3
+	pm.NowPlay = &domain.Track{ID: "current"}
+	pm.NextPlay = &domain.Track{ID: "next"}
+	pm.SongStarted = true
+
+	cmd := pm.Stop()
+	if cmd == nil {
+		t.Fatal("expected stop notification command")
+	}
+	if pm.NowPlay != nil || pm.NextPlay != nil || pm.SongStarted {
+		t.Fatalf("state after stop=%v/%v/%v, want nil/nil/false", pm.NowPlay, pm.NextPlay, pm.SongStarted)
+	}
+	if pm.PlayerGen != 1 {
+		t.Fatalf("player generation=%d, want 1 for fresh test player", pm.PlayerGen)
+	}
+}
