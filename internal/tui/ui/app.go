@@ -443,39 +443,48 @@ func (a *App) View() tea.View {
 	}
 
 	layout := a.uiLayout()
+	mainView := a.renderMainContent(layout)
+	sideView := renderSidebar(
+		a.sidebarActive,
+		a.sidebarAnim,
+		layout.MainViewHeight,
+		layout.MainViewHeight,
+	)
+	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
+
+	view := a.renderBaseView(layout, contentRow)
+
+	v := tea.NewView(a.renderOverlayView(view))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	a.setViewCursor(&v, layout.HeaderHeight+layout.SeparatorHeight)
+
+	return v
+}
+
+func (a *App) renderMainContent(layout UILayout) string {
 	contentH := layout.MainViewHeight
 	mainW := layout.MainWidth
 	frame := a.splashFrame
-	var mainView string
-	dashboard := renderDashboard(a.hideLogo, a.player.Volume(), a.activeSpeed, a.activePreset, a.playback.NowPlay)
-	somRow := a.renderSomRow(dashboard)
-
-	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
-	sepLeft := strings.Repeat("─", sidebarWidth)
-	sepRight := ""
-	if a.width > sidebarWidth+1 {
-		sepRight = strings.Repeat("─", a.width-sidebarWidth-1)
-	}
-	sep := borderStyle.Render(sepLeft + "─" + sepRight)
-	contentTop := layout.HeaderHeight + layout.SeparatorHeight
 
 	inputNotFocused := !a.left.input.Focused()
-
 	playingID := ""
 	if a.playback.NowPlay != nil {
 		playingID = a.playback.NowPlay.ID
 	}
-	col3W := layout.ThirdColumnWidth
-	tracklistW := layout.TracklistWidth
-	switch a.sidebarActive {
 
+	var mainView string
+	switch a.sidebarActive {
 	case SideSearch:
 		mainView = a.left.ViewSearchContent(mainW, contentH, playingID)
+
 	case SideDownloads:
 		var alreadyInMove map[string]bool
 		var selected map[string]bool
 		selectMode := false
-		if a.moveSession != nil && a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
+		if a.moveSession != nil &&
+			a.moveSession.TargetPlIdx >= 0 &&
+			a.moveSession.TargetPlIdx < len(a.left.playlists) {
 			selectMode = true
 			selected = a.moveSession.Selected
 			alreadyInMove = map[string]bool{}
@@ -487,36 +496,60 @@ func (a *App) View() tea.View {
 				alreadyInMove[path] = true
 			}
 		}
-		tracklistView := a.left.ViewDownloadsContent(tracklistW, contentH, selected, selectMode, alreadyInMove, playingID)
-		col3View := a.renderThirdColumn(col3W, contentH)
+
+		tracklistView := a.left.ViewDownloadsContent(
+			layout.TracklistWidth,
+			contentH,
+			selected,
+			selectMode,
+			alreadyInMove,
+			playingID,
+		)
+		col3View := a.renderThirdColumn(layout.ThirdColumnWidth, contentH)
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
+
 	case SideImport:
 		a.importPanel.SetSize(mainW, contentH)
 		mainView = a.importPanel.ViewImportContent(mainW, contentH)
+
 	case SideQueue:
 		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue, playingID)
+
 	case SidePlaylists:
-		tracklistView := a.left.ViewPlaylistsContent(tracklistW, contentH, playingID)
-		col3View := a.renderThirdColumn(col3W, contentH)
+		tracklistView := a.left.ViewPlaylistsContent(layout.TracklistWidth, contentH, playingID)
+		col3View := a.renderThirdColumn(layout.ThirdColumnWidth, contentH)
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
+
 	case SideLogs:
 		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
+
 	default:
 		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused, frame)
 	}
 
-	mainView = lipgloss.NewStyle().
+	return lipgloss.NewStyle().
 		Width(layout.MainWidth).
 		Height(layout.MainViewHeight).
 		Render(mainView)
+}
 
-	sideView := renderSidebar(
-		a.sidebarActive,
-		a.sidebarAnim,
-		layout.MainViewHeight,
-		layout.MainViewHeight,
+func (a *App) renderBaseView(layout UILayout, contentRow string) string {
+	dashboard := renderDashboard(
+		a.hideLogo,
+		a.player.Volume(),
+		a.activeSpeed,
+		a.activePreset,
+		a.playback.NowPlay,
 	)
-	contentRow := lipgloss.JoinHorizontal(lipgloss.Top, sideView, mainView)
+	somRow := a.renderSomRow(dashboard)
+
+	borderStyle := lipgloss.NewStyle().Foreground(colorBorder)
+	sepLeft := strings.Repeat("─", sidebarWidth)
+	sepRight := ""
+	if a.width > sidebarWidth+1 {
+		sepRight = strings.Repeat("─", a.width-sidebarWidth-1)
+	}
+	sep := borderStyle.Render(sepLeft + "─" + sepRight)
 
 	status := ""
 	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
@@ -553,35 +586,39 @@ func (a *App) View() tea.View {
 		b.WriteString(help)
 	}
 
-	view := b.String()
+	return b.String()
+}
 
+func (a *App) renderOverlayView(view string) string {
 	if len(a.modals) > 0 {
 		popup := a.modals[len(a.modals)-1].View()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.left.showPlInput {
+		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	}
+	if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.left.showDeletePopup {
+		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	}
+	if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
-	} else if a.palette.Visible() {
+		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	}
+	if a.palette.Visible() {
 		popup := a.palette.View()
-		view = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+	}
+	return view
+}
+
+func (a *App) setViewCursor(v *tea.View, contentTop int) {
+	if !a.left.input.Focused() {
+		return
 	}
 
-	v := tea.NewView(view)
-	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
-
-	if a.left.input.Focused() {
-		if c := a.left.input.Cursor(); c != nil {
-			c.Position.X += sidebarWidth + 3
-			c.Position.Y = contentTop + 1
-			v.Cursor = c
-		}
+	if c := a.left.input.Cursor(); c != nil {
+		c.Position.X += sidebarWidth + 3
+		c.Position.Y = contentTop + 1
+		v.Cursor = c
 	}
-
-	return v
 }
 
 // render lyrics hoặc import
