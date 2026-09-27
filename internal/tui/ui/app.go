@@ -8,6 +8,7 @@ import (
 	"som/internal/domain"
 	"som/internal/storage"
 	"som/internal/tui/avrcp"
+	"som/internal/tui/layout"
 	"som/internal/tui/player"
 
 	"charm.land/bubbles/v2/spinner"
@@ -417,8 +418,8 @@ func (a *App) somRowHeight() int {
 	return 2
 }
 
-func (a *App) uiLayout() UILayout {
-	return NewUILayout(
+func (a *App) uiLayout() layout.UILayout {
+	return layout.NewUILayout(
 		a.width,
 		a.height,
 		sidebarWidth,
