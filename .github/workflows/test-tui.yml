@@ -1,0 +1,43 @@
+name: TUI Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "internal/tui/**"
+      - "internal/domain/**"
+      - "internal/storage/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/test-tui.yml"
+  pull_request:
+    paths:
+      - "internal/tui/**"
+      - "internal/domain/**"
+      - "internal/storage/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/test-tui.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Install ALSA dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Run TUI tests
+        run: go test ./internal/tui/...
+
+      - name: Run TUI race tests
+        run: go test -race ./internal/tui/...
