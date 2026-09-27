@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 
 	"som/internal/storage"
@@ -94,4 +95,31 @@ func TestHandleAudioEventsIgnoresInvalidPlaylistIndex(t *testing.T) {
 		Tracks: nil,
 		Index:  0,
 	})
+}
+
+
+func TestHandleAudioEventsIgnoresStaleGeneration(t *testing.T) {
+	a := &App{
+		playback: &PlaybackManager{PlayerGen: 5},
+	}
+
+	if cmd := a.handleAudioEvents(TrackChangedMsg{
+		Track: domain.Track{ID: "stale", Title: "Stale"},
+		Gen:   4,
+	}); cmd != nil {
+		t.Fatal("stale track change should not schedule a command")
+	}
+	if a.statusMsg != "" {
+		t.Fatalf("status=%q, want empty", a.statusMsg)
+	}
+
+	if cmd := a.handleAudioEvents(StreamResolvedMsg{
+		Gen: 4,
+		Err: fmt.Errorf("stale stream failure"),
+	}); cmd != nil {
+		t.Fatal("stale stream result should not schedule a command")
+	}
+	if a.statusMsg != "" {
+		t.Fatalf("status after stale stream=%q, want empty", a.statusMsg)
+	}
 }
