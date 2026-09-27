@@ -278,7 +278,8 @@ func (a *App) updateModal(msg tea.Msg) (tea.Cmd, bool) {
 	}
 
 	top := len(a.modals) - 1
-	a.modals[top], modalCmd := a.modals[top].Update(msg)
+	var modalCmd tea.Cmd
+	a.modals[top], modalCmd = a.modals[top].Update(msg)
 
 	switch msg.(type) {
 	case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
