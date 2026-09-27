@@ -267,120 +267,30 @@ func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
 }
 
 func (a *App) renderProgressBar(w int) string {
-	dim := ProgressDimStyle
-	controls := dim.Render("")
-
-	innerW := w - 4
-
 	elapsedSec := 0
 	totalSec := 0
-	if a.playback.NowPlay != nil {
-		elapsedSec = int(a.right.elapsed.Seconds())
-		if elapsedSec < 0 {
-			elapsedSec = 0
-		}
-
-		totalSec = a.playback.NowPlay.Duration
-		if totalSec > 0 && elapsedSec > totalSec {
-			elapsedSec = totalSec
-		}
-	}
-
-	timeStr := FormatDuration(elapsedSec)
-	timeW := len([]rune(timeStr))
-
-	timeStart := (innerW - timeW) / 2
-	if timeStart < 0 {
-		timeStart = 0
-	}
-	leftW := timeStart
-	rightW := innerW - timeStart - timeW
-	if rightW < 0 {
-		rightW = 0
-	}
-
-	fillW := 0
-	if totalSec > 0 {
-		fillW = innerW * elapsedSec / totalSec
-	}
-	if fillW > innerW {
-		fillW = innerW
-	}
-
-	leftFill := fillW
-	if leftFill > leftW {
-		leftFill = leftW
-	}
-	rightFill := fillW - leftW - timeW
-	if rightFill < 0 {
-		rightFill = 0
-	}
-	if rightFill > rightW {
-		rightFill = rightW
-	}
-
-	labelFill := fillW - leftW
-	if labelFill < 0 {
-		labelFill = 0
-	}
-	if labelFill > timeW {
-		labelFill = timeW
-	}
-
-	var bar strings.Builder
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", leftFill)))
-	bar.WriteString(strings.Repeat(" ", leftW-leftFill))
-	if labelFill > 0 {
-		bar.WriteString(ProgressTimeOnFillStyle.Render(string([]rune(timeStr)[:labelFill])))
-	}
-	if labelFill < timeW {
-		bar.WriteString(ProgressTimeStyle.Render(string([]rune(timeStr)[labelFill:])))
-	}
-	bar.WriteString(ProgressFilledStyle.Render(strings.Repeat("█", rightFill)))
-
-	progress := bar.String()
-	borderColor := themeCol("#7c7986")
-	borderChar := lipgloss.NewStyle().Foreground(borderColor)
-
 	title := ""
 	if a.playback.NowPlay != nil {
+		elapsedSec = int(a.right.elapsed.Seconds())
+		totalSec = a.playback.NowPlay.Duration
 		title = a.playback.NowPlay.Title
 	}
-	borderW := w - 2
-	if borderW < 0 {
-		borderW = 0
-	}
-	var topBorder string
-	if title == "" {
-		topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
-	} else {
-		titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
-		titleW := lipgloss.Width(titleRendered)
-		prefix := "╭── "
-		prefixStyled := borderChar.Render(prefix)
-		prefixW := lipgloss.Width(prefixStyled)
-		remain := w - prefixW - titleW - 1
-		if remain < 0 {
-			remain = 0
-		}
-		topBorder = prefixStyled + titleRendered + borderChar.Render(strings.Repeat("─", remain)+"╮")
-	}
 
-	bottomBorder := borderChar.Render("╰" + strings.Repeat("─", w-2) + "╯")
-
-	barPad := innerW - lipgloss.Width(progress)
-	if barPad < 0 {
-		barPad = 0
-	}
-
-	// Merge controls (left) + progress bar (right) into one line.
-	combinedLine := borderChar.Render("│ ") +
-		controls +
-		progress +
-		strings.Repeat(" ", barPad) +
-		borderChar.Render(" │")
-
-	return topBorder + "\n" + combinedLine + "\n" + bottomBorder
+	return render.ProgressBar(
+		w,
+		elapsedSec,
+		totalSec,
+		title,
+		FormatDuration(elapsedSec),
+		render.ProgressBarStyles{
+			Border:     lipgloss.NewStyle().Foreground(themeCol("#7c7986")),
+			Title:      PanelTitleStyle.Foreground(themeCol("#7c7986")),
+			Filled:     ProgressFilledStyle,
+			Time:       ProgressTimeStyle,
+			TimeFilled: ProgressTimeOnFillStyle,
+			Controls:   ProgressDimStyle,
+		},
+	)
 }
 
 func (a *App) renderThirdColumn(w, h int) string {
