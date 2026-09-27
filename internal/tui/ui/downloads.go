@@ -58,7 +58,7 @@ func (p *LeftPanel) scanLocalFiles() {
 	p.locals = append(pinned, unpinned...)
 }
 func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
-	innerW := w - 4
+	innerW := w - 2
 	listContent := lipgloss.NewStyle().
 		PaddingLeft(1).
 		Render(

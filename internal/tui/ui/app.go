@@ -419,7 +419,7 @@ func (a *App) View() tea.View {
 	if col3W < 25 {
 		col3W = 25
 	}
-	tracklistW := mainW - col3W
+	tracklistW := mainW - col3W - 1
 	if tracklistW < 1 {
 		tracklistW = 1
 	}
@@ -835,7 +835,7 @@ func (a *App) renderThirdColumn(w, h int) string {
 		Width(w).
 		Align(lipgloss.Center).
 		Render(DimItemStyle.Render(statsContent))
-	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsView)
+	return lipgloss.JoinVertical(lipgloss.Top, visView, "", lyricBox, statsView)
 }
 func (a *App) setStatus(s string) {
 	a.statusMsg = s

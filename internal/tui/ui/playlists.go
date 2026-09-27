@@ -62,7 +62,7 @@ func (p LeftPanel) getFilteredPlaylistTracks() []storage.PlaylistTrack {
 }
 
 func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
-	innerW := w - 4
+	innerW := w - 2
 
 	var listContent string
 	var title string
