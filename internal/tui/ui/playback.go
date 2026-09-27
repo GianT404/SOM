@@ -43,6 +43,22 @@ func (pm *PlaybackManager) SetDependencies(p *player.Player, prov domain.MusicPr
 	pm.Store = store
 }
 
+// Stop dừng playback và hủy mọi tác vụ cũ.
+func (pm *PlaybackManager) Stop() tea.Cmd {
+	pm.CancelResolve()
+	if pm.Player != nil {
+		pm.Player.Stop()
+		pm.PlayerGen = pm.Player.Generation()
+	}
+	pm.NowPlay = nil
+	pm.NextPlay = nil
+	pm.SongStarted = false
+
+	return func() tea.Msg {
+		return TrackChangedMsg{Track: domain.Track{}, IsLocal: true, Gen: pm.PlayerGen}
+	}
+}
+
 // CancelResolve hủy các luồng tải stream cũ an toàn
 func (pm *PlaybackManager) CancelResolve() {
 	if pm.ResolveCancel != nil {
