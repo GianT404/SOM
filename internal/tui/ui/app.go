@@ -835,7 +835,7 @@ func (a *App) renderThirdColumn(w, h int) string {
 		Width(w).
 		Align(lipgloss.Center).
 		Render(DimItemStyle.Render(statsContent))
-	return lipgloss.JoinVertical(lipgloss.Top, visView, "", lyricBox, statsView)
+	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsView)
 }
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
