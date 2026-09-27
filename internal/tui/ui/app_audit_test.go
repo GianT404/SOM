@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"som/internal/domain"
 	"som/internal/storage"
 )
 
