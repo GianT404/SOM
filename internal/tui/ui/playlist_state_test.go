@@ -62,7 +62,7 @@ func TestPlaylistFilterClampsCursor(t *testing.T) {
 	p.plCursor = 5
 	p.plOffset = 4
 
-	p.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, true, nil)
+	p.Update(tea.WindowSizeMsg{Width: 80, Height: 30}, true, nil)
 
 	if got := len(p.getFilteredPlaylists()); got != 1 {
 		t.Fatalf("filtered playlists=%d, want 1", got)
@@ -86,7 +86,6 @@ func TestPlaylistFilterRestoresPreviousSelection(t *testing.T) {
 	p.input.SetValue("b")
 	p.plCursor = 0
 
-	p.input.SetValue("")
 	p.Update(tea.KeyPressMsg{Code: tea.KeyBackspace}, true, nil)
 
 	if p.plCursor != 1 {
