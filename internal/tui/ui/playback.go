@@ -437,8 +437,12 @@ func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, reco
 			return PlaybackErrorMsg{Err: fmt.Errorf("lỗi lấy link: %v", err)}
 		}
 
-		if err := pm.Player.PlayWithHeaders(streamInfo.URL, streamInfo.Headers); err != nil {
+		started, err := pm.Player.PlayWithHeadersIfGeneration(streamInfo.URL, streamInfo.Headers, gen)
+		if err != nil {
 			return PlaybackErrorMsg{Err: err}
+		}
+		if !started {
+			return nil
 		}
 
 		lr, lyricsErr := getCachedLyrics(pm.Provider, pm.Store, t.ID, t.Title, t.Artist, t.Duration)
