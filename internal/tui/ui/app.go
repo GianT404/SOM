@@ -193,11 +193,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateBoot(msg)
 	}
 
-	if cmd, stop := a.updateModal(msg); stop {
-		return a, cmd
+	modalCmd, stop := a.updateModal(msg)
+	if stop {
+		return a, modalCmd
 	}
 
-	cmds, handled, stop := a.updateSystem(msg)
+	var cmds []tea.Cmd
+	if modalCmd != nil {
+		cmds = append(cmds, modalCmd)
+	}
+
+	systemCmds, handled, stop := a.updateSystem(msg)
+	cmds = append(cmds, systemCmds...)
 	if !handled {
 		cmds = append(cmds, a.routeEvents(msg)...)
 	}
