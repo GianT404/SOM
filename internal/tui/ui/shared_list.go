@@ -2,9 +2,9 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"som/internal/tui/layout"
-	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
