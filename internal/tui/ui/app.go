@@ -803,12 +803,23 @@ func (a *App) renderThirdColumn(w, h int) string {
 	}
 
 	// 2. Spectrum
-	visRaw := a.palette.RenderEQColumn(w-2, visH)
-	visView := lipgloss.NewStyle().
-		Width(w-2).
-		Height(visH).
-		Padding(0, 1).
-		Render(visRaw)
+	visInnerW := w - 4
+	visInnerH := visH - 2
+
+	if visInnerW < 1 {
+		visInnerW = 1
+	}
+	if visInnerH < 1 {
+		visInnerH = 1
+	}
+
+	visRaw := a.palette.RenderEQColumn(visInnerW, visInnerH)
+	visView := renderBox(
+		w,
+		"Spectrum",
+		visRaw,
+		themeCol("#7c7986"),
+	)
 
 	lyricInnerW := w - 4
 	lyricInnerH := lyricH - 2
@@ -830,7 +841,7 @@ func (a *App) renderThirdColumn(w, h int) string {
 		Width(w).
 		Align(lipgloss.Center).
 		Render(DimItemStyle.Render(statsContent))
-	return lipgloss.JoinVertical(lipgloss.Top, visView, "", lyricBox, statsView)
+	return lipgloss.JoinVertical(lipgloss.Top, visView, lyricBox, statsView)
 }
 func (a *App) setStatus(s string) {
 	a.statusMsg = s
