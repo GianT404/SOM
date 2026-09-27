@@ -30,6 +30,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev pkg-config
 
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l .)"
+
       - name: Run Go tests
         run: go test ./...
 
