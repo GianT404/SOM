@@ -337,6 +337,15 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 	case PlayTrackAtMsg:
 		cmds = append(cmds, pm.playTrackCmd(msg.Index, msg.Track))
 
+	case StreamResolvedMsg:
+		if msg.Gen != pm.PlayerGen || pm.NowPlay == nil {
+			break
+		}
+		if pm.Player != nil {
+			pm.PlayerGen = pm.Player.Generation()
+		}
+		pm.SongStarted = true
+
 	case PlaybackTickMsg:
 		if !pm.SongStarted || pm.NowPlay == nil {
 			return pm, nil
