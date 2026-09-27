@@ -58,6 +58,7 @@ type LeftPanel struct {
 
 	suggestions   []string
 	suggestCursor int
+	trackGen      uint64
 	suggestOffset int
 	suggestFocus  bool
 	pinned        []string
@@ -580,6 +581,10 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			cmds = append(cmds, suggestCmd(cur))
 		}
 	case TrackChangedMsg:
+		if msg.Gen < p.trackGen {
+			break
+		}
+		p.trackGen = msg.Gen
 		if msg.IsLocal {
 			p.loadingStream = false
 			path := strings.TrimPrefix(msg.Track.ID, "local:")
@@ -638,6 +643,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		}
 		return p, nil
 	case StreamResolvedMsg:
+		if msg.Gen != p.trackGen {
+			break
+		}
 		p.loadingStream = false
 		return p, nil
 
