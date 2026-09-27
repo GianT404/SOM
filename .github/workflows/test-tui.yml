@@ -19,6 +19,7 @@ on:
       - "go.sum"
       - ".github/workflows/test-tui.yml"
 
+# Final repository gate.
 jobs:
   test:
     runs-on: ubuntu-latest
