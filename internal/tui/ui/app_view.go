@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"som/internal/tui/layout"
 	"charm.land/lipgloss/v2"
 )
 
@@ -37,7 +38,7 @@ func (a *App) View() tea.View {
 	return v
 }
 
-func (a *App) renderMainContent(layout UILayout) string {
+func (a *App) renderMainContent(layout layout.UILayout) string {
 	contentH := layout.MainViewHeight
 	mainW := layout.MainWidth
 	frame := a.splashFrame
@@ -383,7 +384,7 @@ func (a *App) renderProgressBar(w int) string {
 }
 
 func (a *App) renderThirdColumn(w, h int) string {
-	layout := NewThirdColumnLayout(w, h)
+	layout := layout.NewThirdColumnLayout(w, h)
 
 	visRaw := a.palette.RenderEQColumn(
 		layout.SpectrumInnerWidth,
