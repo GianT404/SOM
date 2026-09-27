@@ -1,0 +1,40 @@
+name: Mobile Typecheck
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**/*.ts"
+      - "app/**/*.tsx"
+      - "app/package.json"
+      - "app/package-lock.json"
+      - "app/tsconfig.json"
+      - ".github/workflows/test-mobile.yml"
+  pull_request:
+    paths:
+      - "app/**/*.ts"
+      - "app/**/*.tsx"
+      - "app/package.json"
+      - "app/package-lock.json"
+      - "app/tsconfig.json"
+      - ".github/workflows/test-mobile.yml"
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck
+        working-directory: app
+        run: npm run typecheck
