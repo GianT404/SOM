@@ -26,6 +26,7 @@ type RightPanel struct {
 	playlistPos   int
 	playlistTotal int
 	random        bool
+	trackGen      uint64
 
 	loadingLyrics bool
 	spinner       spinner.Model
@@ -181,6 +182,9 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		}
 
 	case LocalLyricsLoadedMsg:
+		if msg.Gen != r.trackGen {
+			return r, nil
+		}
 		r.SetLyrics(msg.Lyrics)
 		return r, r.spinner.Tick
 	case PlaybackTickMsg:
@@ -226,6 +230,10 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 			return r, cmd
 		}
 	case TrackChangedMsg:
+		if msg.Gen < r.trackGen {
+			return r, nil
+		}
+		r.trackGen = msg.Gen
 		track := msg.Track
 		if track.ID == "" { // Track rỗng do bị xóa
 			r.nowPlay = nil
@@ -250,6 +258,9 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 		return r, r.spinner.Tick
 
 	case StreamResolvedMsg:
+		if msg.Gen != r.trackGen {
+			return r, nil
+		}
 		if msg.LyricsErr != nil {
 			r.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
 		} else {
