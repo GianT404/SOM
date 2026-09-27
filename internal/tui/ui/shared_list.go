@@ -26,30 +26,13 @@ func renderSharedTrackList[T any](
 		end = len(items)
 	}
 
-	tickW := 0
-	headerTick := "  " // 2 ô lề trái
+	layout := newTracklistLayout(innerW, selectMode)
+	headerTick := "  "
 	if selectMode {
-		tickW = 4
-		headerTick = "      " // 2 ô lề trái + 4 ô tick
+		headerTick = "      "
 	}
 
-	// Đặt kích thước CỐ ĐỊNH
-	checkW := 2
-	idxW := 3
-	timeW := 5
-
-	// Tổng các khoảng phân cách: prefix(2) + sau idx(2) + sau title(2) + sau artist(2) = 8
-	spacing := 8
-	availW := innerW - tickW - checkW - idxW - timeW - spacing
-	if availW < 10 {
-		availW = 10
-	}
-
-	// Title 70%, Artist 30%
-	titleW := int(float64(availW) * 0.70)
-	artistW := availW - titleW
-
-	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %*s", headerTick, idxW, "#", titleW, "Title", artistW, "Artist", checkW+timeW, "Time")
+	header := fmt.Sprintf("%s%-*s  %-*s  %-*s  %*s", headerTick, layout.IndexWidth, "#", layout.TitleWidth, "Title", layout.ArtistWidth, "Artist", layout.CheckWidth+layout.TimeWidth, "Time")
 
 	b.WriteString(DimItemStyle.Render(header))
 	b.WriteString("\n")
@@ -77,12 +60,12 @@ func renderSharedTrackList[T any](
 		if showCheck {
 			checkStr = IconCheck + " "
 		}
-		checkStr = runewidth.FillRight(checkStr, checkW)
+		checkStr = runewidth.FillRight(checkStr, layout.CheckWidth)
 
-		idx := fmt.Sprintf("%-*d", idxW, displayIdx)
-		safeTitle := runewidth.FillRight(truncate(title, titleW), titleW)
-		safeArtist := runewidth.FillRight(truncate(artist, artistW), artistW)
-		dur := fmt.Sprintf("%*s", timeW, FormatDuration(durSec))
+		idx := fmt.Sprintf("%-*d", layout.IndexWidth, displayIdx)
+		safeTitle := runewidth.FillRight(truncate(title, layout.TitleWidth), layout.TitleWidth)
+		safeArtist := runewidth.FillRight(truncate(artist, layout.ArtistWidth), layout.ArtistWidth)
+		dur := fmt.Sprintf("%*s", layout.TimeWidth, FormatDuration(durSec))
 
 		line := prefix + tick + idx + "  " + safeTitle + "  " + safeArtist + "  " + checkStr + dur
 
