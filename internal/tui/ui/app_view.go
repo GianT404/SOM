@@ -7,8 +7,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"som/internal/tui/layout"
 	"charm.land/lipgloss/v2"
+	"som/internal/tui/layout"
 )
 
 func (a *App) View() tea.View {
