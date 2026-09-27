@@ -15,6 +15,7 @@ on:
       - "go.sum"
       - ".github/workflows/test-go.yml"
 
+# Final repository gate.
 jobs:
   test:
     runs-on: ubuntu-latest
