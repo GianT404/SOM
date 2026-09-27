@@ -71,8 +71,8 @@ func TestHandleDataEventsIgnoresInvalidPlaylistIndex(t *testing.T) {
 
 	a := &App{
 		left: LeftPanel{
-			plStore:    db,
-			playlists:  []storage.Playlist{{ID: "pl_test", Name: "Test"}},
+			plStore:   db,
+			playlists: []storage.Playlist{{ID: "pl_test", Name: "Test"}},
 		},
 	}
 
@@ -100,7 +100,6 @@ func TestHandleAudioEventsIgnoresInvalidPlaylistIndex(t *testing.T) {
 	})
 }
 
-
 func TestHandleAudioEventsIgnoresStaleGeneration(t *testing.T) {
 	a := &App{
 		playback: &PlaybackManager{PlayerGen: 5},
@@ -126,7 +125,6 @@ func TestHandleAudioEventsIgnoresStaleGeneration(t *testing.T) {
 		t.Fatalf("status after stale stream=%q, want empty", a.statusMsg)
 	}
 }
-
 
 func TestDeleteCmdReportsFilesystemFailure(t *testing.T) {
 	dir := t.TempDir()

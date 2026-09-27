@@ -8,7 +8,7 @@ import (
 
 func TestRightPanelIgnoresStaleTrackChange(t *testing.T) {
 	r := RightPanel{
-		nowPlay: &domain.Track{ID: "current", Title: "Current"},
+		nowPlay:  &domain.Track{ID: "current", Title: "Current"},
 		trackGen: 5,
 	}
 
@@ -29,7 +29,7 @@ func TestRightPanelIgnoresStaleLyrics(t *testing.T) {
 	r := RightPanel{trackGen: 5}
 
 	r, _ = r.Update(StreamResolvedMsg{
-		Gen: 4,
+		Gen:    4,
 		Lyrics: domain.LyricsResp{Plain: "stale lyrics"},
 	}, false)
 	if r.loaded {
@@ -60,7 +60,6 @@ func TestRightPanelAcceptsCurrentGenerationLyrics(t *testing.T) {
 	}
 }
 
-
 func TestLeftPanelIgnoresStaleTrackChange(t *testing.T) {
 	p := LeftPanel{
 		tracks:   []domain.Track{{ID: "current"}},
@@ -83,8 +82,8 @@ func TestLeftPanelIgnoresStaleTrackChange(t *testing.T) {
 
 func TestLeftPanelIgnoresStaleStreamResult(t *testing.T) {
 	p := LeftPanel{
-		activeTab: SideSearch,
-		trackGen:  5,
+		activeTab:     SideSearch,
+		trackGen:      5,
 		loadingStream: true,
 	}
 

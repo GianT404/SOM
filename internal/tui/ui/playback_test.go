@@ -31,7 +31,6 @@ func TestPlayTrackCmdRecordsPreviousTrackOnceInRandomMode(t *testing.T) {
 	}
 }
 
-
 func TestPrevRandomDoesNotGrowHistory(t *testing.T) {
 	pm := NewPlaybackManager()
 	pm.Player = &player.Player{}
@@ -181,7 +180,6 @@ func TestRenameUpdatesAllPlaybackReferences(t *testing.T) {
 	}
 }
 
-
 func TestNewPlayRequestInvalidatesPreviousGeneration(t *testing.T) {
 	pm := NewPlaybackManager()
 	pm.Player = &player.Player{}
@@ -199,7 +197,6 @@ func TestNewPlayRequestInvalidatesPreviousGeneration(t *testing.T) {
 		t.Fatalf("playback generations=%d/%d, want monotonic increase", first, second)
 	}
 }
-
 
 func TestPlaybackStopClearsState(t *testing.T) {
 	pm := NewPlaybackManager()

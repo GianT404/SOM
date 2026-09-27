@@ -232,7 +232,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				if p.suggestCursor < 0 || p.suggestCursor >= len(p.suggestions) {
 					p.suggestCursor = 0
 				}
-				
+
 				q := strings.TrimSpace(p.suggestions[p.suggestCursor])
 				p.input.SetValue(q)
 				p.input.CursorEnd()
@@ -345,7 +345,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				}
 				break
 			}
-				if p.activeTab == SidePlaylists && p.activePlaylist != nil {
+			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 				p.activePlaylist = nil
 				p.plPreFilterID = ""
 				p.plCursor = 0
@@ -595,10 +595,14 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: lr, Gen: msg.Gen} })
 					}
 				} else {
-					cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen} })
+					cmds = append(cmds, func() tea.Msg {
+						return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen}
+					})
 				}
 			} else {
-				cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen} })
+				cmds = append(cmds, func() tea.Msg {
+					return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen}
+				})
 			}
 		} else {
 			p.loadingStream = true
@@ -821,7 +825,6 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 		}
 	}
-
 
 	if p.activeTab == SidePlaylists && p.activePlaylist != nil {
 		if p.input.Focused() && newVal != oldVal {

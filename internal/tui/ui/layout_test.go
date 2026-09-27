@@ -4,12 +4,12 @@ import "testing"
 
 func TestUILayoutReservesTerminalHeight(t *testing.T) {
 	tests := []struct {
-		name      string
-		width     int
-		height    int
-		sidebar   int
-		header    int
-		hideHint  bool
+		name     string
+		width    int
+		height   int
+		sidebar  int
+		header   int
+		hideHint bool
 	}{
 		{name: "normal", width: 120, height: 40, sidebar: 18, header: 2},
 		{name: "hidden hint", width: 120, height: 40, sidebar: 18, header: 2, hideHint: true},

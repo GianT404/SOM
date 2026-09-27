@@ -3,8 +3,8 @@ package ui
 import (
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 
 	"som/internal/storage"
 )
@@ -54,10 +54,10 @@ func TestRebindActivePlaylistClearsRemovedSelection(t *testing.T) {
 
 func TestPlaylistFilterClampsCursor(t *testing.T) {
 	p := LeftPanel{
-		playlists:  testPlaylists(),
+		playlists: testPlaylists(),
 		activeTab: SidePlaylists,
-		height:     30,
-		input:      textinput.New(),
+		height:    30,
+		input:     textinput.New(),
 	}
 	p.input.Focus()
 	p.input.SetValue("alpha")
@@ -79,11 +79,11 @@ func TestPlaylistFilterClampsCursor(t *testing.T) {
 
 func TestPlaylistFilterRestoresPreviousSelection(t *testing.T) {
 	p := LeftPanel{
-		playlists:      testPlaylists(),
-		activeTab:      SidePlaylists,
-		height:         30,
-		plPreFilterID:  "pl_beta",
-		input:          textinput.New(),
+		playlists:     testPlaylists(),
+		activeTab:     SidePlaylists,
+		height:        30,
+		plPreFilterID: "pl_beta",
+		input:         textinput.New(),
 	}
 	p.input.Focus()
 	p.input.SetValue("b")

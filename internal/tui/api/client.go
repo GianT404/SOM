@@ -23,7 +23,7 @@ type HTTPProvider struct {
 	stream *http.Client
 }
 
-// NewHTTPProvider tạo client cho remote mode (--server). apiKey được gắn vào header X-API-Key trên mọi request — backend (AuthMiddleware) 
+// NewHTTPProvider tạo client cho remote mode (--server). apiKey được gắn vào header X-API-Key trên mọi request — backend (AuthMiddleware)
 func NewHTTPProvider(baseURL, apiKey string) *HTTPProvider {
 	return &HTTPProvider{
 		base:   strings.TrimRight(baseURL, "/"),

@@ -61,7 +61,6 @@ func TestPlayer_PlayFrom_CallsStopLockedBeforeOtoCtxCheck(t *testing.T) {
 	}
 }
 
-
 func TestPlayer_StopInvalidatesGeneration(t *testing.T) {
 	p := newTestPlayer()
 	before := p.Generation()
