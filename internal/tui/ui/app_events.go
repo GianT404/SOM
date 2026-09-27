@@ -164,7 +164,13 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 				}
 			}
 		case "stop":
-			a.player.Stop()
+			if a.playback != nil {
+				if c := a.playback.Stop(); c != nil {
+					cmds = append(cmds, c)
+				}
+			} else {
+				a.player.Stop()
+			}
 			if a.avrcp != nil {
 				a.avrcp.UpdatePlaybackStatus("Stopped")
 			}
