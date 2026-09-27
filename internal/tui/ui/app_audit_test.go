@@ -35,7 +35,7 @@ func TestApplyMoveToPlaylistUsesPathIDs(t *testing.T) {
 				Tracks: []storage.PlaylistTrack{{
 					ID: path, Path: path, Title: "Song", Duration: 180,
 				}},
-			},
+			}},
 			locals: []LocalFile{{Path: path, Name: "Song", Duration: 180}},
 		},
 		moveSession: &MoveSession{
