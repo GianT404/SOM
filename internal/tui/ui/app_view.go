@@ -2,13 +2,13 @@ package ui
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	tuilayout "som/internal/tui/layout"
+	"som/internal/tui/render"
 )
 
 func (a *App) View() tea.View {
@@ -428,79 +428,19 @@ func (a *App) renderThirdColumn(w, h int) string {
 }
 
 func (a *App) renderLyricAnim(innerW, innerH int) string {
-	if innerH < 1 || innerW < 1 {
-		return ""
-	}
-
-	if a.playback.NowPlay == nil {
-		return lipgloss.Place(
-			innerW,
-			innerH,
-			lipgloss.Center,
-			lipgloss.Center,
-			DimItemStyle.Render("Play a track to see lyrics..."),
-		)
-	}
-
-	wrap := func(s string) []string {
-		return wordWrap(s, innerW)
-	}
-
 	progress := float64(time.Since(a.lyricAnimStart)) / float64(350*time.Millisecond)
-	if progress >= 1.0 || a.prevLyric == "" {
-		lines := wrap(a.currLyric)
-		if len(lines) > innerH {
-			lines = lines[:innerH]
-		}
-
-		return lipgloss.Place(
-			innerW,
-			innerH,
-			lipgloss.Center,
-			lipgloss.Center,
-			LyricHighlightStyle.
-				Width(innerW).
-				Align(lipgloss.Center).
-				Render(strings.Join(lines, "\n")),
-		)
-	}
-
-	oldLines := wrap(a.prevLyric)
-	newLines := wrap(a.currLyric)
-
-	gap := 2
-	offset := int(math.Round(progress * float64(gap)))
-
-	cY := innerH / 2
-
-	lines := make([]string, innerH)
-
-	putLines := func(y int, texts []string, style lipgloss.Style) {
-		for i, text := range texts {
-			yy := y + i
-			if yy < 0 || yy >= innerH || text == "" {
-				continue
-			}
-
-			lines[yy] = style.
-				Width(innerW).
-				Align(lipgloss.Center).
-				Render(text)
-		}
-	}
-
-	oldY := cY - offset
-	newY := cY + gap - offset
-
-	oldStyle := LyricHighlightStyle
-	newStyle := DimItemStyle
-	if progress > 0.5 {
-		oldStyle = DimItemStyle
-		newStyle = LyricHighlightStyle
-	}
-
-	putLines(oldY, oldLines, oldStyle)
-	putLines(newY, newLines, newStyle)
-
-	return strings.Join(lines, "\n")
+	return render.LyricAnimation(
+		a.prevLyric,
+		a.currLyric,
+		innerW,
+		innerH,
+		progress,
+		render.LyricAnimationStyles{
+			Highlight: LyricHighlightStyle,
+			Dim:       DimItemStyle,
+		},
+		func(s string, width int) []string {
+			return wordWrap(s, width)
+		},
+	)
 }
