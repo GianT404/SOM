@@ -587,13 +587,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				if lyricsJSON, err := p.plStore.GetLocalFileLyrics(path); err == nil && lyricsJSON != "" {
 					var lr domain.LyricsResp
 					if json.Unmarshal([]byte(lyricsJSON), &lr) == nil {
-						cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: lr} })
+						cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: lr, Gen: msg.Gen} })
 					}
 				} else {
-					cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}} })
+					cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen} })
 				}
 			} else {
-				cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}} })
+				cmds = append(cmds, func() tea.Msg { return LocalLyricsLoadedMsg{Lyrics: domain.LyricsResp{Plain: "(No lyrics available)"}, Gen: msg.Gen} })
 			}
 		} else {
 			p.loadingStream = true
