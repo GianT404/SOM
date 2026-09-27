@@ -4,67 +4,9 @@ import (
 	"image/color"
 
 	"charm.land/lipgloss/v2"
-
-	"strings"
+	"som/internal/tui/render"
 )
 
-func renderBox(w int, title string, content string, borderColor color.Color) string {
-	if w < 4 {
-		w = 4
-	}
-
-	borderChar := lipgloss.NewStyle().Foreground(borderColor)
-
-	lines := strings.Split(content, "\n")
-
-	// Top border
-	var topBorder string
-
-	if title == "" {
-		topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
-	} else {
-		prefix := "╭── "
-		prefixW := lipgloss.Width(prefix)
-		maxTitleW := w - prefixW - 1
-
-		if maxTitleW < 1 {
-			title = ""
-		}
-
-		if title == "" {
-			topBorder = borderChar.Render("╭" + strings.Repeat("─", w-2) + "╮")
-		} else {
-			titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
-			titleRendered = lipgloss.NewStyle().Inline(true).MaxWidth(maxTitleW).Render(titleRendered)
-
-			titleW := lipgloss.Width(titleRendered)
-			prefixStyled := borderChar.Render(prefix)
-			remain := w - prefixW - titleW - 1
-
-			if remain < 0 {
-				remain = 0
-			}
-
-			topBorder = prefixStyled + titleRendered + borderChar.Render(strings.Repeat("─", remain)+"╮")
-		}
-	}
-
-	// Content lines: keep every line inside the requested width.
-	innerW := w - 4
-	var bodyLines []string
-
-	for _, line := range lines {
-		padded := lipgloss.NewStyle().MaxWidth(innerW).Render(line)
-		if pad := innerW - lipgloss.Width(padded); pad > 0 {
-			padded += strings.Repeat(" ", pad)
-		}
-		bodyLines = append(bodyLines, borderChar.Render("│ ")+padded+borderChar.Render(" │"))
-	}
-
-	body := strings.Join(bodyLines, "\n")
-
-	// Bottom border
-	bottomBorder := borderChar.Render("╰" + strings.Repeat("─", w-2) + "╯")
-
-	return topBorder + "\n" + body + "\n" + bottomBorder
+func renderBox(w int, title, content string, borderColor color.Color) string {
+	return render.Box(w, title, content, borderColor, PanelTitleStyle)
 }
