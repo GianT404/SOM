@@ -37,8 +37,13 @@ func TestUILayoutReservesTerminalHeight(t *testing.T) {
 				t.Fatalf("main height %d below minimum %d", layout.MainViewHeight, layoutMinMainHeight)
 			}
 
-			if layout.TracklistWidth < 1 || layout.ThirdColumnWidth < layoutThirdColMinW {
+			if layout.TracklistWidth < 1 || layout.ThirdColumnWidth < 1 {
 				t.Fatalf("invalid columns: tracklist=%d third=%d", layout.TracklistWidth, layout.ThirdColumnWidth)
+			}
+			if available := layout.MainWidth - layoutTracklistGap - 1; available >= layoutThirdColMinW &&
+				layout.ThirdColumnWidth < layoutThirdColMinW {
+				t.Fatalf("third column %d below preferred minimum %d when space is available",
+					layout.ThirdColumnWidth, layoutThirdColMinW)
 			}
 
 			if got := layout.TracklistWidth + layout.ThirdColumnWidth + layoutTracklistGap; got != layout.MainWidth {
