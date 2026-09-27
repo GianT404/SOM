@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+
+	"som/internal/tui/layout"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -26,7 +28,7 @@ func renderSharedTrackList[T any](
 		end = len(items)
 	}
 
-	layout := newTracklistLayout(innerW, selectMode)
+	layout := layout.NewTracklistLayout(innerW, selectMode)
 	headerTick := "  "
 	if selectMode {
 		headerTick = "      "
