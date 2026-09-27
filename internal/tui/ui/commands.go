@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"som/internal/domain"
-	"som/internal/scraper"
 	"strings"
 	"time"
+
+	"som/internal/domain"
+	"som/internal/scraper"
 
 	tea "charm.land/bubbletea/v2"
 )
