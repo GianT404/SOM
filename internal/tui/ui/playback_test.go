@@ -216,3 +216,37 @@ func TestPlaybackStopClearsState(t *testing.T) {
 		t.Fatalf("player generation=%d, want 1 for fresh test player", pm.PlayerGen)
 	}
 }
+
+
+func TestStreamResolvedMarksRemotePlaybackStarted(t *testing.T) {
+	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
+	pm.NowPlay = &domain.Track{ID: "remote-track"}
+	pm.PlayerGen = pm.Player.Generation()
+
+	pm.Update(StreamResolvedMsg{Gen: pm.PlayerGen})
+
+	if !pm.SongStarted {
+		t.Fatal("remote stream should be marked started after resolve")
+	}
+	if pm.PlayerGen != pm.Player.Generation() {
+		t.Fatalf("player generation=%d, want %d", pm.PlayerGen, pm.Player.Generation())
+	}
+}
+
+func TestStaleStreamResolvedDoesNotMarkPlaybackStarted(t *testing.T) {
+	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
+	pm.NowPlay = &domain.Track{ID: "current"}
+	pm.PlayerGen = 5
+	pm.SongStarted = false
+
+	pm.Update(StreamResolvedMsg{Gen: 4})
+
+	if pm.SongStarted {
+		t.Fatal("stale stream result should not start playback")
+	}
+	if pm.PlayerGen != 5 {
+		t.Fatalf("player generation=%d, want 5", pm.PlayerGen)
+	}
+}
