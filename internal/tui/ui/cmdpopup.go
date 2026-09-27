@@ -415,11 +415,13 @@ func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 
 func deleteCmd(plStore *storage.DB, path, name string) tea.Cmd {
 	return func() tea.Msg {
-		os.Remove(path)
-		os.Remove(localFileSidecar(path))
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return DeleteDoneMsg{Path: path, Name: name, Err: fmt.Errorf("delete file: %w", err)}
+		}
+		_ = os.Remove(localFileSidecar(path))
 		if plStore != nil {
 			if err := plStore.DeleteLocalFile(path); err != nil {
-				return DeleteDoneMsg{Err: fmt.Errorf("db delete: %w", err)}
+				return DeleteDoneMsg{Path: path, Name: name, Err: fmt.Errorf("db delete: %w", err)}
 			}
 		}
 
