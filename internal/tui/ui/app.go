@@ -189,96 +189,129 @@ func (a *App) applyMoveToPlaylist() {
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	//  Booting
 	if a.booting {
-		switch msg := msg.(type) {
-		case tea.WindowSizeMsg:
-			a.width = msg.Width
-			a.height = msg.Height
-			a.palette.width = msg.Width
-			a.palette.height = msg.Height
-			return a, nil
-		case splashTickMsg:
-			a.splashFrame++
-			return a, splashTick()
-		case splashDoneMsg:
-			a.player = msg.player
-			a.right = NewRightPanel(msg.player)
-			a.left = msg.left
-			a.left.input.Blur()
-			a.booting = false
-			a.playback.SetDependencies(msg.player, a.provider, a.left.plStore)
-			a.loadSettings()
-			a.resizePanels()
-			a.avrcp = avrcp.New()
-			var resumeCmd tea.Cmd
-			a.palette, resumeCmd = a.palette.Resume()
-			cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick(), resumeCmd}
-			if a.avrcp != nil {
-				cmds = append(cmds, a.avrcp.WatchCommands())
-			}
-			for _, k := range a.pendingKeys {
-				_, c := a.Update(k)
-				if c != nil {
-					cmds = append(cmds, c)
-				}
-			}
-			a.pendingKeys = nil
-			return a, tea.Batch(cmds...)
-		case tea.KeyPressMsg:
-			if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
-				return a, tea.Quit
-			}
-			if len(a.pendingKeys) < maxPendingKeys {
-				a.pendingKeys = append(a.pendingKeys, msg)
-			}
-			return a, nil
-		default:
-			return a, nil
-		}
+		return a.updateBoot(msg)
 	}
 
+	if cmd, stop := a.updateModal(msg); stop {
+		return a, cmd
+	}
+
+	cmds, handled, stop := a.updateSystem(msg)
+	if !handled {
+		cmds = append(cmds, a.routeEvents(msg)...)
+	}
+	if stop {
+		return a, tea.Batch(cmds...)
+	}
+
+	cmds = append(cmds, a.updateComponents(msg)...)
+
+	return a, tea.Batch(cmds...)
+}
+
+func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		a.width = msg.Width
+		a.height = msg.Height
+		a.palette.width = msg.Width
+		a.palette.height = msg.Height
+		return a, nil
+	case splashTickMsg:
+		a.splashFrame++
+		return a, splashTick()
+	case splashDoneMsg:
+		a.player = msg.player
+		a.right = NewRightPanel(msg.player)
+		a.left = msg.left
+		a.left.input.Blur()
+		a.booting = false
+		a.playback.SetDependencies(msg.player, a.provider, a.left.plStore)
+		a.loadSettings()
+		a.resizePanels()
+		a.avrcp = avrcp.New()
+		var resumeCmd tea.Cmd
+		a.palette, resumeCmd = a.palette.Resume()
+
+		cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick(), resumeCmd}
+		if a.avrcp != nil {
+			cmds = append(cmds, a.avrcp.WatchCommands())
+		}
+		for _, k := range a.pendingKeys {
+			_, c := a.Update(k)
+			if c != nil {
+				cmds = append(cmds, c)
+			}
+		}
+		a.pendingKeys = nil
+		return a, tea.Batch(cmds...)
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
+			return a, tea.Quit
+		}
+		if len(a.pendingKeys) < maxPendingKeys {
+			a.pendingKeys = append(a.pendingKeys, msg)
+		}
+		return a, nil
+	default:
+		return a, nil
+	}
+}
+
+func (a *App) updateModal(msg tea.Msg) (tea.Cmd, bool) {
+	if len(a.modals) == 0 {
+		return nil, false
+	}
+
+	if _, ok := msg.(CloseAllModalsMsg); ok {
+		a.modals = nil
+		return nil, true
+	}
+	if _, ok := msg.(CloseModalMsg); ok {
+		a.modals = a.modals[:len(a.modals)-1]
+		return nil, true
+	}
+
+	top := len(a.modals) - 1
+	a.modals[top], modalCmd := a.modals[top].Update(msg)
+
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
+		return modalCmd, true
+	default:
+		return modalCmd, false
+	}
+}
+
+func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 	var cmds []tea.Cmd
-	//  Modal Overlay (Highest Priority)
-	if len(a.modals) > 0 {
-		if _, ok := msg.(CloseAllModalsMsg); ok {
-			a.modals = nil
-			return a, nil
-		}
-		if _, ok := msg.(CloseModalMsg); ok {
-			a.modals = a.modals[:len(a.modals)-1]
-			return a, nil
-		}
 
-		var modalCmd tea.Cmd
-		top := len(a.modals) - 1
-		a.modals[top], modalCmd = a.modals[top].Update(msg)
-
-		switch msg.(type) {
-		case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
-			return a, modalCmd
-		}
-		cmds = append(cmds, modalCmd)
-	}
-
-	// System & Routing
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
 		a.resizePanels()
+		return cmds, true, false
+
 	case tea.MouseClickMsg:
 		if a.mouseEnabled {
 			if c := a.handleMouseClick(msg); c != nil {
 				cmds = append(cmds, c)
 			}
 		}
+		return cmds, true, false
+
 	case tea.MouseWheelMsg:
 		if a.mouseEnabled {
 			a.handleMouseWheel(msg.Button == tea.MouseWheelUp)
 		}
+		return cmds, true, false
+
 	case tickMsg:
 		cmds = append(cmds, a.handleTick())
+		return cmds, true, false
+
 	case animTickMsg:
 		if a.sidebarAnim.on && time.Now().Before(a.sidebarAnim.end) {
 			cmds = append(cmds, sidebarAnimTick())
@@ -289,42 +322,60 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.left.animTick++
 			cmds = append(cmds, animTick())
 		}
+		return cmds, true, false
+
 	case logoTickMsg:
 		a.splashFrame++
 		cmds = append(cmds, logoTick())
+		return cmds, true, false
+
 	case spinner.TickMsg:
 		if a.importPanel.importing {
 			var c tea.Cmd
 			a.importPanel.spinner, c = a.importPanel.spinner.Update(msg)
 			cmds = append(cmds, c)
 		}
+		return cmds, true, false
+
 	case tea.KeyPressMsg:
 		oldTab := a.sidebarActive
 		if c := a.handleKeys(msg); c != nil {
 			cmds = append(cmds, c)
 		}
-
-		if oldTab != a.sidebarActive {
-			return a, tea.Batch(cmds...)
-		}
+		return cmds, true, oldTab != a.sidebarActive
 	default:
-		// Uỷ quyền cho 2 Sub-Routers
-		if c := a.handleAudioEvents(msg); c != nil {
-			cmds = append(cmds, c)
-		}
-		if c := a.handleDataEvents(msg); c != nil {
-			cmds = append(cmds, c)
-		}
+		return cmds, false, false
+	}
+}
+
+func (a *App) routeEvents(msg tea.Msg) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	if c := a.handleAudioEvents(msg); c != nil {
+		cmds = append(cmds, c)
+	}
+	if c := a.handleDataEvents(msg); c != nil {
+		cmds = append(cmds, c)
 	}
 
-	//  Update Component Con
-	focusedContent := a.sidebarActive != SideImport && (a.sidebarActive == SideSearch || a.sidebarActive == SideDownloads || a.sidebarActive == SideQueue || a.sidebarActive == SidePlaylists)
-	var leftCmd tea.Cmd
+	return cmds
+}
 
+func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	focusedContent := a.sidebarActive != SideImport &&
+		(a.sidebarActive == SideSearch ||
+			a.sidebarActive == SideDownloads ||
+			a.sidebarActive == SideQueue ||
+			a.sidebarActive == SidePlaylists)
+
+	var leftCmd tea.Cmd
 	a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
 	cmds = append(cmds, leftCmd)
 
 	oldLyric := a.right.GetCurrentLyricLine()
+
 	var rightCmd tea.Cmd
 	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
@@ -353,7 +404,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	a.playback, pbCmd = a.playback.Update(msg)
 	cmds = append(cmds, pbCmd)
 
-	return a, tea.Batch(cmds...)
+	return cmds
 }
 
 // somRowHeight trả số dòng banner SOM cần dành chỗ (0 khi đã ẩn logo).
