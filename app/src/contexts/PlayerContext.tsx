@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { Audio } from 'expo-av';
-import { SearchResult } from '../services/api';
 import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPlaylist, OfflineTrack } from '../services/playlistStore';
