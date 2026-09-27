@@ -178,3 +178,22 @@ func TestRenameUpdatesAllPlaybackReferences(t *testing.T) {
 		}
 	}
 }
+
+
+func TestNewPlayRequestInvalidatesPreviousGeneration(t *testing.T) {
+	pm := NewPlaybackManager()
+	pm.Player = &player.Player{}
+	pm.NowPlay = &domain.Track{ID: "old"}
+
+	pm.playTrackCmd(0, domain.Track{ID: "new-1"})
+	first := pm.PlayerGen
+	pm.playTrackCmd(0, domain.Track{ID: "new-2"})
+	second := pm.PlayerGen
+
+	if first == second {
+		t.Fatalf("playback generations=%d/%d, want different generations", first, second)
+	}
+	if second <= first {
+		t.Fatalf("playback generations=%d/%d, want monotonic increase", first, second)
+	}
+}
