@@ -289,6 +289,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if idx == -1 && msg.NewPlName != "" && a.left.plStore != nil {
 			if pl, err := a.left.plStore.CreatePlaylist(msg.NewPlName); err == nil {
 				a.left.playlists = append(a.left.playlists, pl)
+				a.left.rebindActivePlaylist()
 				idx = len(a.left.playlists) - 1
 			} else {
 				a.setStatus(StatusErrStyle.Render("X " + err.Error()))
