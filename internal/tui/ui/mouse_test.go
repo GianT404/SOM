@@ -34,8 +34,8 @@ func TestMouseClickSelectsRowInDownloads(t *testing.T) {
 	if !a.left.input.Focused() {
 		t.Fatal("precondition: NewLeftPanel starts with input focused")
 	}
-	// Downloads: item0 tại contentTop(7) + 5 = 12. Click y=13 => item 1.
-	if cmd := a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: 13, Button: tea.MouseLeft}); cmd != nil {
+	// Downloads with search visible: item0 starts at contentTop + 5.
+	if cmd := a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: 9, Button: tea.MouseLeft}); cmd != nil {
 		t.Fatalf("unexpected cmd: %v", cmd)
 	}
 	if a.left.dlCursor != 1 {
@@ -49,8 +49,8 @@ func TestMouseClickSelectsRowInDownloads(t *testing.T) {
 
 func TestMouseClickSwitchesSidebarTab(t *testing.T) {
 	a := mouseApp(t)
-	// Hàng sidebar 2 (SideImport) bắt đầu tại contentTop=7 => y=9.
-	a.handleMouseClick(tea.MouseClickMsg{X: 3, Y: 9, Button: tea.MouseLeft})
+	// The sidebar title occupies one row, so SideImport is at contentTop + 2.
+	a.handleMouseClick(tea.MouseClickMsg{X: 3, Y: 5, Button: tea.MouseLeft})
 	if a.sidebarActive != SideImport {
 		t.Fatalf("expected SideImport, got %v", a.sidebarActive)
 	}
@@ -62,8 +62,8 @@ func TestMouseClickFocusesSearchInput(t *testing.T) {
 	if a.left.input.Focused() {
 		t.Fatal("precondition: input should be blurred")
 	}
-	// Downloads: dòng input nằm tại contentTop(7)+1 = 8.
-	a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: 8, Button: tea.MouseLeft})
+	// Downloads: the search input is the first body row inside the box.
+	a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: 4, Button: tea.MouseLeft})
 	if !a.left.input.Focused() {
 		t.Fatal("clicking the search row should focus the input")
 	}
@@ -72,7 +72,7 @@ func TestMouseClickFocusesSearchInput(t *testing.T) {
 func TestMouseRowMappingInDownloads(t *testing.T) {
 	a := mouseApp(t)
 	a.left.input.Blur()
-	for want, y := range []int{12, 13, 14} { // item0..2
+	for want, y := range []int{5, 6, 7} { // item0..2
 		a.handleMouseClick(tea.MouseClickMsg{X: 60, Y: y, Button: tea.MouseLeft})
 		if a.left.dlCursor != want {
 			t.Fatalf("click y=%d should select item %d, got dlCursor=%d", y, want, a.left.dlCursor)

@@ -41,7 +41,7 @@ func TestRenderSettingsPopup(t *testing.T) {
 	if out == "" {
 		t.Fatal("settings popup should not be empty")
 	}
-	for _, want := range []string{"Hide hint bar", "Hide SOM logo", "Theme", "Mouse support", "Default", "ON"} {
+	for _, want := range []string{"Hide hint bar", "Hide header", "Theme", "Mouse support", "Default", "ON"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("popup missing %q", want)
 		}

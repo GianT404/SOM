@@ -65,7 +65,7 @@ func (a *App) listRowOrigin() (int, bool) {
 		if a.left.isSearchVisible() {
 			return ct + 5, true
 		}
-		return ct + 3, true
+		return ct + 2, true
 	case SideQueue:
 		if len(a.playback.Queue) == 0 {
 			return 0, false
@@ -87,7 +87,7 @@ func (a *App) listRowOrigin() (int, bool) {
 		if a.left.isSearchVisible() {
 			return ct + 5, true
 		}
-		return ct + 3, true
+		return ct + 2, true
 		if a.right.showLangPopup || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return 0, false
 		}
@@ -323,7 +323,7 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 
 	// Sidebar: đổi tab.
 	if m.X < sidebarWidth {
-		tabRow := m.Y - contentTop
+		tabRow := m.Y - contentTop - 1
 		if item, ok := RowToSidebarItem(tabRow); ok {
 			return a.switchSidebar(item)
 		}

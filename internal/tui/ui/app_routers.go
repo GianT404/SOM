@@ -208,16 +208,30 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	case OpenSettingsMsg:
 
 		modal := NewSettingsModal(a.settingSwitches(), a.width)
-
-		a.modals = append(a.modals, modal)
+		if len(a.modals) > 0 {
+			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
+				a.modals[len(a.modals)-1] = modal
+			} else {
+				a.modals = append(a.modals, modal)
+			}
+		} else {
+			a.modals = append(a.modals, modal)
+		}
 
 		cmds = append(cmds, modal.Init())
 
 	case OpenHelpMsg:
 
 		modal := NewHelpModal(a.width, a.height)
-
-		a.modals = append(a.modals, modal)
+		if len(a.modals) > 0 {
+			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
+				a.modals[len(a.modals)-1] = modal
+			} else {
+				a.modals = append(a.modals, modal)
+			}
+		} else {
+			a.modals = append(a.modals, modal)
+		}
 
 		cmds = append(cmds, modal.Init())
 

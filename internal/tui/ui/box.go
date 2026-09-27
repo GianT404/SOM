@@ -54,7 +54,10 @@ func renderBox(w int, title string, content string, borderColor color.Color) str
 	var bodyLines []string
 
 	for _, line := range lines {
-		padded := lipgloss.NewStyle().Width(innerW).MaxWidth(innerW).Render(line)
+		padded := lipgloss.NewStyle().MaxWidth(innerW).Render(line)
+		if pad := innerW - lipgloss.Width(padded); pad > 0 {
+			padded += strings.Repeat(" ", pad)
+		}
 		bodyLines = append(bodyLines, borderChar.Render("│ ")+padded+borderChar.Render(" │"))
 	}
 
