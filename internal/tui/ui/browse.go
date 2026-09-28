@@ -910,7 +910,7 @@ func (p LeftPanel) visibleRows() int {
 		if p.isSearchVisible() {
 			overhead = 7
 		} else {
-			overhead = 4
+			overhead = 3
 		}
 	}
 
