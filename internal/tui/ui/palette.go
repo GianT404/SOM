@@ -43,17 +43,17 @@ func visTick() tea.Cmd {
 const paletteVisBands = 28
 
 type CommandPalette struct {
-	visible   bool
-	is3D      bool
-	capture   *audio.Capture
-	captureOK bool
-	amps      []float64
-	phase     float64
-	width     int
-	height    int
-	peaks     []float64
-	peakHold  []int
-
+	visible      bool
+	is3D         bool
+	capture      *audio.Capture
+	captureOK    bool
+	amps         []float64
+	phase        float64
+	phaseSpeed   float64
+	width        int
+	height       int
+	peaks        []float64
+	peakHold     []int
 	tempoHistory []float64
 	lastBass     float64
 	bpm          float64
@@ -75,6 +75,7 @@ func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.peaks = make([]float64, paletteVisBands)
 	m.peakHold = make([]int, paletteVisBands)
 	m.phase = 0
+	m.phaseSpeed = 0.02
 
 	m.tempoHistory = m.tempoHistory[:0]
 	m.lastBass = 0
@@ -141,18 +142,20 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 
 			// Ước lượng tempo từ audio thô, không dùng amp đã smoothing.
 			bpm := m.updateTempo(snap)
+			targetSpeed := 0.017 * (bpm / 100.0)
 
-			// 100 BPM là tốc độ baseline.
-			speed := 0.02 * (bpm / 100.0)
-
-			if speed < 0.012 {
-				speed = 0.012
+			if targetSpeed < 0.008 {
+				targetSpeed = 0.008
 			}
-			if speed > 0.030 {
-				speed = 0.030
+			if targetSpeed > 0.020 {
+				targetSpeed = 0.020
 			}
 
-			m.phase -= speed
+			// Smooth acceleration/deceleration.
+			const speedSmoothing = 0.08
+
+			m.phaseSpeed += (targetSpeed - m.phaseSpeed) * speedSmoothing
+			m.phase -= m.phaseSpeed
 		}
 
 		if m.phase <= -2*math.Pi {
