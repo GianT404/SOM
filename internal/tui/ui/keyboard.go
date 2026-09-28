@@ -157,7 +157,6 @@ func (a *App) toggleVisualizer() tea.Cmd {
 		return nil
 	}
 
-	// Đồng bộ kích thước trước khi render.
 	a.palette.width = a.width
 	a.palette.height = a.height
 

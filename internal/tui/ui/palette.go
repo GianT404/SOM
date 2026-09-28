@@ -43,9 +43,11 @@ func visTick() tea.Cmd {
 const paletteVisBands = 28
 
 type CommandPalette struct {
-	visible      bool
-	capture      *audio.Capture
-	captureOK    bool
+	visible    bool
+	capture    *audio.Capture
+	captureOK  bool
+	tickActive bool
+
 	amps         []float64
 	phase        float64
 	phaseSpeed   float64
@@ -80,16 +82,28 @@ func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.lastBass = 0
 	m.bpm = 100
 
-	return m.Resume()
+	return m.startTick()
+}
+func (m CommandPalette) startTick() (CommandPalette, tea.Cmd) {
+	if m.tickActive {
+		return m, nil
+	}
+
+	m.tickActive = true
+	return m, visTick()
 }
 
 func (m CommandPalette) Close(activeTab SidebarItem) CommandPalette {
 	m.visible = false
+
 	if activeTab != SideDownloads && activeTab != SidePlaylists {
-		return m.Pause()
+		m.tickActive = false
+		m = m.Pause()
 	}
+
 	return m
 }
+
 func (m CommandPalette) Visible() bool { return m.visible }
 
 func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
@@ -97,14 +111,18 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	}
-	if !m.visible && !m.captureOK {
+
+	if !m.tickActive {
 		return m, nil
 	}
 
-	if _, ok := msg.(visTickMsg); ok {
-		snap := m.capture.Bands()
+	if _, ok := msg.(visTickMsg); !ok {
+		return m, nil
+	}
 
-		if snap != nil {
+	if m.captureOK {
+		if snap := m.capture.Bands(); snap != nil {
+			// Spectrum smoothing.
 			for i, v := range snap {
 				if v >= m.amps[i] {
 					m.amps[i] = v
@@ -116,6 +134,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 				}
 			}
 
+			// Peak hold.
 			for i := range m.amps {
 				if m.amps[i] >= m.peaks[i] {
 					m.peaks[i] = m.amps[i]
@@ -132,8 +151,8 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 				}
 			}
 
-			// Ước lượng tempo từ audio thô, không dùng amp đã smoothing.
 			bpm := m.updateTempo(snap)
+
 			targetSpeed := 0.0165 * (bpm / 100.0)
 
 			if targetSpeed < 0.008 {
@@ -143,23 +162,26 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 				targetSpeed = 0.020
 			}
 
-			// Smooth acceleration/deceleration.
+			// Smooth nhưng vẫn đủ nhanh để track mới thay đổi
 			const speedSmoothing = 0.08
 
-			m.phaseSpeed += (targetSpeed - m.phaseSpeed) * speedSmoothing
-			m.phase -= m.phaseSpeed
+			m.phaseSpeed +=
+				(targetSpeed - m.phaseSpeed) * speedSmoothing
 		}
-
-		if m.phase <= -2*math.Pi {
-			m.phase += 2 * math.Pi
-		} else if m.phase >= 2*math.Pi {
-			m.phase -= 2 * math.Pi
-		}
-
-		return m, visTick()
 	}
 
-	return m, nil
+	// --------------------------------------------------
+	// 2. ANIMATION
+
+	m.phase -= m.phaseSpeed
+
+	if m.phase <= -2*math.Pi {
+		m.phase += 2 * math.Pi
+	} else if m.phase >= 2*math.Pi {
+		m.phase -= 2 * math.Pi
+	}
+
+	return m, visTick()
 }
 
 func (m CommandPalette) View() string {
@@ -450,28 +472,28 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 }
 
 func (m CommandPalette) Resume() (CommandPalette, tea.Cmd) {
-	if m.captureOK {
-		return m, visTick()
-	}
-
-	if err := m.capture.Start(paletteVisBands); err == nil {
+	if !m.captureOK {
+		if err := m.capture.Start(paletteVisBands); err != nil {
+			return m, nil
+		}
 		m.captureOK = true
 	}
 
-	return m, visTick()
+	return m.startTick()
 }
 
 func (m CommandPalette) Pause() CommandPalette {
-	if !m.captureOK {
-		return m
+	if m.captureOK {
+		m.capture.Stop()
+		m.captureOK = false
+
+		for i := range m.amps {
+			m.amps[i] = 0
+			m.peaks[i] = 0
+			m.peakHold[i] = 0
+		}
 	}
-	m.capture.Stop()
-	m.captureOK = false
-	for i := range m.amps {
-		m.amps[i] = 0
-		m.peaks[i] = 0
-		m.peakHold[i] = 0
-	}
+
 	return m
 }
 
@@ -663,4 +685,18 @@ func estimateTempo(history []float64, previousBPM float64) (float64, bool) {
 	}
 
 	return bpm, true
+}
+
+func (m CommandPalette) SyncCapture(active bool) (CommandPalette, tea.Cmd) {
+	if active {
+		return m.Resume()
+	}
+
+	m = m.Pause()
+
+	if !m.visible {
+		m.tickActive = false
+	}
+
+	return m, nil
 }

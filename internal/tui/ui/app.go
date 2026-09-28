@@ -24,25 +24,9 @@ func tick() tea.Cmd {
 	})
 }
 
-type animTickMsg time.Time
-
-func animTick() tea.Cmd {
-	return tea.Tick(270*time.Millisecond, func(t time.Time) tea.Msg {
-		return animTickMsg(t)
-	})
-}
-
 func sidebarAnimTick() tea.Cmd {
 	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-		return animTickMsg(t)
-	})
-}
-
-type logoTickMsg time.Time
-
-func logoTick() tea.Cmd {
-	return tea.Tick(63*time.Millisecond, func(t time.Time) tea.Msg {
-		return logoTickMsg(t)
+		return (t)
 	})
 }
 
@@ -52,31 +36,31 @@ type MoveSession struct {
 }
 
 type App struct {
-	provider      domain.MusicProvider
-	downloadDir   string
-	player        *player.Player
-	playback      *PlaybackManager
-	width         int
-	height        int
-	left          LeftPanel
-	right         RightPanel
-	statusMsg     string
-	statusAt      time.Time
-	sessionStart  time.Time
-	sidebarActive SidebarItem
-	sidebarAnim   sidebarAnimState
-	logOffset     int
-	activeContext SidebarItem
-	palette       CommandPalette
-	booting       bool
-	splashFrame   int
-	pendingKeys   []tea.KeyPressMsg
-
-	modals       []Overlay
-	hideHint     bool
-	hideLogo     bool
-	mouseEnabled bool
-	skipSilence  bool
+	provider           domain.MusicProvider
+	downloadDir        string
+	player             *player.Player
+	playback           *PlaybackManager
+	width              int
+	height             int
+	left               LeftPanel
+	right              RightPanel
+	statusMsg          string
+	statusAt           time.Time
+	sessionStart       time.Time
+	sidebarActive      SidebarItem
+	sidebarAnim        sidebarAnimState
+	logOffset          int
+	activeContext      SidebarItem
+	palette            CommandPalette
+	booting            bool
+	splashFrame        int
+	pendingKeys        []tea.KeyPressMsg
+	playbackTickActive bool
+	modals             []Overlay
+	hideHint           bool
+	hideLogo           bool
+	mouseEnabled       bool
+	skipSilence        bool
 
 	mouseLastClickAt  time.Time
 	mouseLastClickY   int
@@ -236,10 +220,8 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.loadSettings()
 		a.resizePanels()
 		a.avrcp = avrcp.New()
-		var resumeCmd tea.Cmd
-		a.palette, resumeCmd = a.palette.Resume()
 
-		cmds := []tea.Cmd{a.left.Init(), tick(), animTick(), logoTick(), resumeCmd}
+		cmds := []tea.Cmd{a.left.Init()}
 		if a.avrcp != nil {
 			cmds = append(cmds, a.avrcp.WatchCommands())
 		}
@@ -315,24 +297,19 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 		return cmds, true, false
 
 	case tickMsg:
+		if !a.playbackTickActive {
+			return cmds, true, false
+		}
+
+		if a.player == nil ||
+			a.playback == nil ||
+			!a.playback.SongStarted ||
+			a.player.State() != player.Playing {
+			a.playbackTickActive = false
+			return cmds, true, false
+		}
+
 		cmds = append(cmds, a.handleTick())
-		return cmds, true, false
-
-	case animTickMsg:
-		if a.sidebarAnim.on && time.Now().Before(a.sidebarAnim.end) {
-			cmds = append(cmds, sidebarAnimTick())
-		} else if a.sidebarAnim.on {
-			a.sidebarAnim.on = false
-		}
-		if a.sidebarActive == SideDownloads {
-			a.left.animTick++
-			cmds = append(cmds, animTick())
-		}
-		return cmds, true, false
-
-	case logoTickMsg:
-		a.splashFrame++
-		cmds = append(cmds, logoTick())
 		return cmds, true, false
 
 	case spinner.TickMsg:
@@ -399,13 +376,41 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 		}
 	}
 
+	var pbCmd tea.Cmd
+	a.playback, pbCmd = a.playback.Update(msg)
+	cmds = append(cmds, pbCmd)
+
 	var paletteCmd tea.Cmd
 	a.palette, paletteCmd = a.palette.Update(msg)
 	cmds = append(cmds, paletteCmd)
 
-	var pbCmd tea.Cmd
-	a.playback, pbCmd = a.playback.Update(msg)
-	cmds = append(cmds, pbCmd)
+	// Chỉ tạo playback timer khi bài  đang phát.
+	if a.player != nil &&
+		a.playback != nil &&
+		a.playback.SongStarted &&
+		a.player.State() == player.Playing {
+
+		if !a.playbackTickActive {
+			a.playbackTickActive = true
+			cmds = append(cmds, tick())
+		}
+	} else {
+		a.playbackTickActive = false
+	}
+
+	// Audio capture chỉ chạy khi spectrum thực sự cần nó.
+	captureNeeded := false
+
+	if a.player != nil &&
+		a.playback != nil &&
+		a.playback.SongStarted &&
+		a.player.State() == player.Playing {
+		captureNeeded = a.spectrumActive()
+	}
+
+	var captureCmd tea.Cmd
+	a.palette, captureCmd = a.palette.SyncCapture(captureNeeded)
+	cmds = append(cmds, captureCmd)
 
 	return cmds
 }
@@ -431,6 +436,7 @@ func (a *App) uiLayout() layout.UILayout {
 func (a *App) mainContentHeight() int {
 	return a.uiLayout().MainViewHeight
 }
+
 func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	oldTab := a.sidebarActive
 	if oldTab != item {
@@ -441,13 +447,6 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 
 		var cmds []tea.Cmd
 
-		if item == SideDownloads || item == SidePlaylists {
-			var cmd tea.Cmd
-			a.palette, cmd = a.palette.Resume()
-			cmds = append(cmds, cmd)
-		} else if !a.palette.Visible() {
-			a.palette = a.palette.Pause()
-		}
 		if item == SideSearch {
 			a.left.searchOnEnter = true
 			if len(a.left.tracks) > 0 {
@@ -468,7 +467,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 		}
 
 		if item == SideDownloads && oldTab != SideDownloads {
-			cmds = append(cmds, animTick())
+			cmds = append(cmds)
 		}
 
 		if item == SideImport && oldTab != SideImport {
@@ -494,6 +493,19 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 		return tea.Batch(cmds...)
 	}
 	return nil
+}
+
+func (a *App) spectrumActive() bool {
+	if a.palette.Visible() {
+		return true
+	}
+
+	switch a.sidebarActive {
+	case SideDownloads, SidePlaylists:
+		return a.playback != nil && a.playback.NowPlay != nil
+	default:
+		return false
+	}
 }
 
 func (a *App) resizePanels() {

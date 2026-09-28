@@ -11,10 +11,19 @@ import (
 )
 
 func (a *App) handleTick() tea.Cmd {
-	a.left.animTick++
+	if a.player == nil ||
+		a.playback == nil ||
+		!a.playback.SongStarted ||
+		a.player.State() != player.Playing {
+		a.playbackTickActive = false
+		return nil
+	}
+
 	var cmds []tea.Cmd
 
-	cmds = append(cmds, func() tea.Msg { return PlaybackTickMsg{} })
+	cmds = append(cmds, func() tea.Msg {
+		return PlaybackTickMsg{}
+	})
 
 	if a.avrcp != nil && a.playback.NowPlay != nil {
 		a.avrcp.UpdatePosition(a.player.Position().Microseconds())
