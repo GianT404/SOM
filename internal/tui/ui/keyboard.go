@@ -100,7 +100,7 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		targetTab := SidebarItem(msg.String()[0] - '1')
 		cmds = append(cmds, a.switchSidebar(targetTab))
-	case "\":
+	case "\\":
 		if a.textInputFocused() {
 			break
 		}
