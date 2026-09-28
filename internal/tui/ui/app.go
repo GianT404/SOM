@@ -24,6 +24,14 @@ func tick() tea.Cmd {
 	})
 }
 
+type animeTickMsg time.Time
+
+func animeTick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return animeTickMsg(t)
+	})
+}
+
 type MoveSession struct {
 	TargetPlIdx int
 	Selected    map[string]bool
@@ -47,6 +55,8 @@ type App struct {
 	palette            CommandPalette
 	booting            bool
 	splashFrame        int
+	animeFrame         int
+	animeActive        bool
 	pendingKeys        []tea.KeyPressMsg
 	playbackTickActive bool
 	modals             []Overlay
@@ -289,6 +299,14 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 		}
 		return cmds, true, false
 
+	case animeTickMsg:
+		if !a.animeActive {
+			return cmds, true, false
+		}
+		a.animeFrame++
+		cmds = append(cmds, animeTick())
+		return cmds, true, false
+
 	case tickMsg:
 		if !a.playbackTickActive {
 			return cmds, true, false
@@ -354,6 +372,10 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 	var rightCmd tea.Cmd
 	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
 	cmds = append(cmds, rightCmd)
+
+	if c := a.syncAnimeAnimation(); c != nil {
+		cmds = append(cmds, c)
+	}
 
 	newLyric := a.right.GetCurrentLyricLine()
 	if oldLyric != newLyric {
@@ -468,11 +490,35 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 			a.importPanel.offset = 0
 		}
 
+		if c := a.syncAnimeAnimation(); c != nil {
+			cmds = append(cmds, c)
+		}
+
 		if len(cmds) == 0 {
 			return nil
 		}
 		return tea.Batch(cmds...)
 	}
+	return nil
+}
+
+func (a *App) syncAnimeAnimation() tea.Cmd {
+	shouldAnimate :=
+		a.sidebarActive == SideLyrics &&
+		a.right.loaded &&
+		!a.right.loadingLyrics &&
+		a.right.noLyrics
+
+	if shouldAnimate {
+		if !a.animeActive {
+			a.animeActive = true
+			a.animeFrame = 0
+			return animeTick()
+		}
+		return nil
+	}
+
+	a.animeActive = false
 	return nil
 }
 
