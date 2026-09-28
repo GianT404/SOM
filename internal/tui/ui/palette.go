@@ -134,7 +134,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 
 			// Ước lượng tempo từ audio thô, không dùng amp đã smoothing.
 			bpm := m.updateTempo(snap)
-			targetSpeed := 0.017 * (bpm / 100.0)
+			targetSpeed := 0.0165 * (bpm / 100.0)
 
 			if targetSpeed < 0.008 {
 				targetSpeed = 0.008
@@ -584,8 +584,6 @@ func (m *CommandPalette) updateTempo(snap []float64) float64 {
 }
 
 // estimateTempo chọn tempo từ onset history.
-// Khi autocorrelation bắt nhịp 2x, ưu tiên pulse chậm hơn nếu
-// correlation ở harmonic chậm vẫn đủ mạnh.
 func estimateTempo(history []float64, previousBPM float64) (float64, bool) {
 	if len(history) < 45 {
 		return 0, false
