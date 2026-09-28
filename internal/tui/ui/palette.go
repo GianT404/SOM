@@ -43,19 +43,20 @@ func visTick() tea.Cmd {
 const paletteVisBands = 28
 
 type CommandPalette struct {
-	visible     bool
-	is3D        bool
-	capture     *audio.Capture
-	captureOK   bool
-	amps        []float64
-	phase       float64
-	width       int
-	height      int
-	peaks       []float64
-	peakHold    []int
-	bassHistory []float64
-	lastBeat    time.Time
-	bpm         float64
+	visible   bool
+	is3D      bool
+	capture   *audio.Capture
+	captureOK bool
+	amps      []float64
+	phase     float64
+	width     int
+	height    int
+	peaks     []float64
+	peakHold  []int
+
+	tempoHistory []float64
+	lastBass     float64
+	bpm          float64
 }
 
 func NewCommandPalette() CommandPalette {
@@ -75,9 +76,9 @@ func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.peakHold = make([]int, paletteVisBands)
 	m.phase = 0
 
-	m.bassHistory = m.bassHistory[:0]
-	m.lastBeat = time.Time{}
-	m.bpm = 120
+	m.tempoHistory = m.tempoHistory[:0]
+	m.lastBass = 0
+	m.bpm = 100
 
 	return m.Resume()
 }
@@ -108,28 +109,9 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		}
 	}
 	if _, ok := msg.(visTickMsg); ok {
-		//xoayy
-		now := time.Now()
+		snap := m.capture.Bands()
 
-		bpm := m.updateTempo(now)
-
-		speed := 0.02 * (bpm / 120.0)
-
-		if speed < 0.01 {
-			speed = 0.01
-		}
-		if speed > 0.03 {
-			speed = 0.03
-		}
-
-		m.phase -= speed
-
-		if m.phase <= -2*math.Pi {
-			m.phase += 2 * math.Pi
-		} else if m.phase >= 2*math.Pi {
-			m.phase -= 2 * math.Pi
-		}
-		if snap := m.capture.Bands(); snap != nil {
+		if snap != nil {
 			for i, v := range snap {
 				if v >= m.amps[i] {
 					m.amps[i] = v
@@ -140,6 +122,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 					}
 				}
 			}
+
 			for i := range m.amps {
 				if m.amps[i] >= m.peaks[i] {
 					m.peaks[i] = m.amps[i]
@@ -155,7 +138,29 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 					}
 				}
 			}
+
+			// Ước lượng tempo từ audio thô, không dùng amp đã smoothing.
+			bpm := m.updateTempo(snap)
+
+			// 100 BPM là tốc độ baseline.
+			speed := 0.02 * (bpm / 100.0)
+
+			if speed < 0.012 {
+				speed = 0.012
+			}
+			if speed > 0.030 {
+				speed = 0.030
+			}
+
+			m.phase -= speed
 		}
+
+		if m.phase <= -2*math.Pi {
+			m.phase += 2 * math.Pi
+		} else if m.phase >= 2*math.Pi {
+			m.phase -= 2 * math.Pi
+		}
+
 		return m, visTick()
 	}
 
@@ -545,70 +550,93 @@ func (m CommandPalette) RenderEQColumn(w, h int) string {
 	}
 	return b.String()
 }
-func (m *CommandPalette) updateTempo(now time.Time) float64 {
-	if len(m.amps) < 4 {
+func (m *CommandPalette) updateTempo(snap []float64) float64 {
+	if len(snap) < 4 {
 		return m.bpm
 	}
 
-	bass := 0.0
-	for i := 1; i < 4; i++ {
-		bass += m.amps[i]
-	}
-	bass /= 3.0
+	bass := (snap[1] + snap[2] + snap[3]) / 3.0
 
-	m.bassHistory = append(m.bassHistory, bass)
-
-	// Giữ khoảng 3 giây dữ liệu ở 30 FPS.
-	const maxHistory = 90
-	if len(m.bassHistory) > maxHistory {
-		m.bassHistory = m.bassHistory[len(m.bassHistory)-maxHistory:]
+	// Chỉ lấy phần bass đang tăng.
+	onset := bass - m.lastBass
+	if onset < 0 {
+		onset = 0
 	}
 
-	if len(m.bassHistory) < 15 {
+	m.lastBass = bass
+
+	m.tempoHistory = append(m.tempoHistory, onset)
+
+	// ~4 giây dữ liệu ở 30 FPS.
+	const maxHistory = 120
+	if len(m.tempoHistory) > maxHistory {
+		m.tempoHistory = m.tempoHistory[len(m.tempoHistory)-maxHistory:]
+	}
+
+	if len(m.tempoHistory) < 45 {
 		return m.bpm
 	}
 
-	avg := 0.0
-	for _, v := range m.bassHistory {
-		avg += v
+	mean := 0.0
+	for _, v := range m.tempoHistory {
+		mean += v
 	}
-	avg /= float64(len(m.bassHistory))
+	mean /= float64(len(m.tempoHistory))
 
-	prev := m.bassHistory[len(m.bassHistory)-2]
-
-	// Phát hiện onset/beat.
-	isBeat := bass > avg*1.35 &&
-		bass > prev &&
-		bass > 0.12
-
-	// Tránh bắt cùng một beat nhiều lần.
-	if !isBeat || (!m.lastBeat.IsZero() && now.Sub(m.lastBeat) < 180*time.Millisecond) {
-		return m.bpm
+	// Center dữ liệu quanh mean.
+	centered := make([]float64, len(m.tempoHistory))
+	for i, v := range m.tempoHistory {
+		centered[i] = v - mean
 	}
 
-	if !m.lastBeat.IsZero() {
-		interval := now.Sub(m.lastBeat).Seconds()
+	bestCorr := -1.0
+	bestLag := 0
 
-		if interval > 0.25 && interval < 1.5 {
-			bpm := 60.0 / interval
+	// 10..30 frames ~ 50..180 BPM.
+	for lag := 10; lag <= 30; lag++ {
+		var xy, xx, yy float64
 
-			// Giữ trong vùng tempo hợp lý.
-			if bpm < 60 {
-				bpm = 60
-			}
-			if bpm > 180 {
-				bpm = 180
-			}
+		for i := lag; i < len(centered); i++ {
+			x := centered[i]
+			y := centered[i-lag]
 
-			// Smooth BPM để animation không giật tốc độ.
-			if m.bpm <= 0 {
-				m.bpm = bpm
-			} else {
-				m.bpm = m.bpm*0.8 + bpm*0.2
-			}
+			xy += x * y
+			xx += x * x
+			yy += y * y
+		}
+
+		if xx <= 0 || yy <= 0 {
+			continue
+		}
+
+		corr := xy / math.Sqrt(xx*yy)
+
+		if corr > bestCorr {
+			bestCorr = corr
+			bestLag = lag
 		}
 	}
 
-	m.lastBeat = now
+	if bestLag == 0 || bestCorr < 0.15 {
+		return m.bpm
+	}
+
+	// visTick ~= 33ms => ~30 samples/sec.
+	bpm := 60.0 / (float64(bestLag) * (1.0 / 30.0))
+
+	if bpm < 60 {
+		bpm = 60
+	}
+	if bpm > 180 {
+		bpm = 180
+	}
+
+	// Smooth để tốc độ quay không nhảy liên tục.
+	if m.bpm <= 0 {
+		m.bpm = bpm
+	} else {
+		m.bpm = m.bpm*0.85 + bpm*0.15
+	}
+
 	return m.bpm
 }
