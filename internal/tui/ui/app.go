@@ -296,8 +296,7 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 
 		if a.player == nil ||
 			a.playback == nil ||
-			!a.playback.SongStarted ||
-			a.player.State() != player.Playing {
+			!a.playback.SongStarted {
 			a.playbackTickActive = false
 			return cmds, true, false
 		}

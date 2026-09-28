@@ -13,8 +13,7 @@ import (
 func (a *App) handleTick() tea.Cmd {
 	if a.player == nil ||
 		a.playback == nil ||
-		!a.playback.SongStarted ||
-		a.player.State() != player.Playing {
+		!a.playback.SongStarted {
 		a.playbackTickActive = false
 		return nil
 	}
@@ -25,11 +24,19 @@ func (a *App) handleTick() tea.Cmd {
 		return PlaybackTickMsg{}
 	})
 
-	if a.avrcp != nil && a.playback.NowPlay != nil {
-		a.avrcp.UpdatePosition(a.player.Position().Microseconds())
+	if a.player.State() == player.Stopped {
+		a.playbackTickActive = false
+		return tea.Batch(cmds...)
 	}
 
-	cmds = append(cmds, tick())
+	if a.player.State() == player.Playing {
+		if a.avrcp != nil && a.playback.NowPlay != nil {
+			a.avrcp.UpdatePosition(a.player.Position().Microseconds())
+		}
+
+		cmds = append(cmds, tick())
+	}
+
 	return tea.Batch(cmds...)
 }
 
