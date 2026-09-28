@@ -2,7 +2,7 @@ package layout
 
 const (
 	thirdColumnLyricRatio      = 0.45
-	thirdColumnStatsHeight     = 1
+	thirdColumnStatsHeight     = 3
 	thirdColumnBoxBorderHeight = 2
 	thirdColumnMinInnerWidth   = 1
 	thirdColumnMinInnerHeight  = 1

@@ -5,10 +5,11 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tuilayout "som/internal/tui/layout"
 	"som/internal/tui/render"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func (a *App) View() tea.View {
@@ -319,12 +320,24 @@ func (a *App) renderThirdColumn(w, h int) string {
 	hTime := int(duration.Hours())
 	mTime := int(duration.Minutes()) % 60
 	sTime := int(duration.Seconds()) % 60
-	statsContent := fmt.Sprintf("Session: %02dh %02dm %02ds", hTime, mTime, sTime)
+	statsContent := fmt.Sprintf(
+		"%02dh %02dm %02ds",
+		hTime,
+		mTime,
+		sTime,
+	)
 
-	statsView := lipgloss.NewStyle().
-		Width(layout.Width).
+	statsInner := lipgloss.NewStyle().
+		Width(layout.Width - 4).
 		Align(lipgloss.Center).
 		Render(DimItemStyle.Render(statsContent))
+
+	statsView := renderBox(
+		layout.Width,
+		"Session",
+		statsInner,
+		themeCol("#7c7986"),
+	)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
