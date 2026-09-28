@@ -150,19 +150,16 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 
 	progressBar := a.renderProgressBar(a.width)
 
-	var b strings.Builder
-	if !a.hideLogo {
-		b.WriteString(somRow + "\n")
-	}
-	b.WriteString(sep + "\n")
-	b.WriteString(contentRow + "\n")
-	b.WriteString(status + "\n")
-	b.WriteString(progressBar + "\n")
-	if !a.hideHint {
-		b.WriteString(help)
-	}
-
-	return b.String()
+	return render.BaseFrame(
+		somRow,
+		sep,
+		contentRow,
+		status,
+		progressBar,
+		help,
+		a.hideLogo,
+		a.hideHint,
+	)
 }
 
 func (a *App) renderOverlayView(view string) string {
