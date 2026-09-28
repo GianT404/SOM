@@ -29,6 +29,7 @@ type RightPanel struct {
 	trackGen      uint64
 
 	loadingLyrics bool
+	noLyrics      bool
 	spinner       spinner.Model
 
 	// showLangPopup and langCursor drive the "l"-triggered lyrics language
@@ -55,6 +56,7 @@ func (r *RightPanel) SetTrack(t *domain.Track) {
 	r.offset = 0
 	r.loaded = false
 	r.loadingLyrics = true
+	r.noLyrics = false
 	r.showLangPopup = false
 	r.langCursor = 0
 	r.highlightLine = 0
@@ -65,6 +67,7 @@ func (r *RightPanel) SetLyrics(lr domain.LyricsResp) {
 	r.lyrics = lr
 	r.loaded = true
 	r.loadingLyrics = false
+	r.noLyrics = len(lr.Synced) == 0 && strings.TrimSpace(lr.Plain) == ""
 	r.curLine = 0
 	r.offset = 0
 	r.langCursor = lr.LanguageIndex()
@@ -262,7 +265,7 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 			return r, nil
 		}
 		if msg.LyricsErr != nil {
-			r.SetLyrics(domain.LyricsResp{Plain: "(no lyrics available)"})
+			r.SetLyrics(domain.LyricsResp{})
 		} else {
 			r.SetLyrics(msg.Lyrics)
 		}
