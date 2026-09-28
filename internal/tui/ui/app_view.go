@@ -221,13 +221,13 @@ func (a *App) renderSomRow(dashboard string) string {
 			}
 			hint = styleHint(".", "select") + "  " + styleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + styleHint("+", "already in playlist") + "  " + styleHint("esc", "cancel")
 		} else {
-			hint = styleHint("ctrl+p", "pin/unpin") + "  " + styleHint("\\", "visualizer") + "  " + styleHint(":", "Command") + "  "
+			hint = styleHint("ctrl+p", "pin/unpin") + "  " + styleHint("\\", "visualizer") + "  " + styleHint("l", "lyric") + styleHint(":", "Command") + "  "
 		}
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = styleHint(",", "new playlist") + "  " + styleHint("delete", "its deletes :)") + "  "
+		hint = styleHint(",", "new playlist") + "  " + styleHint("l", "lyric") + styleHint("delete", "its deletes :)") + "  "
 
 	default:
 		return dashboard
@@ -308,9 +308,20 @@ func (a *App) renderThirdColumn(w, h int) string {
 		layout.LyricsInnerWidth,
 		layout.LyricsInnerHeight,
 	)
+
+	lyricTitle := "Lyrics"
+
+	if a.right.showLangPopup {
+		lyricTitle = "Select Language"
+		lyricContent = a.right.renderLangPopupHeight(
+			layout.LyricsInnerWidth,
+			layout.LyricsInnerHeight,
+		)
+	}
+
 	lyricBox := renderBox(
 		layout.Width,
-		"Lyrics",
+		lyricTitle,
 		lyricContent,
 		themeCol("#7c7986"),
 	)

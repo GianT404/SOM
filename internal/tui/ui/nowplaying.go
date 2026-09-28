@@ -76,10 +76,10 @@ func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
 	r.random = random
 }
 
-func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
+func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (RightPanel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		if focused && r.showLangPopup {
+		if r.showLangPopup {
 			switch msg.String() {
 			case "up", "k":
 				if r.langCursor > 0 {
@@ -156,7 +156,7 @@ func (r RightPanel) Update(msg tea.Msg, focused bool) (RightPanel, tea.Cmd) {
 
 		switch msg.String() {
 		case "l":
-			if focused && len(r.lyrics.AllTracks) > 0 {
+			if (focused || allowLanguagePopup) && len(r.lyrics.AllTracks) > 0 {
 				r.langCursor = r.lyrics.LanguageIndex()
 				r.showLangPopup = true
 			}

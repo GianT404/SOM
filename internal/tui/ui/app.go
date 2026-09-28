@@ -354,6 +354,10 @@ func (a *App) routeEvents(msg tea.Msg) []tea.Cmd {
 	return cmds
 }
 
+func isKeyPressMsg(msg tea.Msg) bool {
+	_, ok := msg.(tea.KeyPressMsg)
+	return ok
+}
 func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -364,13 +368,27 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 			a.sidebarActive == SidePlaylists)
 
 	var leftCmd tea.Cmd
-	a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
-	cmds = append(cmds, leftCmd)
+	if !(a.right.showLangPopup && isKeyPressMsg(msg)) {
+		a.left, leftCmd = a.left.Update(msg, focusedContent, a.playback.NowPlay)
+		cmds = append(cmds, leftCmd)
+	}
 
 	oldLyric := a.right.GetCurrentLyricLine()
 
 	var rightCmd tea.Cmd
-	a.right, rightCmd = a.right.Update(msg, a.sidebarActive == SideLyrics)
+
+	lyricsFocused := a.sidebarActive == SideLyrics
+
+	allowLanguagePopup :=
+		(a.sidebarActive == SideDownloads ||
+			a.sidebarActive == SidePlaylists) &&
+			!a.textInputFocused()
+
+	a.right, rightCmd = a.right.Update(
+		msg,
+		lyricsFocused,
+		allowLanguagePopup,
+	)
 	cmds = append(cmds, rightCmd)
 
 	if c := a.syncAnimeAnimation(); c != nil {

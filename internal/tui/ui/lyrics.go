@@ -61,16 +61,21 @@ func languageLabel(code string) string {
 }
 
 func (r RightPanel) renderLangPopup(innerW int) string {
-	lyrH := r.lyricsHeight()
+	return r.renderLangPopupHeight(innerW, r.lyricsHeight())
+}
+
+func (r RightPanel) renderLangPopupHeight(innerW, lyrH int) string {
 	var b strings.Builder
 
 	for i, t := range r.lyrics.AllTracks {
 		label := languageLabel(t.Language)
+
 		cursor := " "
 		tick := " "
 		if i == r.lyrics.LanguageIndex() {
 			tick = "+"
 		}
+
 		line := fmt.Sprintf(" %s [%s] %s", cursor, tick, label)
 
 		if i == r.langCursor {
@@ -78,19 +83,24 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 			if pad < 0 {
 				pad = 0
 			}
-			b.WriteString(LyricSelectStyle.Render(line + strings.Repeat(" ", pad)))
+
+			b.WriteString(
+				LyricSelectStyle.Render(line + strings.Repeat(" ", pad)),
+			)
 		} else {
 			b.WriteString(LyricNormalStyle.Render(line))
 		}
+
 		b.WriteString("\n")
 	}
 
 	written := len(r.lyrics.AllTracks)
+
 	if written == 0 {
-		hint := "(no languages available)"
-		b.WriteString(DimItemStyle.Render(hint))
+		b.WriteString(DimItemStyle.Render("(no languages available)"))
 		written++
 	}
+
 	b.WriteString("\n")
 	written++
 
@@ -98,6 +108,7 @@ func (r RightPanel) renderLangPopup(innerW int) string {
 		b.WriteString("\n")
 		written++
 	}
+
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
