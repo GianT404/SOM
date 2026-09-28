@@ -82,3 +82,39 @@ func TestThirdColumnLayoutKeepsSectionsInsideContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestTracklistLayoutKeepsColumnsPositive(t *testing.T) {
+	for _, width := range []int{1, 4, 10, 20, 40, 80, 120} {
+		for _, selectMode := range []bool{false, true} {
+			layout := NewTracklistLayout(width, selectMode)
+
+			if layout.Width < 1 || layout.TitleWidth < 1 || layout.ArtistWidth < 1 {
+				t.Fatalf("width=%d select=%v has invalid widths: %+v", width, selectMode, layout)
+			}
+			if layout.TickWidth != 0 && layout.TickWidth != tracklistTickWidth {
+				t.Fatalf("width=%d select=%v tick width=%d", width, selectMode, layout.TickWidth)
+			}
+			if layout.CheckWidth != tracklistCheckWidth ||
+				layout.IndexWidth != tracklistIndexWidth ||
+				layout.TimeWidth != tracklistTimeWidth {
+				t.Fatalf("width=%d select=%v has invalid fixed columns: %+v", width, selectMode, layout)
+			}
+		}
+	}
+}
+
+func TestUILayoutHandlesTinyTerminalWidth(t *testing.T) {
+	for _, width := range []int{0, 1, 2, 5, 10} {
+		layout := NewUILayout(width, 20, 18, 2, false)
+
+		if layout.MainWidth < minMainWidth {
+			t.Fatalf("width=%d main width=%d below minimum %d", width, layout.MainWidth, minMainWidth)
+		}
+		if layout.TracklistWidth < 1 || layout.ThirdColumnWidth < 1 {
+			t.Fatalf("width=%d invalid columns: %+v", width, layout)
+		}
+		if got := layout.TracklistWidth + layout.ThirdColumnWidth + tracklistGap; got != layout.MainWidth {
+			t.Fatalf("width=%d columns use %d, want %d", width, got, layout.MainWidth)
+		}
+	}
+}
