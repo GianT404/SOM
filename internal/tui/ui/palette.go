@@ -44,7 +44,6 @@ const paletteVisBands = 28
 
 type CommandPalette struct {
 	visible      bool
-	is3D         bool
 	capture      *audio.Capture
 	captureOK    bool
 	amps         []float64
@@ -101,14 +100,7 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 	if !m.visible && !m.captureOK {
 		return m, nil
 	}
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		switch keyMsg.String() {
-		case "l", "L":
-			if m.visible {
-				m.is3D = !m.is3D
-			}
-		}
-	}
+
 	if _, ok := msg.(visTickMsg); ok {
 		snap := m.capture.Bands()
 
@@ -173,10 +165,6 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 func (m CommandPalette) View() string {
 	if m.width < 10 || m.height < 5 {
 		return DimItemStyle.Render("Visualizer too small")
-	}
-
-	if m.is3D {
-		return m.Render3DVisualizer(m.width, m.height)
 	}
 
 	return m.RenderVisualizer(m.width, m.height)
