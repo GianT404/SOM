@@ -27,7 +27,7 @@ func tick() tea.Cmd {
 type animeTickMsg time.Time
 
 func animeTick() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 		return animeTickMsg(t)
 	})
 }
@@ -505,9 +505,9 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 func (a *App) syncAnimeAnimation() tea.Cmd {
 	shouldAnimate :=
 		a.sidebarActive == SideLyrics &&
-		a.right.loaded &&
-		!a.right.loadingLyrics &&
-		a.right.noLyrics
+			a.right.loaded &&
+			!a.right.loadingLyrics &&
+			a.right.noLyrics
 
 	if shouldAnimate {
 		if !a.animeActive {
