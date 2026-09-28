@@ -234,17 +234,19 @@ func renderSidebarBox(w int, title string, content string, borderColor color.Col
 	borderChar := lipgloss.NewStyle().Foreground(borderColor)
 	titleRendered := PanelTitleStyle.Foreground(borderColor).Render(title)
 
-	titleW := lipgloss.Width(titleRendered)
-	remain := w - 2 - titleW
+	prefix := "╭─"
+	suffix := "╮"
 
+	titleW := lipgloss.Width(titleRendered)
+	remain := w - lipgloss.Width(prefix) - titleW - lipgloss.Width(suffix)
 	if remain < 0 {
 		remain = 0
 	}
 
 	lines[0] =
-		borderChar.Render("╭─") +
+		borderChar.Render(prefix) +
 			titleRendered +
-			borderChar.Render(strings.Repeat("─", remain)+"╮")
+			borderChar.Render(strings.Repeat("─", remain)+suffix)
 
 	return strings.Join(lines, "\n")
 }
