@@ -23,7 +23,6 @@ func (a *App) View() tea.View {
 	mainView := a.renderMainContent(layout)
 	sideView := renderSidebar(
 		a.sidebarActive,
-		a.sidebarAnim,
 		layout.MainViewHeight,
 		layout.MainViewHeight,
 	)

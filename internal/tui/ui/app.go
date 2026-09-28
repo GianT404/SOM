@@ -24,12 +24,6 @@ func tick() tea.Cmd {
 	})
 }
 
-func sidebarAnimTick() tea.Cmd {
-	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-		return (t)
-	})
-}
-
 type MoveSession struct {
 	TargetPlIdx int
 	Selected    map[string]bool
@@ -48,7 +42,6 @@ type App struct {
 	statusAt           time.Time
 	sessionStart       time.Time
 	sidebarActive      SidebarItem
-	sidebarAnim        sidebarAnimState
 	logOffset          int
 	activeContext      SidebarItem
 	palette            CommandPalette
@@ -474,17 +467,6 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 			a.importPanel.ScanImportDirs(a.downloadDir, a.left.plStore)
 			a.importPanel.cursor = 0
 			a.importPanel.offset = 0
-		}
-
-		if item != oldTab {
-			a.sidebarAnim = sidebarAnimState{
-				on:    true,
-				from:  oldTab,
-				to:    item,
-				start: time.Now(),
-				end:   time.Now().Add(sidebarGhostDuration),
-			}
-			cmds = append(cmds, sidebarAnimTick())
 		}
 
 		if len(cmds) == 0 {
