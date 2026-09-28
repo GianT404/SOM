@@ -104,11 +104,8 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		if a.textInputFocused() {
 			break
 		}
-		if a.palette.Visible() {
-			a.palette = a.palette.Close(a.sidebarActive)
-		} else {
-			var cmd tea.Cmd
-			a.palette, cmd = a.palette.Open()
+
+		if cmd := a.toggleVisualizer(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	case ":":
@@ -153,4 +150,18 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	}
 	return tea.Batch(cmds...)
+}
+func (a *App) toggleVisualizer() tea.Cmd {
+	if a.palette.Visible() {
+		a.palette = a.palette.Close(a.sidebarActive)
+		return nil
+	}
+
+	// Đồng bộ kích thước trước khi render.
+	a.palette.width = a.width
+	a.palette.height = a.height
+
+	var cmd tea.Cmd
+	a.palette, cmd = a.palette.Open()
+	return cmd
 }

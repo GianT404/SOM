@@ -66,6 +66,12 @@ func NewCommandPalette() CommandPalette {
 
 func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.visible = true
+
+	m.amps = make([]float64, paletteVisBands)
+	m.peaks = make([]float64, paletteVisBands)
+	m.peakHold = make([]int, paletteVisBands)
+	m.phase = 0
+
 	return m.Resume()
 }
 
@@ -83,7 +89,9 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	}
-
+	if !m.visible {
+		return m, nil
+	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "l", "L":
@@ -133,15 +141,15 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 }
 
 func (m CommandPalette) View() string {
-	if !m.captureOK {
-		return DimItemStyle.Render("visualizer unavailable")
+	if m.width < 10 || m.height < 5 {
+		return DimItemStyle.Render("Visualizer too small")
 	}
 
 	if m.is3D {
 		return m.Render3DVisualizer(m.width, m.height)
-	} else {
-		return m.RenderVisualizer(m.width, m.height)
 	}
+
+	return m.RenderVisualizer(m.width, m.height)
 }
 
 var brailleBit = [2][4]uint8{
@@ -352,7 +360,7 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
 	var out strings.Builder
 	for row := 0; row < subAppH; row++ {
-		for col := 0; col < subAppH; col++ {
+		for col := 0; col < subAppW; col++ {
 			var mask uint8
 			any := false
 			sumR := 0.0
@@ -425,13 +433,14 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
 func (m CommandPalette) Resume() (CommandPalette, tea.Cmd) {
 	if m.captureOK {
-		return m, nil
-	}
-	if err := m.capture.Start(paletteVisBands); err == nil {
-		m.captureOK = true
 		return m, visTick()
 	}
-	return m, nil
+
+	if err := m.capture.Start(paletteVisBands); err == nil {
+		m.captureOK = true
+	}
+
+	return m, visTick()
 }
 
 func (m CommandPalette) Pause() CommandPalette {
