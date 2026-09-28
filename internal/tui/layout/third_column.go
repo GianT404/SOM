@@ -30,15 +30,35 @@ func NewThirdColumnLayout(width, height int) ThirdColumnLayout {
 		height = 1
 	}
 
+	statsHeight := thirdColumnStatsHeight
+
+	// Khi container quá thấp, thu nhỏ Session trước
+	// để tổng ba section không vượt quá chiều cao.
+	if height >= 3 && statsHeight > height-2 {
+		statsHeight = height - 2
+	}
+	if statsHeight < 1 {
+		statsHeight = 1
+	}
+
+	remainingHeight := height - statsHeight
+
 	lyricsHeight := int(float64(height) * thirdColumnLyricRatio)
 	if lyricsHeight < 1 {
 		lyricsHeight = 1
 	}
 
-	spectrumHeight := height - lyricsHeight - thirdColumnStatsHeight
+	if lyricsHeight > remainingHeight-1 {
+		lyricsHeight = remainingHeight - 1
+	}
+	if lyricsHeight < 1 {
+		lyricsHeight = 1
+	}
+
+	spectrumHeight := remainingHeight - lyricsHeight
 	if spectrumHeight < 1 {
 		spectrumHeight = 1
-		lyricsHeight = height - spectrumHeight - thirdColumnStatsHeight
+		lyricsHeight = remainingHeight - spectrumHeight
 		if lyricsHeight < 1 {
 			lyricsHeight = 1
 		}
@@ -65,7 +85,7 @@ func NewThirdColumnLayout(width, height int) ThirdColumnLayout {
 
 		SpectrumHeight: spectrumHeight,
 		LyricsHeight:   lyricsHeight,
-		StatsHeight:    thirdColumnStatsHeight,
+		StatsHeight:    statsHeight,
 
 		SpectrumInnerWidth:  innerWidth,
 		SpectrumInnerHeight: spectrumInnerHeight,
