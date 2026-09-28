@@ -568,58 +568,9 @@ func (m *CommandPalette) updateTempo(snap []float64) float64 {
 		return m.bpm
 	}
 
-	mean := 0.0
-	for _, v := range m.tempoHistory {
-		mean += v
-	}
-	mean /= float64(len(m.tempoHistory))
-
-	// Center dữ liệu quanh mean.
-	centered := make([]float64, len(m.tempoHistory))
-	for i, v := range m.tempoHistory {
-		centered[i] = v - mean
-	}
-
-	bestCorr := -1.0
-	bestLag := 0
-
-	// 10..30 frames ~ 50..180 BPM.
-	for lag := 10; lag <= 30; lag++ {
-		var xy, xx, yy float64
-
-		for i := lag; i < len(centered); i++ {
-			x := centered[i]
-			y := centered[i-lag]
-
-			xy += x * y
-			xx += x * x
-			yy += y * y
-		}
-
-		if xx <= 0 || yy <= 0 {
-			continue
-		}
-
-		corr := xy / math.Sqrt(xx*yy)
-
-		if corr > bestCorr {
-			bestCorr = corr
-			bestLag = lag
-		}
-	}
-
-	if bestLag == 0 || bestCorr < 0.15 {
+	bpm, ok := estimateTempo(m.tempoHistory, m.bpm)
+	if !ok {
 		return m.bpm
-	}
-
-	// visTick ~= 33ms => ~30 samples/sec.
-	bpm := 60.0 / (float64(bestLag) * (1.0 / 30.0))
-
-	if bpm < 60 {
-		bpm = 60
-	}
-	if bpm > 180 {
-		bpm = 180
 	}
 
 	// Smooth để tốc độ quay không nhảy liên tục.
@@ -630,4 +581,88 @@ func (m *CommandPalette) updateTempo(snap []float64) float64 {
 	}
 
 	return m.bpm
+}
+
+// estimateTempo chọn tempo từ onset history.
+// Khi autocorrelation bắt nhịp 2x, ưu tiên pulse chậm hơn nếu
+// correlation ở harmonic chậm vẫn đủ mạnh.
+func estimateTempo(history []float64, previousBPM float64) (float64, bool) {
+	if len(history) < 45 {
+		return 0, false
+	}
+
+	mean := 0.0
+	for _, v := range history {
+		mean += v
+	}
+	mean /= float64(len(history))
+
+	centered := make([]float64, len(history))
+	for i, v := range history {
+		centered[i] = v - mean
+	}
+
+	// 10..25 frames ~= 72..180 BPM.
+	// Giữ upper lag ở 25 để không biến tempo 120 thành 60.
+	correlations := make(map[int]float64, 16)
+	bestCorr := -1.0
+	bestLag := 0
+
+	for lag := 10; lag <= 25; lag++ {
+		var xy, xx, yy float64
+
+		for i := lag; i < len(centered); i++ {
+			x := centered[i]
+			y := centered[i-lag]
+			xy += x * y
+			xx += x * x
+			yy += y * y
+		}
+
+		if xx <= 0 || yy <= 0 {
+			continue
+		}
+
+		corr := xy / math.Sqrt(xx*yy)
+		correlations[lag] = corr
+
+		if corr > bestCorr {
+			bestCorr = corr
+			bestLag = lag
+		}
+	}
+
+	if bestLag == 0 || bestCorr < 0.15 {
+		return 0, false
+	}
+
+	// visTick ~= 33ms => ~30 samples/sec.
+	bpm := 60.0 / (float64(bestLag) * (1.0 / 30.0))
+
+	// Với các tempo >100 BPM, kiểm tra nhịp half-time.
+	// Ví dụ 150 BPM có thể bị detector bắt ở 12 frames,
+	// trong khi pulse chính thực tế nằm ở 24 frames (~75 BPM).
+	if bpm > 100 && bpm <= 165 {
+		halfLag := bestLag * 2
+		halfCorr, ok := correlations[halfLag]
+
+		if ok && halfCorr >= bestCorr*0.65 {
+			halfBPM := 60.0 / (float64(halfLag) * (1.0 / 30.0))
+
+			// Ưu tiên half-time khi nó cũng gần tempo đang ổn định.
+			if previousBPM <= 0 ||
+				math.Abs(halfBPM-previousBPM) <= math.Abs(bpm-previousBPM)+8 {
+				bpm = halfBPM
+			}
+		}
+	}
+
+	if bpm < 60 {
+		bpm = 60
+	}
+	if bpm > 180 {
+		bpm = 180
+	}
+
+	return bpm, true
 }
