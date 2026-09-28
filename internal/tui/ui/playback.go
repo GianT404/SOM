@@ -352,8 +352,6 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		}
 
 		// Xử lý khi bài hát KẾT THÚC.
-		// Player.State() được cập nhật bất đồng bộ bởi ffmpeg/oto, nên chỉ
-		// dựa vào Stopped có thể bỏ lỡ tick cuối và làm autoplay không chạy.
 		ended := pm.Player.State() == player.Stopped
 		if !ended && pm.NowPlay.Duration > 0 {
 			ended = pm.Player.Position() >= time.Duration(pm.NowPlay.Duration)*time.Second

@@ -31,9 +31,6 @@ type RightPanel struct {
 	loadingLyrics bool
 	noLyrics      bool
 	spinner       spinner.Model
-
-	// showLangPopup and langCursor drive the "l"-triggered lyrics language
-	// picker popup.
 	showLangPopup bool
 	langCursor    int
 	highlightLine int

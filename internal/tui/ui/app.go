@@ -401,17 +401,24 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 	// Chỉ tạo playback timer khi bài  đang phát.
 	if a.player != nil &&
 		a.playback != nil &&
-		a.playback.SongStarted &&
-		a.player.State() == player.Playing {
+		a.playback.SongStarted {
 
-		if !a.playbackTickActive {
-			a.playbackTickActive = true
-			cmds = append(cmds, tick())
+		switch a.player.State() {
+		case player.Playing:
+			if !a.playbackTickActive {
+				a.playbackTickActive = true
+				cmds = append(cmds, tick())
+			}
+
+		case player.Paused:
+			a.playbackTickActive = false
+
+		case player.Stopped:
+
 		}
 	} else {
 		a.playbackTickActive = false
 	}
-
 	// Audio capture chỉ chạy khi spectrum thực sự cần nó.
 	captureNeeded := false
 

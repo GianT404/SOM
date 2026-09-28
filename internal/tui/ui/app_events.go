@@ -146,7 +146,6 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	case avrcp.AVRCPCmdMsg:
 		switch msg.Cmd {
 		case "next":
-			a.player.Stop()
 			cmds = append(cmds, func() tea.Msg { return PlayNextMsg{} })
 		case "previous":
 			cmds = append(cmds, func() tea.Msg { return PlayPrevMsg{} })
