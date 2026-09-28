@@ -164,8 +164,6 @@ func rebuildTheme() {
 
 	sidebarInactiveStyle = lipgloss.NewStyle().
 		Foreground(colorDark)
-
-	ghostStrongStyle = lipgloss.NewStyle().Foreground(ghostStrong)
 	sidebarNumStyle = lipgloss.NewStyle().Foreground(colorAccent)
 }
 
