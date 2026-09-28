@@ -43,16 +43,19 @@ func visTick() tea.Cmd {
 const paletteVisBands = 28
 
 type CommandPalette struct {
-	visible   bool
-	is3D      bool
-	capture   *audio.Capture
-	captureOK bool
-	amps      []float64
-	phase     float64
-	width     int
-	height    int
-	peaks     []float64
-	peakHold  []int
+	visible     bool
+	is3D        bool
+	capture     *audio.Capture
+	captureOK   bool
+	amps        []float64
+	phase       float64
+	width       int
+	height      int
+	peaks       []float64
+	peakHold    []int
+	bassHistory []float64
+	lastBeat    time.Time
+	bpm         float64
 }
 
 func NewCommandPalette() CommandPalette {
@@ -72,6 +75,10 @@ func (m CommandPalette) Open() (CommandPalette, tea.Cmd) {
 	m.peakHold = make([]int, paletteVisBands)
 	m.phase = 0
 
+	m.bassHistory = m.bassHistory[:0]
+	m.lastBeat = time.Time{}
+	m.bpm = 120
+
 	return m.Resume()
 }
 
@@ -89,18 +96,33 @@ func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	}
-	if !m.visible {
+	if !m.visible && !m.captureOK {
 		return m, nil
 	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "l", "L":
-			m.is3D = !m.is3D
+			if m.visible {
+				m.is3D = !m.is3D
+			}
 		}
 	}
 	if _, ok := msg.(visTickMsg); ok {
 		//xoayy
-		m.phase -= 0.02
+		now := time.Now()
+
+		bpm := m.updateTempo(now)
+
+		speed := 0.02 * (bpm / 120.0)
+
+		if speed < 0.01 {
+			speed = 0.01
+		}
+		if speed > 0.03 {
+			speed = 0.03
+		}
+
+		m.phase -= speed
 
 		if m.phase <= -2*math.Pi {
 			m.phase += 2 * math.Pi
@@ -522,4 +544,71 @@ func (m CommandPalette) RenderEQColumn(w, h int) string {
 		}
 	}
 	return b.String()
+}
+func (m *CommandPalette) updateTempo(now time.Time) float64 {
+	if len(m.amps) < 4 {
+		return m.bpm
+	}
+
+	bass := 0.0
+	for i := 1; i < 4; i++ {
+		bass += m.amps[i]
+	}
+	bass /= 3.0
+
+	m.bassHistory = append(m.bassHistory, bass)
+
+	// Giữ khoảng 3 giây dữ liệu ở 30 FPS.
+	const maxHistory = 90
+	if len(m.bassHistory) > maxHistory {
+		m.bassHistory = m.bassHistory[len(m.bassHistory)-maxHistory:]
+	}
+
+	if len(m.bassHistory) < 15 {
+		return m.bpm
+	}
+
+	avg := 0.0
+	for _, v := range m.bassHistory {
+		avg += v
+	}
+	avg /= float64(len(m.bassHistory))
+
+	prev := m.bassHistory[len(m.bassHistory)-2]
+
+	// Phát hiện onset/beat.
+	isBeat := bass > avg*1.35 &&
+		bass > prev &&
+		bass > 0.12
+
+	// Tránh bắt cùng một beat nhiều lần.
+	if !isBeat || (!m.lastBeat.IsZero() && now.Sub(m.lastBeat) < 180*time.Millisecond) {
+		return m.bpm
+	}
+
+	if !m.lastBeat.IsZero() {
+		interval := now.Sub(m.lastBeat).Seconds()
+
+		if interval > 0.25 && interval < 1.5 {
+			bpm := 60.0 / interval
+
+			// Giữ trong vùng tempo hợp lý.
+			if bpm < 60 {
+				bpm = 60
+			}
+			if bpm > 180 {
+				bpm = 180
+			}
+
+			// Smooth BPM để animation không giật tốc độ.
+			if m.bpm <= 0 {
+				m.bpm = bpm
+			} else {
+				m.bpm = m.bpm*0.8 + bpm*0.2
+			}
+		}
+	}
+
+	m.lastBeat = now
+	return m.bpm
 }
