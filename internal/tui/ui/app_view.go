@@ -41,7 +41,7 @@ func (a *App) View() tea.View {
 func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 	contentH := layout.MainViewHeight
 	mainW := layout.MainWidth
-	frame := a.splashFrame
+	frame := a.animeFrame
 
 	inputNotFocused := !a.left.input.Focused()
 	playingID := ""
