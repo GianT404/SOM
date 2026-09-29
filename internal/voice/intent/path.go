@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	DefaultModelPath      = "~/.local/share/som/voice/intent.json"
-	SystemModelPath       = "/usr/local/share/som/voice/intent.json"
-	RepoModelPath         = "internal/voice/intent/model.json"
-	DefaultMinConfidence  = 0.30
+	DefaultModelPath     = "~/.local/share/som/voice/intent.json"
+	SystemModelPath      = "/usr/local/share/som/voice/intent.json"
+	RepoModelPath        = "internal/voice/intent/model.json"
+	DefaultMinConfidence = 0.30
 )
 
 func ResolveModelPath(configured string) (string, error) {
