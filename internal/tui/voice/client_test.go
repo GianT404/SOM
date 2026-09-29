@@ -1,6 +1,7 @@
 package voice
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -23,10 +24,6 @@ func TestBuildArgs(t *testing.T) {
 }
 
 func TestClientReadsJSONEvent(t *testing.T) {
-	oldHelper := os.Getenv("SOM_VOICE_TEST_HELPER")
-	if oldHelper != "" {
-		t.Setenv("SOM_VOICE_TEST_HELPER", oldHelper)
-	}
 	client := NewClient(Config{
 		Command:        os.Args[0],
 		WakeWord:       "yui",
