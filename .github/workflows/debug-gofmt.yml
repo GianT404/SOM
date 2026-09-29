@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/voice-playback-capture-lifecycle
+  pull_request:
 
 jobs:
   gofmt-diff:
