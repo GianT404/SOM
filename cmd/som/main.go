@@ -162,13 +162,11 @@ func main() {
 					WakeAliases:    voiceWakeAliases,
 					CommandTimeout: voiceCommandTimeout,
 				})
-				events, err := voiceClient.Start()
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "Voice:", err)
-					os.Exit(1)
-				}
 				app.SetVoiceIntentModel(model, voiceMinConfidence)
-				app.SetVoiceEvents(events)
+				// Start voice only after the TUI boot sequence has initialized the
+				// player. This keeps microphone setup behind the playback backend
+				// initialization instead of racing it during process startup.
+				app.SetVoiceStarter(voiceClient.Start)
 				defer func() { _ = voiceClient.Close() }()
 			}
 
