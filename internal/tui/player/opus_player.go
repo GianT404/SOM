@@ -168,6 +168,8 @@ type Player struct {
 	stopped     bool
 	stderrBuf   syncBuffer
 	volume      float64
+	duckFactor  float64
+	voiceAEC   bool
 	tap         *pcmTap
 	generation  uint64
 	audioFilter string
@@ -203,6 +205,7 @@ func New() *Player {
 		otoCtx:      ctx,
 		state:       Stopped,
 		volume:      1.0,
+		duckFactor:  1.0,
 		tap:         newPCMTap(),
 		speed:       1.0,
 		audioFilter: "dynaudnorm=f=250:g=11:p=0.9:m=10",
@@ -338,10 +341,13 @@ func (p *Player) playFromLocked(filePath string, startSec float64, headers map[s
 	}
 
 	p.player = p.otoCtx.NewPlayer(io.TeeReader(pcmOut, tap))
-	p.player.SetVolume(p.volume)
+	p.player.SetVolume(p.effectiveVolumeLocked())
 
 	p.player.Play()
 	p.state = Playing
+	if p.voiceAEC {
+		go routeVoicePlaybackThroughAEC()
+	}
 
 	go func(cmd *exec.Cmd, gen uint64, optr *oto.Player) {
 		err := cmd.Wait()
@@ -501,8 +507,43 @@ func (p *Player) SetVolume(v float64) {
 
 	p.volume = v
 	if p.player != nil {
-		p.player.SetVolume(v)
+		p.player.SetVolume(p.effectiveVolumeLocked())
 	}
+}
+
+// SetDucking applies a temporary playback multiplier without changing the user volume.
+func (p *Player) SetDucking(factor float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if factor < 0 {
+		factor = 0
+	}
+	if factor > 1 {
+		factor = 1
+	}
+	p.duckFactor = factor
+	if p.player != nil {
+		p.player.SetVolume(p.effectiveVolumeLocked())
+	}
+}
+
+func (p *Player) SetVoiceAEC(enabled bool) {
+	p.mu.Lock()
+	p.voiceAEC = enabled
+	playing := p.player != nil && p.state == Playing
+	p.mu.Unlock()
+	if enabled && playing {
+		go routeVoicePlaybackThroughAEC()
+	}
+}
+
+func (p *Player) effectiveVolumeLocked() float64 {
+	factor := p.duckFactor
+	if factor <= 0 {
+		factor = 1
+	}
+	return p.volume * factor
 }
 
 func (p *Player) Volume() float64 {
@@ -657,9 +698,12 @@ func (p *Player) PlayFromBuffer() bool {
 	reader := &gaplessReader{buf: buf, pipe: pipe}
 
 	p.player = p.otoCtx.NewPlayer(io.TeeReader(reader, p.ensureTapLocked()))
-	p.player.SetVolume(p.volume)
+	p.player.SetVolume(p.effectiveVolumeLocked())
 	p.player.Play()
 	p.state = Playing
+	if p.voiceAEC {
+		go routeVoicePlaybackThroughAEC()
+	}
 
 	go func(c *exec.Cmd, gen uint64, optr *oto.Player) {
 		err := c.Wait()
