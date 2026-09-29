@@ -119,10 +119,9 @@ func New() *Player {
 	ensurePipeWirePulseServer()
 
 	op := &oto.NewContextOptions{
-		SampleRate:     48000,
-		ChannelCount:   2,
-		Format:         oto.FormatSignedInt16LE,
-		ApplicationName: "SOM",
+		SampleRate:   48000,
+		ChannelCount: 2,
+		Format:       oto.FormatSignedInt16LE,
 	}
 	ctx, ready, err := oto.NewContext(op)
 	if err != nil {
