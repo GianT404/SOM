@@ -143,3 +143,14 @@ type MetaSavedMsg struct {
 	Track domain.Track
 	Err   error
 }
+
+
+type VoiceEventMsg struct {
+	Event      string
+	Transcript string
+	WakeAlias  string
+	Command    string
+	State      string
+}
+
+type VoiceDisconnectedMsg struct{}
