@@ -13,7 +13,6 @@ const (
 	pcmBytesPerSample = 2
 )
 
-
 type Capture struct {
 	mu    sync.Mutex
 	bands []float64
@@ -40,18 +39,22 @@ func (c *Capture) StartPCM(src PCMSource, bands int) error {
 		defer src.Unsubscribe(sub)
 		const frameBytes = pcmChannels * pcmBytesPerSample
 		var leftover []byte
-		for {
+			for {
 			select {
 			case <-stop:
 				return
 			case chunk, ok := <-sub:
-				if !ok { return }
+				if !ok {
+					return
+				}
 				leftover = append(leftover, chunk...)
 				usable := len(leftover) - (len(leftover) % frameBytes)
-				if usable <= 0 { continue }
+				if usable <= 0 {
+					continue
+				}
 				frame := leftover[:usable]
 				leftover = append([]byte(nil), leftover[usable:]...)
-				n := usable / frameBytes
+			n := usable / frameBytes
 				samples := make([]float64, n)
 				for i := 0; i < n; i++ {
 					off := i * frameBytes
@@ -60,7 +63,7 @@ func (c *Capture) StartPCM(src PCMSource, bands int) error {
 					samples[i] = (float64(left) + float64(right)) / 2.0 / 32768.0
 				}
 				bandsOut := magnitudeBands(samples, bands)
-							c.mu.Lock()
+				c.mu.Lock()
 				c.bands = bandsOut
 				c.mu.Unlock()
 			}
