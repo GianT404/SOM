@@ -232,6 +232,7 @@ func (p *Player) SetSkipSilence(on bool) {
 	defer p.mu.Unlock()
 	p.skipSilence = on
 }
+
 // Subscribe returns the exact decoded PCM stream being fed to Oto.
 // Format: signed 16-bit little-endian, 48 kHz, stereo.
 func (p *Player) Subscribe() chan []byte {
