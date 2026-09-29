@@ -66,18 +66,18 @@ type App struct {
 	mouseEnabled       bool
 	skipSilence        bool
 
-	mouseLastClickAt  time.Time
-	mouseLastClickY   int
-	mouseLastClickTab SidebarItem
-	avrcp             *avrcp.Server
-	activePreset      int
-	activeSpeed       int
-	activeSort        string
-	importPanel       ImportPanel
-	moveSession       *MoveSession
-	prevLyric         string
-	currLyric         string
-	lyricAnimStart    time.Time
+	mouseLastClickAt   time.Time
+	mouseLastClickY    int
+	mouseLastClickTab  SidebarItem
+	avrcp              *avrcp.Server
+	activePreset       int
+	activeSpeed        int
+	activeSort         string
+	importPanel        ImportPanel
+	moveSession        *MoveSession
+	prevLyric          string
+	currLyric          string
+	lyricAnimStart     time.Time
 	voiceEvents        <-chan voice.Event
 	voiceIntentModel   *intent.Model
 	voiceMinConfidence float64
