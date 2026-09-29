@@ -221,6 +221,7 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.player = msg.player
 		a.right = NewRightPanel(msg.player)
 		a.left = msg.left
+		a.palette.SetPlayer(msg.player)
 		a.left.input.Blur()
 		a.booting = false
 		a.playback.SetDependencies(msg.player, a.provider, a.left.plStore)
