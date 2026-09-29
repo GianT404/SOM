@@ -14,7 +14,6 @@ import (
 	"som/internal/voice/intent"
 
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -92,9 +91,6 @@ type Overlay interface {
 const maxPendingKeys = 64
 
 func NewApp(provider domain.MusicProvider, downloadDir string) *App {
-	mi := textinput.New()
-	mi.CharLimit = 50
-	mi.Prompt = ""
 	return &App{
 		provider:      provider,
 		downloadDir:   downloadDir,
