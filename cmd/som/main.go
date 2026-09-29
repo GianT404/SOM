@@ -19,6 +19,7 @@ import (
 	"som/internal/scraper"
 	"som/internal/storage"
 	"som/internal/tui/api"
+	"som/internal/tui/player"
 	"som/internal/tui/ui"
 	"som/internal/tui/voice"
 	"som/internal/voice/intent"
@@ -139,6 +140,10 @@ func main() {
 			}
 			if err := storage.MigrateFromLegacy(downloadDir); err != nil {
 				log.Printf("[storage] migration warning: %v", err)
+			}
+
+			if voiceEnabled {
+				player.PrepareVoicePlaybackRouting()
 			}
 
 			app := ui.NewApp(provider, downloadDir)
