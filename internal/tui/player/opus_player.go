@@ -133,6 +133,8 @@ func (t *pcmTap) flush() {
 	}
 }
 
+
+type Player struct {
 	mu          sync.Mutex
 	state       State
 	otoCtx      *oto.Context
