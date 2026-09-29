@@ -2,6 +2,7 @@ package voice
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,7 +75,8 @@ func (c *Client) Start() (<-chan Event, error) {
 	}
 
 	cmd := exec.Command(c.config.Command, c.buildArgs()...)
-	cmd.Stderr = io.Discard
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -90,7 +92,7 @@ func (c *Client) Start() (<-chan Event, error) {
 	c.stop = make(chan struct{})
 
 	stop := c.stop
-	go c.readLoop(stdout, cmd, stop)
+	go c.readLoop(stdout, cmd, stop, &stderr)
 	return c.events, nil
 }
 
@@ -105,7 +107,7 @@ func (c *Client) buildArgs() []string {
 	return args
 }
 
-func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd, stop <-chan struct{}) {
+func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd, stop <-chan struct{}, stderr *bytes.Buffer) {
 	defer stdout.Close()
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 4096), maxEventLine)
@@ -131,7 +133,27 @@ func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd, stop <-chan struc
 	}
 
 wait:
-	_ = cmd.Wait()
+	exitErr := cmd.Wait()
+
+	stderrText := ""
+	if stderr != nil {
+		stderrText = strings.TrimSpace(stderr.String())
+	}
+	if stderrText != "" || exitErr != nil {
+		state := stderrText
+		if exitErr != nil {
+			if state != "" {
+				state = fmt.Sprintf("%v: %s", exitErr, state)
+			} else {
+				state = exitErr.Error()
+			}
+		}
+		select {
+		case c.events <- Event{Event: "error", State: state}:
+		case <-stop:
+		}
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cmd == cmd {
