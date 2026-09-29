@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"som/internal/tui/audio"
+	"som/internal/tui/player"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -47,6 +48,7 @@ type CommandPalette struct {
 	capture    *audio.Capture
 	captureOK  bool
 	tickActive bool
+	player     *player.Player
 
 	amps         []float64
 	phase        float64
@@ -105,6 +107,8 @@ func (m CommandPalette) Close(activeTab SidebarItem) CommandPalette {
 }
 
 func (m CommandPalette) Visible() bool { return m.visible }
+
+func (m *CommandPalette) SetPlayer(p *player.Player) { m.player = p }
 
 func (m CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
@@ -473,7 +477,13 @@ func (m CommandPalette) RenderVisualizer(subAppW, subAppH int) string {
 
 func (m CommandPalette) Resume() (CommandPalette, tea.Cmd) {
 	if !m.captureOK {
-		if err := m.capture.Start(paletteVisBands); err != nil {
+		var err error
+		if m.player != nil {
+			err = m.capture.StartPCM(m.player, paletteVisBands)
+		} else {
+			err = m.capture.Start(paletteVisBands)
+		}
+		if err != nil {
 			return m, nil
 		}
 		m.captureOK = true

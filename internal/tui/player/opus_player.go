@@ -87,6 +87,73 @@ func ensurePipeWirePulseServer() {
 	_ = os.Setenv("PULSE_SERVER", "unix:"+socket)
 }
 
+type pcmTap struct {
+	mu   sync.Mutex
+	subs map[chan []byte]struct{}
+}
+
+func newPCMTap() *pcmTap {
+	return &pcmTap{subs: make(map[chan []byte]struct{})}
+}
+
+func (p *Player) ensureTapLocked() *pcmTap {
+	if p.tap == nil {
+		p.tap = newPCMTap()
+	}
+	return p.tap
+}
+
+func (t *pcmTap) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	if len(t.subs) == 0 {
+		t.mu.Unlock()
+		return len(p), nil
+	}
+	subs := make([]chan []byte, 0, len(t.subs))
+	for c := range t.subs {
+		subs = append(subs, c)
+	}
+	t.mu.Unlock()
+	cp := make([]byte, len(p))
+	copy(cp, p)
+	for _, c := range subs {
+		select {
+		case c <- cp:
+		default:
+		}
+	}
+	return len(p), nil
+}
+
+func (t *pcmTap) subscribe() chan []byte {
+	c := make(chan []byte, 8)
+	t.mu.Lock()
+	t.subs[c] = struct{}{}
+	t.mu.Unlock()
+	return c
+}
+
+func (t *pcmTap) unsubscribe(c chan []byte) {
+	t.mu.Lock()
+	delete(t.subs, c)
+	t.mu.Unlock()
+}
+
+func (t *pcmTap) flush() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for c := range t.subs {
+		for {
+			select {
+			case <-c:
+			default:
+				goto drained
+			}
+		}
+	drained:
+	}
+}
+
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -101,6 +168,7 @@ type Player struct {
 	stopped     bool
 	stderrBuf   syncBuffer
 	volume      float64
+	tap         *pcmTap
 	generation  uint64
 	audioFilter string
 	speed       float64
@@ -126,7 +194,7 @@ func New() *Player {
 	ctx, ready, err := oto.NewContext(op)
 	if err != nil {
 		fmt.Printf("oto init error: %v\n", err)
-		return &Player{state: Stopped}
+		return &Player{state: Stopped, tap: newPCMTap()}
 	}
 
 	<-ready
@@ -135,6 +203,7 @@ func New() *Player {
 		otoCtx:      ctx,
 		state:       Stopped,
 		volume:      1.0,
+		tap:         newPCMTap(),
 		speed:       1.0,
 		audioFilter: "dynaudnorm=f=250:g=11:p=0.9:m=10",
 	}
@@ -163,6 +232,23 @@ func (p *Player) SetSkipSilence(on bool) {
 	defer p.mu.Unlock()
 	p.skipSilence = on
 }
+
+// Subscribe returns the exact decoded PCM stream being fed to Oto.
+// Format: signed 16-bit little-endian, 48 kHz, stereo.
+func (p *Player) Subscribe() chan []byte {
+	p.mu.Lock()
+	tap := p.ensureTapLocked()
+	p.mu.Unlock()
+	return tap.subscribe()
+}
+
+func (p *Player) Unsubscribe(c chan []byte) {
+	p.mu.Lock()
+	tap := p.ensureTapLocked()
+	p.mu.Unlock()
+	tap.unsubscribe(c)
+}
+
 func (p *Player) State() State {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -214,6 +300,8 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 }
 
 func (p *Player) playFromLocked(filePath string, startSec float64, headers map[string]string) error {
+	tap := p.ensureTapLocked()
+	tap.flush()
 	p.stopLocked()
 
 	if p.otoCtx == nil {
@@ -249,7 +337,7 @@ func (p *Player) playFromLocked(filePath string, startSec float64, headers map[s
 		return fmt.Errorf("ffmpeg start error: %w", err)
 	}
 
-	p.player = p.otoCtx.NewPlayer(pcmOut)
+	p.player = p.otoCtx.NewPlayer(io.TeeReader(pcmOut, tap))
 	p.player.SetVolume(p.volume)
 
 	p.player.Play()
@@ -568,7 +656,7 @@ func (p *Player) PlayFromBuffer() bool {
 
 	reader := &gaplessReader{buf: buf, pipe: pipe}
 
-	p.player = p.otoCtx.NewPlayer(reader)
+	p.player = p.otoCtx.NewPlayer(io.TeeReader(reader, p.ensureTapLocked()))
 	p.player.SetVolume(p.volume)
 	p.player.Play()
 	p.state = Playing
