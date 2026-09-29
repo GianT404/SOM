@@ -33,7 +33,6 @@ jobs:
 
       - name: Check Go formatting
         run: |
-          gofmt -d internal/tui/ui/app.go
           files="$(gofmt -l .)"
           if [ -n "$files" ]; then
             echo "Files need gofmt:"
