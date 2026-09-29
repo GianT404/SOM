@@ -49,6 +49,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 | Self Install/Update | `som --install`, `som --upgrade`, minisign signature verification |
 | CLI & Completion | Cobra with auto-completion for Zsh, Bash, Fish |
 | AVRCP/MPRIS2 | Bluetooth media controls on Linux desktop |
+| Voice Control | Local Vietnamese wake phrase + intent control |
 
 ---
 
@@ -107,6 +108,64 @@ npx expo start
 ```
 
 ---
+
+## Voice Control
+
+SOM can consume the local `som-voice-wake` JSONL event stream and turn recognized commands into the existing TUI playback/search actions.
+
+### Requirements
+
+- `som-voice-wake` available in `$PATH`
+- A compatible exported intent model, defaulting to `~/.local/share/som/voice/intent.json`
+- The Vietnamese Zipformer + VAD assets used by `som-voice-wake`
+
+Start SOM with voice control:
+
+```bash
+som --voice
+```
+
+The wake session accepts both forms:
+
+```text
+yui phát nhạc
+```
+
+and:
+
+```text
+yui
+<short pause>
+phát nhạc
+```
+
+The default command pause window is 3 seconds. Override it with:
+
+```bash
+som --voice --voice-command-timeout 4s
+```
+
+Useful environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SOM_VOICE_COMMAND` | `som-voice-wake` | Voice event producer executable |
+| `SOM_VOICE_INTENT_MODEL` | `~/.local/share/som/voice/intent.json` | Exported intent model |
+| `SOM_WAKE_WORD` | `yui` | Primary wake word |
+| `SOM_WAKE_ALIASES` | producer defaults | Comma-separated ASR wake aliases |
+| `SOM_WAKE_COMMAND_TIMEOUT` | `3s` | Pause window after wake-only speech |
+| `SOM_VOICE_MIN_CONFIDENCE` | `0.30` | Minimum accepted intent confidence |
+
+Supported intents currently map to existing TUI actions:
+
+```text
+PLAY
+PAUSE
+NEXT
+PREVIOUS
+RANDOM
+SEARCH
+```
 
 ### TUI Key Bindings
 
@@ -181,6 +240,13 @@ som completion fish > ~/.config/fish/completions/som.fish
 | `--update-ytdlp` | Update bundled yt-dlp |
 | `--version` | Print version |
 | `--changelog` | Print current version commits |
+| `--voice` | Enable local Vietnamese voice control |
+| `--voice-command` | Override the voice event producer executable |
+| `--voice-intent-model` | Override the exported intent model path |
+| `--voice-wake-word` | Override the primary wake word |
+| `--voice-wake-aliases` | Override comma-separated wake aliases |
+| `--voice-command-timeout` | Override the wake → command pause window |
+| `--voice-min-confidence` | Override minimum intent confidence |
 
 ---
 
