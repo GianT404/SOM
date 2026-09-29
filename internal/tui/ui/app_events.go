@@ -43,17 +43,67 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 		case player.Paused:
 			return func() tea.Msg { return TogglePauseMsg{} }
 		case player.Stopped:
-			if a.playback.NowPlay == nil {
-				a.setStatus(StatusErrStyle.Render("X Voice: nothing to play"))
-				return nil
-			}
-			track := *a.playback.NowPlay
-			return func() tea.Msg {
-				return PlayTrackAtMsg{
-					Index: a.playback.CurrentIdx,
-					Track: track,
+			if a.playback.NowPlay != nil {
+				track := *a.playback.NowPlay
+				return func() tea.Msg {
+					return PlayTrackAtMsg{
+						Index: a.playback.CurrentIdx,
+						Track: track,
+					}
 				}
 			}
+
+			// No current track yet: make voice PLAY behave like pressing
+			// Enter on the currently selected item in the active playback tab.
+			switch a.left.activeTab {
+			case SideSearch:
+				if a.left.searchCursor >= 0 && a.left.searchCursor < len(a.left.tracks) {
+					track := a.left.tracks[a.left.searchCursor]
+					return func() tea.Msg { return PlayStartedMsg{Track: track} }
+				}
+
+			case SideDownloads:
+				locals := a.left.getFilteredLocals()
+				if a.left.dlCursor >= 0 && a.left.dlCursor < len(locals) {
+					track := locals[a.left.dlCursor]
+					return func() tea.Msg {
+						return PlayLocalMsg{Path: track.Path, Title: track.Name}
+					}
+				}
+
+			case SideQueue:
+				if a.left.qCursor >= 0 && a.left.qCursor < len(a.left.queue) {
+					return func() tea.Msg { return PlayQueueMsg{Index: a.left.qCursor} }
+				}
+
+			case SidePlaylists:
+				if a.left.activePlaylist != nil {
+					filtered := a.left.getFilteredPlaylistTracks()
+					if a.left.plCursor >= 0 && a.left.plCursor < len(filtered) {
+						picked := filtered[a.left.plCursor]
+						tracks := make([]domain.Track, len(a.left.activePlaylist.Tracks))
+						startIdx := 0
+						for i, pt := range a.left.activePlaylist.Tracks {
+							tracks[i] = domain.Track{
+								ID:        "local:" + pt.Path,
+								Title:     pt.Title,
+								Artist:     pt.Artist,
+								Duration:   pt.Duration,
+								Thumbnail:  pt.Thumbnail,
+							}
+							if pt.ID == picked.ID {
+								startIdx = i
+							}
+						}
+						return func() tea.Msg {
+							return PlayPlaylistMsg{Tracks: tracks, Index: startIdx}
+						}
+					}
+				}
+			}
+
+			a.setStatus(StatusErrStyle.Render("X Voice: nothing selected to play"))
+			return nil
 		}
 
 	case "PAUSE":
