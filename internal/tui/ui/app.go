@@ -231,7 +231,9 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.avrcp = avrcp.New()
 
 		cmds := []tea.Cmd{a.left.Init()}
-		if a.voiceEvents != nil { cmds = append(cmds, a.waitVoiceEvent()) }
+		if a.voiceEvents != nil {
+			cmds = append(cmds, a.waitVoiceEvent())
+		}
 		if a.avrcp != nil {
 			cmds = append(cmds, a.avrcp.WatchCommands())
 		}
