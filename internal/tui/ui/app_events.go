@@ -87,9 +87,9 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 							tracks[i] = domain.Track{
 								ID:        "local:" + pt.Path,
 								Title:     pt.Title,
-								Artist:     pt.Artist,
-								Duration:   pt.Duration,
-								Thumbnail:  pt.Thumbnail,
+								Artist:    pt.Artist,
+								Duration:  pt.Duration,
+								Thumbnail: pt.Thumbnail,
 							}
 							if pt.ID == picked.ID {
 								startIdx = i
