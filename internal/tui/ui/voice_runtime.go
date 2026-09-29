@@ -24,6 +24,9 @@ func (a *App) startVoiceCmd() tea.Cmd {
 	}
 	starter := a.voiceStarter
 	return func() tea.Msg {
+		if a.player != nil {
+			a.player.SetDucking(0.25)
+		}
 		events, err := starter()
 		if err != nil {
 			return VoiceStartErrorMsg{Err: err}
