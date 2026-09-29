@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"som/internal/tui/voice"
+	voicequery "som/internal/voice"
 	"som/internal/voice/intent"
 
 	tea "charm.land/bubbletea/v2"
@@ -84,7 +85,7 @@ func (a *App) handleVoiceEvent(msg VoiceEventMsg) tea.Cmd {
 			return VoiceCommandMsg{
 				Command: VoiceCommand{
 					Intent:     prediction.Intent,
-					Query:      intent.ExtractSearchQuery(commandText),
+					Query:      voicequery.ExtractSearchQuery(commandText),
 					Transcript: commandText,
 					Confidence: prediction.Confidence,
 					WakeAlias:  msg.WakeAlias,
