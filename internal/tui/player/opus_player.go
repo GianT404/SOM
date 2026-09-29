@@ -103,31 +103,45 @@ func (t *pcmTap) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 	subs := make([]chan []byte, 0, len(t.subs))
-	for c := range t.subs { subs = append(subs, c) }
+	for c := range t.subs {
+		subs = append(subs, c)
+	}
 	t.mu.Unlock()
 	cp := make([]byte, len(p))
 	copy(cp, p)
 	for _, c := range subs {
-		select { case c <- cp: default: }
+		select {
+		case c <- cp:
+		default:
+		}
 	}
 	return len(p), nil
 }
 
 func (t *pcmTap) subscribe() chan []byte {
 	c := make(chan []byte, 8)
-	t.mu.Lock(); t.subs[c] = struct{}{}; t.mu.Unlock()
+	t.mu.Lock()
+	t.subs[c] = struct{}{}
+	t.mu.Unlock()
 	return c
 }
 
 func (t *pcmTap) unsubscribe(c chan []byte) {
-	t.mu.Lock(); delete(t.subs, c); t.mu.Unlock()
+	t.mu.Lock()
+	delete(t.subs, c)
+	t.mu.Unlock()
 }
 
 func (t *pcmTap) flush() {
-	t.mu.Lock(); defer t.mu.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	for c := range t.subs {
 		for {
-			select { case <-c: default: goto drained }
+			select {
+			case <-c:
+			default:
+				goto drained
+			}
 		}
 	drained:
 	}
