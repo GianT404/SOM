@@ -2,8 +2,8 @@ package ui
 
 import (
 	"som/internal/domain"
-	"som/internal/tui/voice"
 	"som/internal/storage"
+	"som/internal/tui/voice"
 )
 
 type SearchResultMsg struct {
