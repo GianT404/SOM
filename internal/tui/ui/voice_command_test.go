@@ -7,8 +7,6 @@ import (
 	"som/internal/voice/intent"
 )
 
-
-
 func TestNormalizeVoiceIntent(t *testing.T) {
 	cases := map[string]string{
 		"":          "",
@@ -65,7 +63,7 @@ func TestHandleVoiceEventCommand(t *testing.T) {
 }
 func TestHandleVoiceCommandPlaySelectedDownload(t *testing.T) {
 	a := &App{
-		player: &player.Player{},
+		player:   &player.Player{},
 		playback: &PlaybackManager{},
 		left: LeftPanel{
 			activeTab: SideDownloads,
@@ -96,4 +94,3 @@ func TestHandleVoiceCommandPlaySelectedDownload(t *testing.T) {
 		t.Fatalf("play = %#v", play)
 	}
 }
-

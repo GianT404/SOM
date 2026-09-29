@@ -79,6 +79,7 @@ type App struct {
 	currLyric          string
 	lyricAnimStart     time.Time
 	voiceEvents        <-chan voice.Event
+	voiceStarter       func() (<-chan voice.Event, error)
 	voiceIntentModel   *intent.Model
 	voiceMinConfidence float64
 }
@@ -228,8 +229,8 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.avrcp = avrcp.New()
 
 		cmds := []tea.Cmd{a.left.Init()}
-		if a.voiceEvents != nil {
-			cmds = append(cmds, a.waitVoiceEvent())
+		if voiceCmd := a.startVoiceCmd(); voiceCmd != nil {
+			cmds = append(cmds, voiceCmd)
 		}
 		if a.avrcp != nil {
 			cmds = append(cmds, a.avrcp.WatchCommands())
@@ -357,6 +358,15 @@ func (a *App) routeEvents(msg tea.Msg) []tea.Cmd {
 		cmds = append(cmds, c)
 	}
 	switch event := msg.(type) {
+	case VoiceStartedMsg:
+		a.voiceEvents = event.Events
+		if c := a.waitVoiceEvent(); c != nil {
+			cmds = append(cmds, c)
+		}
+	case VoiceStartErrorMsg:
+		if event.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X Voice: " + event.Err.Error()))
+		}
 	case VoiceEventMsg:
 		if c := a.handleVoiceEventMsg(event); c != nil {
 			cmds = append(cmds, c)
