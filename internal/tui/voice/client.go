@@ -79,9 +79,19 @@ func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd) {
 		var event Event
 		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil { continue }
 		if strings.TrimSpace(event.Event) == "" { continue }
-		c.events <- event
+		select {
+		case c.events <- event:
+		case <-c.stop:
+			return
+		}
 	}
-	if err := scanner.Err(); err != nil { c.events <- Event{Event: "error", State: err.Error()} }
+	if err := scanner.Err(); err != nil {
+		select {
+		case c.events <- Event{Event: "error", State: err.Error()}:
+		case <-c.stop:
+			return
+		}
+	}
 	_ = cmd.Wait()
 	c.mu.Lock(); defer c.mu.Unlock()
 	if c.cmd == cmd { c.cmd = nil }
@@ -89,8 +99,12 @@ func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd) {
 }
 
 func (c *Client) Close() error {
-	c.mu.Lock(); cmd, done := c.cmd, c.done; c.mu.Unlock()
+	c.mu.Lock()
+	cmd, done, stop := c.cmd, c.done, c.stop
+	c.stop = nil
+	c.mu.Unlock()
 	if cmd == nil { return nil }
+	if stop != nil { close(stop) }
 	if cmd.Process != nil { _ = cmd.Process.Signal(os.Interrupt) }
 	select {
 	case <-done: return nil
