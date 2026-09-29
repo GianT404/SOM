@@ -144,7 +144,6 @@ type MetaSavedMsg struct {
 	Err   error
 }
 
-
 type VoiceEventMsg struct {
 	Event      string
 	Transcript string
