@@ -169,7 +169,6 @@ type Player struct {
 	stderrBuf   syncBuffer
 	volume      float64
 	duckFactor  float64
-	voiceAEC   bool
 	tap         *pcmTap
 	generation  uint64
 	audioFilter string
@@ -345,9 +344,6 @@ func (p *Player) playFromLocked(filePath string, startSec float64, headers map[s
 
 	p.player.Play()
 	p.state = Playing
-	if p.voiceAEC {
-		go routeVoicePlaybackThroughAEC()
-	}
 
 	go func(cmd *exec.Cmd, gen uint64, optr *oto.Player) {
 		err := cmd.Wait()
@@ -528,15 +524,6 @@ func (p *Player) SetDucking(factor float64) {
 	}
 }
 
-func (p *Player) SetVoiceAEC(enabled bool) {
-	p.mu.Lock()
-	p.voiceAEC = enabled
-	playing := p.player != nil && p.state == Playing
-	p.mu.Unlock()
-	if enabled && playing {
-		go routeVoicePlaybackThroughAEC()
-	}
-}
 
 func (p *Player) effectiveVolumeLocked() float64 {
 	factor := p.duckFactor
@@ -701,9 +688,6 @@ func (p *Player) PlayFromBuffer() bool {
 	p.player.SetVolume(p.effectiveVolumeLocked())
 	p.player.Play()
 	p.state = Playing
-	if p.voiceAEC {
-		go routeVoicePlaybackThroughAEC()
-	}
 
 	go func(c *exec.Cmd, gen uint64, optr *oto.Player) {
 		err := c.Wait()
