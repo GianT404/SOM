@@ -19,9 +19,18 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 		return nil
 	}
 	if command.Confidence > 0 && command.Confidence < a.voiceMinConfidence {
-		a.setStatus(StatusErrStyle.Render(fmt.Sprintf("X Voice unclear (%.0f%%): %s", command.Confidence*100, command.Transcript)))
+		a.setStatus(
+			StatusErrStyle.Render(
+				fmt.Sprintf(
+					"X Voice unclear (%.0f%%): %s",
+					command.Confidence*100,
+					command.Transcript,
+				),
+			),
+		)
 		return nil
 	}
+
 	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("● Voice: %s", intent)))
 	switch intent {
 	case "PLAY":
@@ -39,10 +48,18 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 				return nil
 			}
 			track := *a.playback.NowPlay
-			return func() tea.Msg { return PlayTrackAtMsg{Index: a.playback.CurrentIdx, Track: track} }
+			return func() tea.Msg {
+				return PlayTrackAtMsg{
+					Index: a.playback.CurrentIdx,
+					Track: track,
+				}
+			}
 		}
+
 	case "PAUSE":
-		if a.player == nil { return nil }
+		if a.player == nil {
+			return nil
+		}
 		if a.player.State() == player.Playing {
 			return func() tea.Msg { return TogglePauseMsg{} }
 		}
@@ -51,20 +68,27 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 		} else {
 			a.setStatus(StatusMsgStyle.Render("> Voice: nothing is playing"))
 		}
+
 	case "NEXT":
 		return func() tea.Msg { return PlayNextMsg{} }
+
 	case "PREVIOUS":
 		return func() tea.Msg { return PlayPrevMsg{} }
+
 	case "RANDOM":
 		return func() tea.Msg { return ToggleRandomMsg{} }
+
 	case "SEARCH":
 		query := strings.TrimSpace(command.Query)
 		if query == "" {
 			a.setStatus(StatusErrStyle.Render("X Voice: search query is empty"))
 			return nil
 		}
+
 		var cmds []tea.Cmd
-		if c := a.switchSidebar(SideSearch); c != nil { cmds = append(cmds, c) }
+		if cmd := a.switchSidebar(SideSearch); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		a.left.activeTab = SideSearch
 		a.left.searchOnEnter = true
 		a.left.inputSearch = query
@@ -81,9 +105,9 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 		a.setStatus(StatusMsgStyle.Render("> Voice search: " + query))
 		cmds = append(cmds, a.left.spinner.Tick, searchCmd(a.provider, query))
 		return tea.Batch(cmds...)
-	default:
-		a.setStatus(StatusErrStyle.Render("X Voice: unsupported intent " + intent))
 	}
+
+	a.setStatus(StatusErrStyle.Render("X Voice: unsupported intent " + intent))
 	return nil
 }
 
