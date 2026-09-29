@@ -2,6 +2,7 @@ package ui
 
 import (
 	"som/internal/domain"
+	"som/internal/tui/voice"
 	"som/internal/storage"
 )
 
@@ -142,6 +143,14 @@ type MetaSavedMsg struct {
 	Path  string
 	Track domain.Track
 	Err   error
+}
+
+type VoiceStartedMsg struct {
+	Events <-chan voice.Event
+}
+
+type VoiceStartErrorMsg struct {
+	Err error
 }
 
 type VoiceEventMsg struct {
