@@ -9,6 +9,7 @@ type VoiceCommand struct {
 	Query      string
 	Transcript string
 	Confidence float64
+	WakeAlias  string
 }
 
 // VoiceCommandMsg đưa một voice command vào event pipeline của TUI.
@@ -20,3 +21,5 @@ type VoiceCommandMsg struct {
 func NormalizeVoiceIntent(intent string) string {
 	return strings.ToUpper(strings.TrimSpace(intent))
 }
+
+const DefaultVoiceMinConfidence = 0.30
