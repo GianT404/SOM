@@ -1,0 +1,17 @@
+name: Debug gofmt
+
+on:
+  push:
+    branches:
+      - fix/voice-playback-capture-lifecycle
+
+jobs:
+  gofmt-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Show gofmt diff
+        run: gofmt -d internal/tui/ui/app_events.go internal/tui/ui/voice_command_test.go
