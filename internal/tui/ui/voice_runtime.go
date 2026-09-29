@@ -123,6 +123,10 @@ func (a *App) handleVoiceEvent(msg VoiceEventMsg) tea.Cmd {
 }
 
 func (a *App) handleVoiceDisconnected() {
+	if a.player != nil {
+		a.player.SetVoiceAEC(false)
+		a.player.SetDucking(1.0)
+	}
 	a.voiceEvents = nil
 	a.setStatus(StatusErrStyle.Render("X Voice: process stopped"))
 }
