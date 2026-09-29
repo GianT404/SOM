@@ -39,7 +39,7 @@ func (c *Capture) StartPCM(src PCMSource, bands int) error {
 		defer src.Unsubscribe(sub)
 		const frameBytes = pcmChannels * pcmBytesPerSample
 		var leftover []byte
-			for {
+		for {
 			select {
 			case <-stop:
 				return
