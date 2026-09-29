@@ -54,7 +54,7 @@ func (c *Capture) StartPCM(src PCMSource, bands int) error {
 				}
 				frame := leftover[:usable]
 				leftover = append([]byte(nil), leftover[usable:]...)
-			n := usable / frameBytes
+				n := usable / frameBytes
 				samples := make([]float64, n)
 				for i := 0; i < n; i++ {
 					off := i * frameBytes
