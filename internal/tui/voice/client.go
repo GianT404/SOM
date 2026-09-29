@@ -74,28 +74,38 @@ func (c *Client) buildArgs() []string {
 
 func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd) {
 	defer stdout.Close()
-	scanner := bufio.NewScanner(stdout); scanner.Buffer(make([]byte, 4096), maxEventLine)
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 4096), maxEventLine)
 	for scanner.Scan() {
 		var event Event
-		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil { continue }
-		if strings.TrimSpace(event.Event) == "" { continue }
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			continue
+		}
+		if strings.TrimSpace(event.Event) == "" {
+			continue
+		}
 		select {
 		case c.events <- event:
 		case <-c.stop:
-			return
+			goto wait
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		select {
 		case c.events <- Event{Event: "error", State: err.Error()}:
 		case <-c.stop:
-			return
 		}
 	}
+
+wait:
 	_ = cmd.Wait()
-	c.mu.Lock(); defer c.mu.Unlock()
-	if c.cmd == cmd { c.cmd = nil }
-	close(c.done); close(c.events)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cmd == cmd {
+		c.cmd = nil
+	}
+	close(c.done)
+	close(c.events)
 }
 
 func (c *Client) Close() error {
