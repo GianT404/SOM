@@ -82,6 +82,7 @@ type App struct {
 	voiceIntentModel   *intent.Model
 	voiceMinConfidence float64
 }
+
 type Overlay interface {
 	Init() tea.Cmd
 	Update(tea.Msg) (Overlay, tea.Cmd)
@@ -92,16 +93,16 @@ const maxPendingKeys = 64
 
 func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 	return &App{
-		provider:      provider,
-		downloadDir:   downloadDir,
-		sidebarActive: SideDownloads,
-		activeContext: SideDownloads,
-		sessionStart:  time.Now(),
-		palette:       NewCommandPalette(),
-		booting:       true,
-		activeSpeed:   3,
-		mouseEnabled:  false,
-		importPanel:   NewImportPanel(),
+		provider:           provider,
+		downloadDir:        downloadDir,
+		sidebarActive:      SideDownloads,
+		activeContext:      SideDownloads,
+		sessionStart:       time.Now(),
+		palette:            NewCommandPalette(),
+		booting:            true,
+		activeSpeed:        3,
+		mouseEnabled:       false,
+		importPanel:        NewImportPanel(),
 		playback:           NewPlaybackManager(),
 		voiceMinConfidence: DefaultVoiceMinConfidence,
 	}
