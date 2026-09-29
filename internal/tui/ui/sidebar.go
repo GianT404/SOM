@@ -21,6 +21,7 @@ const (
 )
 
 const sidebarWidth = 15
+
 func (s SidebarItem) Num() string {
 	switch s {
 	case SideSearch:
