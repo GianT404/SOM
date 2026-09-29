@@ -81,11 +81,15 @@ func (a *App) handleVoiceEvent(msg VoiceEventMsg) tea.Cmd {
 		}
 
 		prediction := a.voiceIntentModel.Predict(commandText)
+		query := ""
+		if NormalizeVoiceIntent(prediction.Intent) == "SEARCH" {
+			query = voicequery.ExtractSearchQuery(commandText)
+		}
 		return func() tea.Msg {
 			return VoiceCommandMsg{
 				Command: VoiceCommand{
 					Intent:     prediction.Intent,
-					Query:      voicequery.ExtractSearchQuery(commandText),
+					Query:      query,
 					Transcript: commandText,
 					Confidence: prediction.Confidence,
 					WakeAlias:  msg.WakeAlias,
