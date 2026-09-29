@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -67,6 +69,24 @@ func (r *gaplessReader) Close() error {
 	return nil
 }
 
+func ensurePipeWirePulseServer() {
+	if runtime.GOOS != "linux" || strings.TrimSpace(os.Getenv("PULSE_SERVER")) != "" {
+		return
+	}
+
+	runtimeDir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+	if runtimeDir == "" {
+		return
+	}
+
+	socket := runtimeDir + "/pulse/native"
+	if _, err := os.Stat(socket); err != nil {
+		return
+	}
+
+	_ = os.Setenv("PULSE_SERVER", "unix:"+socket)
+}
+
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -96,10 +116,13 @@ type Player struct {
 }
 
 func New() *Player {
+	ensurePipeWirePulseServer()
+
 	op := &oto.NewContextOptions{
-		SampleRate:   48000,
-		ChannelCount: 2,
-		Format:       oto.FormatSignedInt16LE,
+		SampleRate:     48000,
+		ChannelCount:   2,
+		Format:         oto.FormatSignedInt16LE,
+		ApplicationName: "SOM",
 	}
 	ctx, ready, err := oto.NewContext(op)
 	if err != nil {
