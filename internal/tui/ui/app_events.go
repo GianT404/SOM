@@ -121,6 +121,11 @@ func (a *App) handleTick() tea.Cmd {
 func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case VoiceCommandMsg:
+		if cmd := a.handleVoiceCommand(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
 	case PlayStartedMsg:
 		t := msg.Track
 		a.activeContext = SideSearch

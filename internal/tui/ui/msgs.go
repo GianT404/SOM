@@ -143,15 +143,3 @@ type MetaSavedMsg struct {
 	Track domain.Track
 	Err   error
 }
-
-
-type VoiceCommand struct {
-	Intent     string
-	Query      string
-	Transcript string
-	Confidence float64
-}
-
-type VoiceCommandMsg struct {
-	Command VoiceCommand
-}
