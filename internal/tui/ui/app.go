@@ -519,10 +519,6 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 			a.left.suggestFocus = false
 		}
 
-		if item == SideDownloads && oldTab != SideDownloads {
-			cmds = append(cmds)
-		}
-
 		if item == SideImport && oldTab != SideImport {
 			a.importPanel.ScanImportDirs(a.downloadDir, a.left.plStore)
 			a.importPanel.cursor = 0
