@@ -154,7 +154,6 @@ func (t *pcmTap) flush() {
 	}
 }
 
-
 type Player struct {
 	mu          sync.Mutex
 	state       State
@@ -235,8 +234,19 @@ func (p *Player) SetSkipSilence(on bool) {
 }
 // Subscribe returns the exact decoded PCM stream being fed to Oto.
 // Format: signed 16-bit little-endian, 48 kHz, stereo.
-func (p *Player) Subscribe() chan []byte { return p.tap.subscribe() }
-func (p *Player) Unsubscribe(c chan []byte) { p.tap.unsubscribe(c) }
+func (p *Player) Subscribe() chan []byte {
+	p.mu.Lock()
+	tap := p.ensureTapLocked()
+	p.mu.Unlock()
+	return tap.subscribe()
+}
+
+func (p *Player) Unsubscribe(c chan []byte) {
+	p.mu.Lock()
+	tap := p.ensureTapLocked()
+	p.mu.Unlock()
+	tap.unsubscribe(c)
+}
 
 func (p *Player) State() State {
 	p.mu.Lock()
