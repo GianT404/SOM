@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"som/internal/domain"
 	"som/internal/local"
@@ -18,6 +20,8 @@ import (
 	"som/internal/storage"
 	"som/internal/tui/api"
 	"som/internal/tui/ui"
+	"som/internal/tui/voice"
+	"som/internal/voice/intent"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/go-chi/chi/v5/middleware"
@@ -30,6 +34,13 @@ func main() {
 	var serverURL string
 	var apiKey string
 	var downloadDir string
+	var voiceEnabled bool
+	voiceCommand := envOrDefault("SOM_VOICE_COMMAND", voice.DefaultCommand)
+	voiceIntentModel := envOrDefault("SOM_VOICE_INTENT_MODEL", intent.DefaultModelPath)
+	voiceWakeWord := envOrDefault("SOM_WAKE_WORD", voice.DefaultWakeWord)
+	voiceWakeAliases := strings.TrimSpace(os.Getenv("SOM_WAKE_ALIASES"))
+	voiceCommandTimeout := envDuration("SOM_WAKE_COMMAND_TIMEOUT", voice.DefaultCommandPause)
+	voiceMinConfidence := envFloatEnv("SOM_VOICE_MIN_CONFIDENCE", intent.DefaultMinConfidence)
 	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag bool
 
 	var rootCmd = &cobra.Command{
@@ -132,6 +143,35 @@ func main() {
 
 			app := ui.NewApp(provider, downloadDir)
 
+			var voiceClient *voice.Client
+			if voiceEnabled {
+				modelPath, err := intent.ResolveModelPath(voiceIntentModel)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Voice intent model:", err)
+					os.Exit(1)
+				}
+				model, err := intent.Load(modelPath)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Voice intent model:", err)
+					os.Exit(1)
+				}
+
+				voiceClient = voice.NewClient(voice.Config{
+					Command: voiceCommand,
+					WakeWord: voiceWakeWord,
+					WakeAliases: voiceWakeAliases,
+					CommandTimeout: voiceCommandTimeout,
+				})
+				events, err := voiceClient.Start()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Voice:", err)
+					os.Exit(1)
+				}
+				app.SetVoiceIntentModel(model, voiceMinConfidence)
+				app.SetVoiceEvents(events)
+				defer func() { _ = voiceClient.Close() }()
+			}
+
 			defer func() {
 				if r := recover(); r != nil {
 					path := ui.LogBuf.DumpCrash(fmt.Sprintf("panic: %v", r))
@@ -175,6 +215,13 @@ func main() {
 	rootCmd.Flags().StringVar(&serverURL, "server", "", "URL of Google Cloud backend (leave empty to run locally)")
 	rootCmd.Flags().StringVar(&apiKey, "api-key", "", "API key for --server remote mode (or set SOM_API_KEY env var)")
 	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Directory to store downloaded tracks (default: ~/.local/share/som)")
+	rootCmd.Flags().BoolVar(&voiceEnabled, "voice", false, "enable local voice control using som-voice-wake")
+	rootCmd.Flags().StringVar(&voiceCommand, "voice-command", voiceCommand, "voice wake executable")
+	rootCmd.Flags().StringVar(&voiceIntentModel, "voice-intent-model", voiceIntentModel, "path to the exported SOM Voice intent model")
+	rootCmd.Flags().StringVar(&voiceWakeWord, "voice-wake-word", voiceWakeWord, "primary voice wake word")
+	rootCmd.Flags().StringVar(&voiceWakeAliases, "voice-wake-aliases", voiceWakeAliases, "comma-separated ASR wake aliases")
+	rootCmd.Flags().DurationVar(&voiceCommandTimeout, "voice-command-timeout", voiceCommandTimeout, "pause window after wake-only speech")
+	rootCmd.Flags().Float64Var(&voiceMinConfidence, "voice-min-confidence", voiceMinConfidence, "minimum intent confidence")
 	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "download and install the latest SOM release from GitHub")
 	rootCmd.Flags().BoolVar(&installFlag, "install", false, "copy this binary to /usr/local/bin (or platform equivalent)")
 	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "print the current version and exit")
@@ -249,4 +296,25 @@ func gitTagPrev(currentTag string) string {
 		}
 	}
 	return ""
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" { return value }
+	return fallback
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" { return fallback }
+	duration, err := time.ParseDuration(value)
+	if err != nil { return fallback }
+	return duration
+}
+
+func envFloatEnv(name string, fallback float64) float64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" { return fallback }
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil { return fallback }
+	return parsed
 }
