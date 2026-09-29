@@ -364,7 +364,9 @@ func (a *App) routeEvents(msg tea.Msg) []tea.Cmd {
 			cmds = append(cmds, c)
 		}
 	case VoiceStartErrorMsg:
-		a.setStatus(StatusErrStyle.Render("X Voice: " + strings.TrimSpace(event.Err.Error())))
+		if event.Err != nil {
+			a.setStatus(StatusErrStyle.Render("X Voice: " + event.Err.Error()))
+		}
 	case VoiceEventMsg:
 		if c := a.handleVoiceEventMsg(event); c != nil {
 			cmds = append(cmds, c)
