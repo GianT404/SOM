@@ -14,6 +14,24 @@ func (a *App) SetVoiceEvents(events <-chan voice.Event) {
 	a.voiceEvents = events
 }
 
+func (a *App) SetVoiceStarter(starter func() (<-chan voice.Event, error)) {
+	a.voiceStarter = starter
+}
+
+func (a *App) startVoiceCmd() tea.Cmd {
+	if a.voiceStarter == nil {
+		return nil
+	}
+	starter := a.voiceStarter
+	return func() tea.Msg {
+		events, err := starter()
+		if err != nil {
+			return VoiceStartErrorMsg{Err: err}
+		}
+		return VoiceStartedMsg{Events: events}
+	}
+}
+
 func (a *App) SetVoiceIntentModel(model *intent.Model, minConfidence float64) {
 	a.voiceIntentModel = model
 	if minConfidence > 0 && minConfidence <= 1 {
