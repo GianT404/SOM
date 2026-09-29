@@ -96,6 +96,13 @@ func newPCMTap() *pcmTap {
 	return &pcmTap{subs: make(map[chan []byte]struct{})}
 }
 
+func (p *Player) ensureTapLocked() *pcmTap {
+	if p.tap == nil {
+		p.tap = newPCMTap()
+	}
+	return p.tap
+}
+
 func (t *pcmTap) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	if len(t.subs) == 0 {
@@ -282,7 +289,8 @@ func (p *Player) playFrom(filePath string, startSec float64, headers map[string]
 }
 
 func (p *Player) playFromLocked(filePath string, startSec float64, headers map[string]string) error {
-	p.tap.flush()
+	tap := p.ensureTapLocked()
+	tap.flush()
 	p.stopLocked()
 
 	if p.otoCtx == nil {
@@ -318,7 +326,7 @@ func (p *Player) playFromLocked(filePath string, startSec float64, headers map[s
 		return fmt.Errorf("ffmpeg start error: %w", err)
 	}
 
-	p.player = p.otoCtx.NewPlayer(io.TeeReader(pcmOut, p.tap))
+	p.player = p.otoCtx.NewPlayer(io.TeeReader(pcmOut, tap))
 	p.player.SetVolume(p.volume)
 
 	p.player.Play()
@@ -637,7 +645,7 @@ func (p *Player) PlayFromBuffer() bool {
 
 	reader := &gaplessReader{buf: buf, pipe: pipe}
 
-	p.player = p.otoCtx.NewPlayer(io.TeeReader(reader, p.tap))
+	p.player = p.otoCtx.NewPlayer(io.TeeReader(reader, p.ensureTapLocked()))
 	p.player.SetVolume(p.volume)
 	p.player.Play()
 	p.state = Playing
