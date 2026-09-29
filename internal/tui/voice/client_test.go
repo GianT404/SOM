@@ -1,6 +1,7 @@
 package voice
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,4 +20,44 @@ func TestBuildArgs(t *testing.T) {
 	if args != want {
 		t.Fatalf("args = %q, want %q", args, want)
 	}
+}
+
+func TestClientReadsJSONEvent(t *testing.T) {
+	oldHelper := os.Getenv("SOM_VOICE_TEST_HELPER")
+	if oldHelper != "" {
+		t.Setenv("SOM_VOICE_TEST_HELPER", oldHelper)
+	}
+	client := NewClient(Config{
+		Command:        os.Args[0],
+		WakeWord:       "yui",
+		WakeAliases:    "yui,ui,uy",
+		CommandTimeout: time.Second,
+	})
+	t.Setenv("SOM_VOICE_TEST_HELPER", "1")
+
+	events, err := client.Start()
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	select {
+	case event, ok := <-events:
+		if !ok {
+			t.Fatal("voice event channel closed before event")
+		}
+		if event.Event != "command" || event.WakeAlias != "yui" || event.Command != "phát nhạc" {
+			t.Fatalf("event = %#v", event)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for voice event")
+	}
+}
+
+func TestMain(m *testing.M) {
+	if os.Getenv("SOM_VOICE_TEST_HELPER") == "1" {
+		fmt.Println(`{"event":"command","timestamp":"2026-09-29T00:00:00Z","wake_alias":"yui","command":"phát nhạc","state":"idle"}`)
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
 }
