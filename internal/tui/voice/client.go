@@ -89,7 +89,8 @@ func (c *Client) Start() (<-chan Event, error) {
 	c.done = make(chan struct{})
 	c.stop = make(chan struct{})
 
-	go c.readLoop(stdout, cmd)
+	stop := c.stop
+	go c.readLoop(stdout, cmd, stop)
 	return c.events, nil
 }
 
@@ -104,7 +105,7 @@ func (c *Client) buildArgs() []string {
 	return args
 }
 
-func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd) {
+func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd, stop <-chan struct{}) {
 	defer stdout.Close()
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 4096), maxEventLine)
@@ -118,14 +119,14 @@ func (c *Client) readLoop(stdout io.ReadCloser, cmd *exec.Cmd) {
 		}
 		select {
 		case c.events <- event:
-		case <-c.stop:
+		case <-stop:
 			goto wait
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		select {
 		case c.events <- Event{Event: "error", State: err.Error()}:
-		case <-c.stop:
+		case <-stop:
 		}
 	}
 
