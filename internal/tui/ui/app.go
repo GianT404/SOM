@@ -10,6 +10,8 @@ import (
 	"som/internal/tui/avrcp"
 	"som/internal/tui/layout"
 	"som/internal/tui/player"
+	"som/internal/tui/voice"
+	"som/internal/voice/intent"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
@@ -77,6 +79,9 @@ type App struct {
 	prevLyric         string
 	currLyric         string
 	lyricAnimStart    time.Time
+	voiceEvents        <-chan voice.Event
+	voiceIntentModel   *intent.Model
+	voiceMinConfidence float64
 }
 type Overlay interface {
 	Init() tea.Cmd
@@ -101,7 +106,8 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 		activeSpeed:   3,
 		mouseEnabled:  false,
 		importPanel:   NewImportPanel(),
-		playback:      NewPlaybackManager(),
+		playback:           NewPlaybackManager(),
+		voiceMinConfidence: DefaultVoiceMinConfidence,
 	}
 }
 
@@ -225,6 +231,7 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.avrcp = avrcp.New()
 
 		cmds := []tea.Cmd{a.left.Init()}
+		if a.voiceEvents != nil { cmds = append(cmds, a.waitVoiceEvent()) }
 		if a.avrcp != nil {
 			cmds = append(cmds, a.avrcp.WatchCommands())
 		}
