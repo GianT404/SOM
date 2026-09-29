@@ -18,7 +18,7 @@ func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
 		a.setStatus(StatusErrStyle.Render("X Voice: no intent"))
 		return nil
 	}
-	if command.Confidence > 0 && command.Confidence < 0.35 {
+	if command.Confidence > 0 && command.Confidence < a.voiceMinConfidence {
 		a.setStatus(StatusErrStyle.Render(fmt.Sprintf("X Voice unclear (%.0f%%): %s", command.Confidence*100, command.Transcript)))
 		return nil
 	}
