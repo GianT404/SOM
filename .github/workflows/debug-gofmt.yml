@@ -1,0 +1,16 @@
+name: Debug Gofmt
+
+on:
+  pull_request:
+
+jobs:
+  gofmt-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+      - name: Show gofmt diff
+        run: |
+          gofmt -d internal/tui/player/opus_player.go internal/tui/audio/capture.go
