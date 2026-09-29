@@ -3,8 +3,11 @@ package ui
 import (
 	"testing"
 
+	"som/internal/tui/player"
 	"som/internal/voice/intent"
 )
+
+
 
 func TestNormalizeVoiceIntent(t *testing.T) {
 	cases := map[string]string{
@@ -60,3 +63,37 @@ func TestHandleVoiceEventCommand(t *testing.T) {
 		t.Fatalf("wake alias = %q", voiceMsg.Command.WakeAlias)
 	}
 }
+func TestHandleVoiceCommandPlaySelectedDownload(t *testing.T) {
+	a := &App{
+		player: &player.Player{},
+		playback: &PlaybackManager{},
+		left: LeftPanel{
+			activeTab: SideDownloads,
+			locals: []LocalFile{{
+				Name: "track.opus",
+				Path: "/music/track.opus",
+			}},
+		},
+	}
+
+	cmd := a.handleVoiceCommand(VoiceCommandMsg{
+		Command: VoiceCommand{
+			Intent:     "PLAY",
+			Transcript: "phát nhạc",
+			Confidence: 1,
+		},
+	})
+	if cmd == nil {
+		t.Fatal("expected play command")
+	}
+
+	msg := cmd()
+	play, ok := msg.(PlayLocalMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want PlayLocalMsg", msg)
+	}
+	if play.Path != "/music/track.opus" || play.Title != "track.opus" {
+		t.Fatalf("play = %#v", play)
+	}
+}
+
