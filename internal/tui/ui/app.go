@@ -357,6 +357,14 @@ func (a *App) routeEvents(msg tea.Msg) []tea.Cmd {
 	if c := a.handleDataEvents(msg); c != nil {
 		cmds = append(cmds, c)
 	}
+	switch event := msg.(type) {
+	case VoiceEventMsg:
+		if c := a.handleVoiceEventMsg(event); c != nil {
+			cmds = append(cmds, c)
+		}
+	case VoiceDisconnectedMsg:
+		a.handleVoiceDisconnected()
+	}
 
 	return cmds
 }
