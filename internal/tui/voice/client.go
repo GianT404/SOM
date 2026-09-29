@@ -39,10 +39,10 @@ type Event struct {
 
 type Client struct {
 	config Config
-	mu sync.Mutex
-	cmd *exec.Cmd
-	done chan struct{}
-	stop chan struct{}
+	mu     sync.Mutex
+	cmd    *exec.Cmd
+	done   chan struct{}
+	stop   chan struct{}
 	events chan Event
 }
 
