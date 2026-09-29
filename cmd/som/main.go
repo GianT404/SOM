@@ -157,9 +157,9 @@ func main() {
 				}
 
 				voiceClient = voice.NewClient(voice.Config{
-					Command: voiceCommand,
-					WakeWord: voiceWakeWord,
-					WakeAliases: voiceWakeAliases,
+					Command:        voiceCommand,
+					WakeWord:       voiceWakeWord,
+					WakeAliases:    voiceWakeAliases,
 					CommandTimeout: voiceCommandTimeout,
 				})
 				events, err := voiceClient.Start()
@@ -299,22 +299,32 @@ func gitTagPrev(currentTag string) string {
 }
 
 func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" { return value }
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
 	return fallback
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
-	if value == "" { return fallback }
+	if value == "" {
+		return fallback
+	}
 	duration, err := time.ParseDuration(value)
-	if err != nil { return fallback }
+	if err != nil {
+		return fallback
+	}
 	return duration
 }
 
 func envFloatEnv(name string, fallback float64) float64 {
 	value := strings.TrimSpace(os.Getenv(name))
-	if value == "" { return fallback }
+	if value == "" {
+		return fallback
+	}
 	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil { return fallback }
+	if err != nil {
+		return fallback
+	}
 	return parsed
 }
