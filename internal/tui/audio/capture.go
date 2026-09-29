@@ -26,7 +26,10 @@ func New() *Capture {
 
 func (c *Capture) StartPCM(src PCMSource, bands int) error {
 	c.mu.Lock()
-	if c.stop != nil { c.mu.Unlock(); return nil }
+	if c.stop != nil {
+		c.mu.Unlock()
+		return nil
+	}
 	stop := make(chan struct{})
 	c.stop = stop
 	c.bands = nil
@@ -57,7 +60,9 @@ func (c *Capture) StartPCM(src PCMSource, bands int) error {
 					samples[i] = (float64(left) + float64(right)) / 2.0 / 32768.0
 				}
 				bandsOut := magnitudeBands(samples, bands)
-				c.mu.Lock(); c.bands = bandsOut; c.mu.Unlock()
+							c.mu.Lock()
+				c.bands = bandsOut
+				c.mu.Unlock()
 			}
 		}
 	}()
