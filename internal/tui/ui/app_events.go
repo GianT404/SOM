@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"som/internal/domain"
 	"som/internal/tui/avrcp"
@@ -9,6 +10,82 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 )
+
+func (a *App) handleVoiceCommand(msg VoiceCommandMsg) tea.Cmd {
+	command := msg.Command
+	intent := NormalizeVoiceIntent(command.Intent)
+	if intent == "" {
+		a.setStatus(StatusErrStyle.Render("X Voice: no intent"))
+		return nil
+	}
+	if command.Confidence > 0 && command.Confidence < 0.35 {
+		a.setStatus(StatusErrStyle.Render(fmt.Sprintf("X Voice unclear (%.0f%%): %s", command.Confidence*100, command.Transcript)))
+		return nil
+	}
+	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("● Voice: %s", intent)))
+	switch intent {
+	case "PLAY":
+		if a.player == nil || a.playback == nil {
+			return nil
+		}
+		switch a.player.State() {
+		case player.Playing:
+			return nil
+		case player.Paused:
+			return func() tea.Msg { return TogglePauseMsg{} }
+		case player.Stopped:
+			if a.playback.NowPlay == nil {
+				a.setStatus(StatusErrStyle.Render("X Voice: nothing to play"))
+				return nil
+			}
+			track := *a.playback.NowPlay
+			return func() tea.Msg { return PlayTrackAtMsg{Index: a.playback.CurrentIdx, Track: track} }
+		}
+	case "PAUSE":
+		if a.player == nil { return nil }
+		if a.player.State() == player.Playing {
+			return func() tea.Msg { return TogglePauseMsg{} }
+		}
+		if a.player.State() == player.Paused {
+			a.setStatus(StatusMsgStyle.Render("> Voice: already paused"))
+		} else {
+			a.setStatus(StatusMsgStyle.Render("> Voice: nothing is playing"))
+		}
+	case "NEXT":
+		return func() tea.Msg { return PlayNextMsg{} }
+	case "PREVIOUS":
+		return func() tea.Msg { return PlayPrevMsg{} }
+	case "RANDOM":
+		return func() tea.Msg { return ToggleRandomMsg{} }
+	case "SEARCH":
+		query := strings.TrimSpace(command.Query)
+		if query == "" {
+			a.setStatus(StatusErrStyle.Render("X Voice: search query is empty"))
+			return nil
+		}
+		var cmds []tea.Cmd
+		if c := a.switchSidebar(SideSearch); c != nil { cmds = append(cmds, c) }
+		a.left.activeTab = SideSearch
+		a.left.searchOnEnter = true
+		a.left.inputSearch = query
+		a.left.input.SetValue(query)
+		a.left.input.Blur()
+		a.left.loading = true
+		a.left.searched = false
+		a.left.errMsg = ""
+		a.left.tracks = nil
+		a.left.suggestions = nil
+		a.left.suggestCursor = 0
+		a.left.suggestOffset = 0
+		a.left.suggestFocus = false
+		a.setStatus(StatusMsgStyle.Render("> Voice search: " + query))
+		cmds = append(cmds, a.left.spinner.Tick, searchCmd(a.provider, query))
+		return tea.Batch(cmds...)
+	default:
+		a.setStatus(StatusErrStyle.Render("X Voice: unsupported intent " + intent))
+	}
+	return nil
+}
 
 func (a *App) handleTick() tea.Cmd {
 	if a.player == nil ||
