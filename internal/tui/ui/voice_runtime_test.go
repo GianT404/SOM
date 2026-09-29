@@ -3,6 +3,7 @@ package ui
 import (
 	"testing"
 
+	"som/internal/tui/voice"
 	"som/internal/voice/intent"
 
 	tea "charm.land/bubbletea/v2"
@@ -73,4 +74,45 @@ func TestHandleVoiceCommandDispatchesNext(t *testing.T) {
 	}
 
 	var _ tea.Msg = msg
+}
+
+func TestStartVoiceCmd(t *testing.T) {
+	events := make(chan voice.Event)
+	called := false
+	app := &App{
+		voiceStarter: func() (<-chan voice.Event, error) {
+			called = true
+			return events, nil
+		},
+	}
+
+	cmd := app.startVoiceCmd()
+	if cmd == nil {
+		t.Fatal("expected voice start command")
+	}
+
+	msg := cmd()
+	started, ok := msg.(VoiceStartedMsg)
+	if !ok {
+		t.Fatalf("message type = %T, want VoiceStartedMsg", msg)
+	}
+	if !called {
+		t.Fatal("voice starter was not called")
+	}
+	if started.Events != events {
+		t.Fatal("voice event channel was not forwarded")
+	}
+}
+
+func TestRouteVoiceStarted(t *testing.T) {
+	events := make(chan voice.Event)
+	app := &App{}
+
+	cmds := app.routeEvents(VoiceStartedMsg{Events: events})
+	if app.voiceEvents != events {
+		t.Fatal("voice event channel was not attached to app")
+	}
+	if len(cmds) != 1 || cmds[0] == nil {
+		t.Fatalf("routeEvents returned %d commands, want one wait command", len(cmds))
+	}
 }
