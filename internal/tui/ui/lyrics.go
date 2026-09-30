@@ -112,6 +112,55 @@ func (r RightPanel) renderLangPopupHeight(innerW, lyrH int) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
+
+func renderNoLyricsContent(innerW, innerH, frame int) string {
+	if innerW < 1 || innerH < 1 || len(animeFrames) == 0 {
+		return ""
+	}
+
+	logo := animeFrames[frame%len(animeFrames)]
+	noLyr := DimItemStyle.Render("(no lyrics available)")
+	block := lipgloss.JoinVertical(
+		lipgloss.Center,
+		logo,
+		"",
+		noLyr,
+	)
+
+	blockLines := strings.Split(block, "\n")
+	var final []string
+	for _, line := range blockLines {
+		if len(final) >= innerH {
+			break
+		}
+		final = append(final, line)
+	}
+
+	topPad := (innerH - len(final)) / 2
+	if topPad < 0 {
+		topPad = 0
+	}
+
+	var b strings.Builder
+	for i := 0; i < topPad; i++ {
+		b.WriteString("\n")
+	}
+
+	centerStyle := lipgloss.NewStyle().
+		Width(innerW).
+		Align(lipgloss.Center)
+
+	for _, line := range final {
+		b.WriteString(centerStyle.Render(line) + "\n")
+	}
+
+	for i := topPad + len(final); i < innerH; i++ {
+		b.WriteString("\n")
+	}
+
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
 func (r RightPanel) renderLyrics(innerW int, frame int) string {
 	lyrH := r.lyricsHeight()
 	var b strings.Builder
@@ -219,35 +268,7 @@ func (r RightPanel) renderLyrics(innerW int, frame int) string {
 		return strings.TrimSuffix(b.String(), "\n")
 	}
 
-	logo := animeFrames[frame%len(animeFrames)]
-	noLyr := DimItemStyle.Render("(no lyrics available)")
-	block := lipgloss.JoinVertical(lipgloss.Center, logo, "", noLyr)
-
-	blockLines := strings.Split(block, "\n")
-	var final []string
-	for _, l := range blockLines {
-		if len(final) >= lyrH {
-			break
-		}
-		final = append(final, l)
-	}
-
-	topPad := (lyrH - len(final)) / 2
-	if topPad < 0 {
-		topPad = 0
-	}
-	for i := 0; i < topPad; i++ {
-		b.WriteString("\n")
-	}
-	centerStyle := lipgloss.NewStyle().Width(innerW).Align(lipgloss.Center)
-	for _, line := range final {
-		b.WriteString(centerStyle.Render(line) + "\n")
-	}
-	for i := topPad + len(final); i < lyrH; i++ {
-		b.WriteString("\n")
-	}
-	return strings.TrimSuffix(b.String(), "\n")
-}
+	return renderNoLyricsContent(innerW, lyrH, frame)
 
 func (r RightPanel) lyricsHeight() int {
 	h := r.height - 2
