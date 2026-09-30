@@ -55,6 +55,7 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		mainView = a.left.ViewSearchContent(mainW, contentH, playingID)
 
 	case SideDownloads:
+		a.left.SetSize(layout.TracklistWidth, contentH)
 		var alreadyInMove map[string]bool
 		var selected map[string]bool
 		selectMode := false
@@ -92,6 +93,7 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		mainView = a.left.ViewQueueContent(mainW, contentH, a.playback.Queue, playingID)
 
 	case SidePlaylists:
+		a.left.SetSize(layout.TracklistWidth, contentH)
 		tracklistView := a.left.ViewPlaylistsContent(layout.TracklistWidth, contentH, playingID)
 		col3View := a.renderThirdColumn(layout.ThirdColumnWidth, contentH)
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
