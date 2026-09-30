@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-const lyricSyncOffset = 330 * time.Millisecond
+const lyricSyncOffset = 350 * time.Millisecond
 
 type RightPanel struct {
 	lyrics  domain.LyricsResp
