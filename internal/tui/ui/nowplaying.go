@@ -11,6 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+const lyricSyncOffset = 330 * time.Millisecond
+
 type RightPanel struct {
 	lyrics  domain.LyricsResp
 	loaded  bool
@@ -194,7 +196,8 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 
 			// Tự cập nhật Lyrics
 			if r.loaded && len(r.lyrics.Synced) > 0 {
-				elapsedSec := r.elapsed.Seconds()
+				// Advance lyric timing slightly so displayed lyrics lead the audio.
+				elapsedSec := r.elapsed.Add(lyricSyncOffset).Seconds()
 				best := 0
 				for i, line := range r.lyrics.Synced {
 					if line.Time <= elapsedSec {
