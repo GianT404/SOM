@@ -309,6 +309,7 @@ func (a *App) renderThirdColumn(w, h int) string {
 	lyricContent := a.renderLyricAnim(
 		layout.LyricsInnerWidth,
 		layout.LyricsInnerHeight,
+		a.animeFrame,
 	)
 
 	lyricTitle := "Lyrics"
@@ -359,7 +360,11 @@ func (a *App) renderThirdColumn(w, h int) string {
 	)
 }
 
-func (a *App) renderLyricAnim(innerW, innerH int) string {
+func (a *App) renderLyricAnim(innerW, innerH, frame int) string {
+	if a.right.noLyrics {
+		return renderNoLyricsContent(innerW, innerH, frame)
+	}
+
 	progress := float64(time.Since(a.lyricAnimStart)) / float64(350*time.Millisecond)
 	return render.LyricAnimation(
 		a.prevLyric,
