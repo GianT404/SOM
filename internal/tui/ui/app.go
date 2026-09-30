@@ -528,11 +528,15 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 }
 
 func (a *App) syncAnimeAnimation() tea.Cmd {
+	thirdColumnVisible :=
+		a.sidebarActive == SideDownloads ||
+			a.sidebarActive == SidePlaylists
+
 	shouldAnimate :=
-		a.sidebarActive == SideLyrics &&
-			a.right.loaded &&
+		a.right.loaded &&
 			!a.right.loadingLyrics &&
-			a.right.noLyrics
+			a.right.noLyrics &&
+			(a.sidebarActive == SideLyrics || thirdColumnVisible)
 
 	if shouldAnimate {
 		if !a.animeActive {
