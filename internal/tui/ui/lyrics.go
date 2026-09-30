@@ -269,6 +269,7 @@ func (r RightPanel) renderLyrics(innerW int, frame int) string {
 	}
 
 	return renderNoLyricsContent(innerW, lyrH, frame)
+}
 
 func (r RightPanel) lyricsHeight() int {
 	h := r.height - 2
