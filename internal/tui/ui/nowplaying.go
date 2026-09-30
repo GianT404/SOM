@@ -197,7 +197,7 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 			// Tự cập nhật Lyrics
 			if r.loaded && len(r.lyrics.Synced) > 0 {
 				// Advance lyric timing slightly so displayed lyrics lead the audio.
-				elapsedSec := r.elapsed.Add(lyricSyncOffset).Seconds()
+				elapsedSec := r.elapsed.Seconds() + lyricSyncOffset.Seconds()
 				best := 0
 				for i, line := range r.lyrics.Synced {
 					if line.Time <= elapsedSec {
