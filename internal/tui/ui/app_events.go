@@ -229,7 +229,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case LyricsLanguageSelectedMsg:
-		a.preferredLyricLanguage = msg.Language
+		a.right.SetPreferredLanguage(msg.Language)
 		if a.left.plStore != nil && msg.Language != "" {
 			a.left.plStore.SetSetting(lyricsLanguageSettingKey, msg.Language)
 		}
