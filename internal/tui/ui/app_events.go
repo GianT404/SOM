@@ -235,16 +235,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		}
 	case NobodyHereMsg:
 		modal := NewVersionModal(a.version)
-		if len(a.modals) > 0 {
-			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
-				a.modals[len(a.modals)-1] = modal
-			} else {
-				a.modals = append(a.modals, modal)
-			}
-		} else {
-			a.modals = append(a.modals, modal)
-		}
-
+		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 	case PinStatusMsg:
 		a.setStatus(StatusErrStyle.Render("X " + msg.Message))
@@ -253,33 +244,13 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
 		}
 	case OpenSettingsMsg:
-
 		modal := NewSettingsModal(a.settingSwitches(), a.width)
-		if len(a.modals) > 0 {
-			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
-				a.modals[len(a.modals)-1] = modal
-			} else {
-				a.modals = append(a.modals, modal)
-			}
-		} else {
-			a.modals = append(a.modals, modal)
-		}
-
+		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 
 	case OpenHelpMsg:
-
 		modal := NewHelpModal(a.width, a.height)
-		if len(a.modals) > 0 {
-			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
-				a.modals[len(a.modals)-1] = modal
-			} else {
-				a.modals = append(a.modals, modal)
-			}
-		} else {
-			a.modals = append(a.modals, modal)
-		}
-
+		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 
 	case ApplySettingMsg:
