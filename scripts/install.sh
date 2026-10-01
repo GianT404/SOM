@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="GianT404/SOM"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="$HOME/.local/bin"
 
 info()  { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 warn()  { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
@@ -82,8 +82,9 @@ install_som() {
 	curl -fsSL "$url" -o "$tmp/som"
 	chmod +x "$tmp/som"
 
+	mkdir -p "$INSTALL_DIR"
 	info "Installing $INSTALL_DIR/som ..."
-	sudo mv "$tmp/som" "$INSTALL_DIR/som"
+	mv "$tmp/som" "$INSTALL_DIR/som"
 	rm -rf "$tmp"
 
 	# Warn if an older som earlier in PATH shadows the one we just installed.
