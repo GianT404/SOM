@@ -34,9 +34,15 @@ func installDesktopAssets(exePath string) error {
 	if err := os.MkdirAll(iconDir, 0o755); err != nil {
 		return fmt.Errorf("create icon directory: %w", err)
 	}
+	if err := fixSudoOwnership(iconDir); err != nil {
+		return fmt.Errorf("fix icon directory ownership: %w", err)
+	}
 
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
 		return fmt.Errorf("create application directory: %w", err)
+	}
+	if err := fixSudoOwnership(appDir); err != nil {
+		return fmt.Errorf("fix application directory ownership: %w", err)
 	}
 
 	desktop := bytes.ReplaceAll(
@@ -51,9 +57,15 @@ func installDesktopAssets(exePath string) error {
 	if err := os.WriteFile(iconPath, somIcon, 0o644); err != nil {
 		return fmt.Errorf("write icon: %w", err)
 	}
+	if err := fixSudoOwnership(iconPath); err != nil {
+		return fmt.Errorf("fix icon ownership: %w", err)
+	}
 
 	if err := os.WriteFile(desktopPath, desktop, 0o644); err != nil {
 		return fmt.Errorf("write desktop entry: %w", err)
+	}
+	if err := fixSudoOwnership(desktopPath); err != nil {
+		return fmt.Errorf("fix desktop entry ownership: %w", err)
 	}
 
 	fmt.Println("Installed desktop assets:")
