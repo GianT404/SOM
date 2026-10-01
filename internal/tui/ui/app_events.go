@@ -228,6 +228,11 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case LyricsLanguageSelectedMsg:
+		a.preferredLyricLanguage = msg.Language
+		if a.left.plStore != nil && msg.Language != "" {
+			a.left.plStore.SetSetting(lyricsLanguageSettingKey, msg.Language)
+		}
 	case PinStatusMsg:
 		a.setStatus(StatusErrStyle.Render("X " + msg.Message))
 	case SearchResultMsg:
