@@ -32,6 +32,14 @@ func animeTick() tea.Cmd {
 	})
 }
 
+type sessionTickMsg time.Time
+
+func sessionTick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return sessionTickMsg(t)
+	})
+}
+
 type MoveSession struct {
 	TargetPlIdx int
 	Selected    map[string]bool
@@ -224,7 +232,7 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.resizePanels()
 		a.avrcp = avrcp.New()
 
-		cmds := []tea.Cmd{a.left.Init()}
+		cmds := []tea.Cmd{a.left.Init(), sessionTick()}
 		if a.avrcp != nil {
 			cmds = append(cmds, a.avrcp.WatchCommands())
 		}
@@ -305,6 +313,10 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 		}
 		a.animeFrame++
 		cmds = append(cmds, animeTick())
+		return cmds, true, false
+
+	case sessionTickMsg:
+		cmds = append(cmds, sessionTick())
 		return cmds, true, false
 
 	case tickMsg:
