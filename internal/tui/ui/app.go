@@ -93,6 +93,7 @@ type Overlay interface {
 }
 
 const maxPendingKeys = 64
+const lyricsLanguageSettingKey = "lyrics_language"
 
 func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 	mi := textinput.New()
@@ -225,6 +226,9 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.player = msg.player
 		a.right = NewRightPanel(msg.player)
 		a.left = msg.left
+		if a.left.plStore != nil {
+			a.right.SetPreferredLanguage(a.left.plStore.GetSetting(lyricsLanguageSettingKey))
+		}
 		a.left.input.Blur()
 		a.booting = false
 		a.playback.SetDependencies(msg.player, a.provider, a.left.plStore)
