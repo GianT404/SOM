@@ -168,6 +168,12 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Error TUI: %v\n", err)
 				os.Exit(1)
 			}
+
+			d := app.SessionDuration()
+			h := int(d.Hours())
+			m := int(d.Minutes()) % 60
+			s := int(d.Seconds()) % 60
+			fmt.Printf("\nSession: %02dh %02dm %02ds\n", h, m, s)
 		},
 	}
 
