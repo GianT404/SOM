@@ -266,7 +266,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 
 // --- HELPER FUNC ---
 func (a *App) cmdOptionList() []string {
-	if a.sidebarActive == SideSearch {
+	if a.sidebarActive == SideSearch || a.sidebarActive == SideQueue || a.sidebarActive == SideImport {
 		return []string{
 			"Audio settings",
 			"Playback speed",
