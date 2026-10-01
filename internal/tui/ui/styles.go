@@ -268,3 +268,7 @@ func styleHint(key, val string) string {
 	v := lipgloss.NewStyle().Foreground(colorWhite).Render(val)
 	return k + " " + v
 }
+
+func StyleHint(key, val string) string {
+	return styleHint(key, val)
+}
