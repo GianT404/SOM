@@ -233,6 +233,19 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if a.left.plStore != nil && msg.Language != "" {
 			a.left.plStore.SetSetting(lyricsLanguageSettingKey, msg.Language)
 		}
+	case NobodyHereMsg:
+		modal := NewVersionModal(a.version)
+		if len(a.modals) > 0 {
+			if _, ok := a.modals[len(a.modals)-1].(*EscMenuModal); ok {
+				a.modals[len(a.modals)-1] = modal
+			} else {
+				a.modals = append(a.modals, modal)
+			}
+		} else {
+			a.modals = append(a.modals, modal)
+		}
+
+		cmds = append(cmds, modal.Init())
 	case PinStatusMsg:
 		a.setStatus(StatusErrStyle.Render("X " + msg.Message))
 	case SearchResultMsg:

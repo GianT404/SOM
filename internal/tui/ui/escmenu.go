@@ -11,6 +11,7 @@ var escMenuItems = []string{
 	"Settings",
 	"Help",
 	"Quit",
+	"?",
 }
 
 type EscMenuModal struct {
@@ -47,6 +48,8 @@ func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 				return m, func() tea.Msg { return OpenHelpMsg{} }
 			case 2:
 				return m, tea.Quit
+			case 3:
+				return m, func() tea.Msg { return NobodyHereMsg{} }
 			}
 		}
 	case tea.MouseWheelMsg:

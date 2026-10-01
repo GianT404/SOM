@@ -72,6 +72,7 @@ type App struct {
 	hideLogo           bool
 	mouseEnabled       bool
 	skipSilence        bool
+	version            string
 
 	mouseLastClickAt  time.Time
 	mouseLastClickY   int
@@ -116,6 +117,10 @@ func NewApp(provider domain.MusicProvider, downloadDir string) *App {
 
 func (a *App) Init() tea.Cmd {
 	return tea.Batch(splashTick(), bootCmd(a.provider, a.downloadDir))
+}
+
+func (a *App) SetVersion(version string) {
+	a.version = version
 }
 
 func (a *App) selectedMoveCount() int {

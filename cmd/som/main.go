@@ -134,7 +134,7 @@ func main() {
 			}
 
 			app := ui.NewApp(provider, downloadDir)
-
+			app.SetVersion(Version)
 			defer func() {
 				if r := recover(); r != nil {
 					path := ui.LogBuf.DumpCrash(fmt.Sprintf("panic: %v", r))

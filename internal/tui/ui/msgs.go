@@ -142,6 +142,7 @@ type QueueChangedMsg struct {
 
 type OpenSettingsMsg struct{}
 type OpenHelpMsg struct{}
+type NobodyHereMsg struct{}
 type ApplySettingMsg struct {
 	Index int
 	Value bool
