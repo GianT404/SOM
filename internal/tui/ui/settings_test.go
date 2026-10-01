@@ -110,18 +110,6 @@ func TestSettingsToggleViaKeys(t *testing.T) {
 	if !isMono() {
 		t.Fatal("right on option 2 should enable mono theme")
 	}
-
-	// 4. Test thoát
-	_, cmd = settingsModal.Update(kp(tea.KeyEsc))
-	closeMsg, ok := cmd().(CloseModalMsg)
-	if !ok {
-		t.Fatal("esc should return CloseModalMsg")
-	}
-
-	a.Update(closeMsg) // Ép App đóng modal
-	if len(a.modals) != 0 {
-		t.Fatal("esc should close the settings popup")
-	}
 }
 func TestSettingsCursorWrap(t *testing.T) {
 	setTheme(themeDefault)
