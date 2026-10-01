@@ -22,17 +22,22 @@ func NewEscMenuModal() *EscMenuModal {
 }
 func (m *EscMenuModal) Init() tea.Cmd { return nil }
 func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
-	if k, ok := msg.(tea.KeyPressMsg); ok {
-		switch k.String() {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
 		case "esc", "q":
 			return m, func() tea.Msg { return CloseModalMsg{} }
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
+			} else {
+				m.cursor = len(escMenuItems) - 1
 			}
 		case "down", "j":
 			if m.cursor < len(escMenuItems)-1 {
 				m.cursor++
+			} else {
+				m.cursor = 0
 			}
 		case "enter":
 			switch m.cursor {
@@ -42,6 +47,20 @@ func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 				return m, func() tea.Msg { return OpenHelpMsg{} }
 			case 2:
 				return m, tea.Quit
+			}
+		}
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp {
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(escMenuItems) - 1
+			}
+		} else if msg.Button == tea.MouseWheelDown {
+			if m.cursor < len(escMenuItems)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
 			}
 		}
 	}
