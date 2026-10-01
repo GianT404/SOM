@@ -77,8 +77,11 @@ func main() {
 				return
 			}
 			if syncAssetsFlag {
-				const installedPath = "/usr/local/bin/som"
-
+				installedPath, err := os.Executable()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Asset sync failed:", err)
+					os.Exit(1)
+				}
 				if err := installDesktopAssets(installedPath); err != nil {
 					fmt.Fprintln(os.Stderr, "Asset sync failed:", err)
 					os.Exit(1)
@@ -182,7 +185,7 @@ func main() {
 	rootCmd.Flags().StringVar(&apiKey, "api-key", "", "API key for --server remote mode (or set SOM_API_KEY env var)")
 	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Directory to store downloaded tracks (default: ~/.local/share/som)")
 	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "download and install the latest SOM release from GitHub")
-	rootCmd.Flags().BoolVar(&installFlag, "install", false, "copy this binary to /usr/local/bin (or platform equivalent)")
+	rootCmd.Flags().BoolVar(&installFlag, "install", false, "install this binary to a user-local bin directory")
 	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "print the current version and exit")
 	rootCmd.Flags().BoolVar(&checkUpdateFlag, "check-update", false, "check whether a newer SOM release exists without installing")
 	rootCmd.Flags().BoolVar(&uninstallFlag, "uninstall", false, "remove the installed som binary from your machine")
