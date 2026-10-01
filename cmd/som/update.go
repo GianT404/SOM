@@ -122,17 +122,17 @@ func runSelfUpdate(current string) error {
 		reader = pr.Wrap(dlResp.Body)
 	}
 
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("determine executable path: %w", err)
+	}
+
 	opts := selfupdate.Options{}
 	if verifier != nil {
 		opts.Verifier = verifier
 	}
 	if err := selfupdate.Apply(reader, opts); err != nil {
 		return err
-	}
-
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("determine executable path: %w", err)
 	}
 
 	cmd := exec.Command(exe, "--sync-assets")
