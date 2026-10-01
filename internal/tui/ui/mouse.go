@@ -79,6 +79,30 @@ func (a *App) listRowOrigin() (int, bool) {
 		// listRowOrigin points to the first lyric content line.
 		return ct + 1, true
 
+	case SideImport:
+		if a.importPanel.importing || len(a.importPanel.files) == 0 {
+			return 0, false
+		}
+		// Import renderBox has one leading blank body line before the first item.
+		return ct + 2, true
+
+	case SideImport:
+		if idx >= len(a.importPanel.files) {
+			return false
+		}
+		a.importPanel.cursor = idx
+		if a.importPanel.cursor < a.importPanel.offset {
+			a.importPanel.offset = a.importPanel.cursor
+		}
+		visImport := a.importPanel.visibleRows()
+		if a.importPanel.cursor >= a.importPanel.offset+visImport {
+			a.importPanel.offset = a.importPanel.cursor - visImport + 1
+		}
+		if a.importPanel.offset < 0 {
+			a.importPanel.offset = 0
+		}
+		return true
+
 	case SidePlaylists:
 		if a.left.activePlaylist != nil {
 			if len(a.left.activePlaylist.Tracks) == 0 {
@@ -195,6 +219,21 @@ func (a *App) stepListCursor(delta int) {
 		if len(a.playback.Queue) == 0 {
 			return
 		}
+	case SideImport:
+		if len(a.importPanel.files) == 0 || a.importPanel.importing {
+			return
+		}
+		cur = a.importPanel.cursor
+		if cur+delta < 0 {
+			cur = len(a.importPanel.files) - 1
+		} else if cur+delta >= len(a.importPanel.files) {
+			cur = 0
+		} else {
+			cur += delta
+		}
+		a.moveListCursorTo(cur)
+		return
+
 	case SidePlaylists:
 		cur = a.left.plCursor
 		if a.left.activePlaylist != nil {
@@ -407,6 +446,8 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 		cur = a.left.qCursor
 	case SidePlaylists:
 		cur = a.left.plCursor
+	case SideImport:
+		cur = a.importPanel.cursor
 	}
 	if cur < 0 {
 		cur = 0
@@ -414,6 +455,9 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	vis := a.left.visibleRows()
 	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
 		vis += 1
+	}
+	if a.sidebarActive == SideImport {
+		vis = a.importPanel.visibleRows()
 	}
 
 	if local >= vis {
@@ -429,6 +473,8 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 		idx = a.left.qOffset + local
 	case SidePlaylists:
 		idx = a.left.plOffset + local
+	case SideImport:
+		idx = a.importPanel.offset + local
 	default:
 		return nil
 	}
