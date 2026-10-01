@@ -232,8 +232,6 @@ func (a *App) stepListCursor(delta int) {
 		return
 	}
 
-	// Con lăn dùng cùng quy tắc vòng như phím ↑/↓:
-	// từ đầu lăn lên → cuối, từ cuối lăn xuống → đầu.
 	cur += delta
 	if cur < 0 {
 		cur = items - 1
