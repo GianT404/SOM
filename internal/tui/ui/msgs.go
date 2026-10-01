@@ -10,6 +10,10 @@ type SearchResultMsg struct {
 	Err    error
 }
 
+type LyricsLanguageSelectedMsg struct {
+	Language string
+}
+
 type PinStatusMsg struct {
 	Message string
 }
