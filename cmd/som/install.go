@@ -21,13 +21,16 @@ func runUninstall() error {
 }
 
 func uninstallUnix() error {
-	const dest = "/usr/local/bin/som"
+	dest, err := unixInstallPath()
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(dest); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("%s does not exist — nothing to uninstall", dest)
 		}
 		if os.IsPermission(err) {
-			return fmt.Errorf("no permission to remove %s — run again with sudo:\n  sudo som --uninstall", dest)
+			return fmt.Errorf("no permission to remove %s — run again without sudo: %s --uninstall", filepath.Dir(dest), filepath.Base(dest))
 		}
 		return err
 	}
@@ -68,7 +71,8 @@ func alreadyInstalled() bool {
 	}
 	switch runtime.GOOS {
 	case "linux", "darwin":
-		return exe == "/usr/local/bin/som"
+		path, err := unixInstallPath()
+		return err == nil && exe == path
 	case "windows":
 		localAppData := os.Getenv("LocalAppData")
 		if localAppData == "" {
@@ -80,19 +84,40 @@ func alreadyInstalled() bool {
 	}
 }
 
+func unixInstallPath() (string, error) {
+	home, err := somUserHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "bin", "som"), nil
+}
+
 func installUnix() error {
-	const destDir = "/usr/local/bin"
-	dest := filepath.Join(destDir, "som")
+	dest, err := unixInstallPath()
+	if err != nil {
+		return err
+	}
+	destDir := filepath.Dir(dest)
+
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create installation directory: %w", err)
+	}
+	if err := fixSudoOwnership(destDir); err != nil {
+		return fmt.Errorf("fix installation directory ownership: %w", err)
+	}
 
 	if !alreadyInstalled() {
 		if err := copyExecutableTo(dest); err != nil {
 			if os.IsPermission(err) {
 				return fmt.Errorf(
-					"no permission to write to %s — run again with sudo:\n  sudo som --install",
+					"no permission to write to %s — try: sudo som --install",
 					destDir,
 				)
 			}
 			return err
+		}
+		if err := fixSudoOwnership(dest); err != nil {
+			return fmt.Errorf("fix executable ownership: %w", err)
 		}
 
 		fmt.Println("Installed to", dest)
