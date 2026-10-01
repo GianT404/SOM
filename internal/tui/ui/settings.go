@@ -76,17 +76,26 @@ func NewSettingsModal(items []Switch, w int) *SettingsModal {
 }
 func (m *SettingsModal) Init() tea.Cmd { return nil }
 func (m *SettingsModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
-	if k, ok := msg.(tea.KeyPressMsg); ok {
-		switch k.String() {
+	if len(m.items) == 0 {
+		return m, nil
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
 		case "esc", "q":
 			return m, func() tea.Msg { return CloseModalMsg{} }
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
+			} else {
+				m.cursor = len(m.items) - 1
 			}
 		case "down", "j":
 			if m.cursor < len(m.items)-1 {
 				m.cursor++
+			} else {
+				m.cursor = 0
 			}
 		case "left", "h":
 			m.items[m.cursor].ToggleLeft()
@@ -98,6 +107,20 @@ func (m *SettingsModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 			idx := m.cursor
 			val := m.items[idx].Value()
 			return m, func() tea.Msg { return ApplySettingMsg{Index: idx, Value: val} }
+		}
+	case tea.MouseWheelMsg:
+		if msg.Button == tea.MouseWheelUp {
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.items) - 1
+			}
+		} else if msg.Button == tea.MouseWheelDown {
+			if m.cursor < len(m.items)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
 		}
 	}
 	return m, nil
