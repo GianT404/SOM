@@ -50,6 +50,7 @@ type LeftPanel struct {
 	inputSearch   string
 	inputDownload string
 	inputPlaylist string
+	pinStatus     string
 
 	animTick          int
 	showDeletePopup   bool
@@ -1086,18 +1087,18 @@ func (p *LeftPanel) togglePin(path string) {
 			// Đã pin -> Thực hiện Unpin
 			p.pinned = append(p.pinned[:i], p.pinned[i+1:]...)
 			p.savePinned()
-			p.errMsg = ""
+			p.pinStatus = ""
 			return
 		}
 	}
 	// Chưa pin -> Thực hiện Pin
 	if len(p.pinned) >= 5 {
-		p.errMsg = "Maximum 5 pinned tracks allowed."
+		p.pinStatus = "Maximum 5 pinned tracks allowed."
 		return
 	}
 	p.pinned = append(p.pinned, path)
 	p.savePinned()
-	p.errMsg = ""
+	p.pinStatus = ""
 }
 
 func (p *LeftPanel) savePinned() {
