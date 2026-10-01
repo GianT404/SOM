@@ -102,6 +102,22 @@ func TestMouseWheelDisabledWhenOff(t *testing.T) {
 	}
 }
 
+func TestMouseWheelWrapsDownloads(t *testing.T) {
+	a := mouseApp(t)
+	a.left.input.Blur()
+
+	a.left.dlCursor = len(a.left.getFilteredLocals()) - 1
+	a.Update(tea.MouseWheelMsg{X: 60, Y: 20, Button: tea.MouseWheelDown})
+	if a.left.dlCursor != 0 {
+		t.Fatalf("wheel down from last item should wrap to first, got dlCursor=%d", a.left.dlCursor)
+	}
+
+	a.Update(tea.MouseWheelMsg{X: 60, Y: 20, Button: tea.MouseWheelUp})
+	if a.left.dlCursor != len(a.left.getFilteredLocals())-1 {
+		t.Fatalf("wheel up from first item should wrap to last, got dlCursor=%d", a.left.dlCursor)
+	}
+}
+
 func TestProgressBarSeekGeometry(t *testing.T) {
 	a := mouseApp(t)
 	base := a.progressBarTop()
