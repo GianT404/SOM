@@ -37,7 +37,6 @@ var languageNames = map[string]string{
 	"en":      "English",
 	"vi":      "Tiếng Việt",
 	"ja":      "日本語 (Japanese)",
-	"ko":      "한국어 (Korean)",
 	"zh":      "中文 (Chinese)",
 	"zh-Hans": "中文简体 (Chinese Simplified)",
 	"zh-Hant": "中文繁體 (Chinese Traditional)",
@@ -111,7 +110,6 @@ func (r RightPanel) renderLangPopupHeight(innerW, lyrH int) string {
 
 	return strings.TrimSuffix(b.String(), "\n")
 }
-
 
 func renderNoLyricsContent(innerW, innerH, frame int) string {
 	if innerW < 1 || innerH < 1 || len(animeFrames) == 0 {
