@@ -84,7 +84,7 @@ func (r RightPanel) renderLangPopupHeight(innerW, lyrH int) string {
 			}
 
 			b.WriteString(
-				LyricSelectStyle.Render(line + strings.Repeat(" ", pad)),
+				SelectedItemStyle.Render(line + strings.Repeat(" ", pad)),
 			)
 		} else {
 			b.WriteString(LyricNormalStyle.Render(line))
