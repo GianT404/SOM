@@ -228,6 +228,8 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case PinStatusMsg:
+		a.setStatus(StatusErrStyle.Render("X " + msg.Message))
 	case SearchResultMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
