@@ -59,7 +59,7 @@ var helpSections = []helpSection{
 		binds: []helpBind{
 			{"--version", "Show version"},
 			{"--upgrade", "True to it's name."},
-			{"--uninstall", "Remove binary from /usr/local/bin"},
+			{"--uninstall", "Remove installed binary"},
 			{"--check-update", "Check for updates without installing"},
 			{"--update-ytdlp", "Update the yt-dlp binary"},
 		},
