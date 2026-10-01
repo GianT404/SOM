@@ -476,6 +476,13 @@ func (a *App) mainContentHeight() int {
 	return a.uiLayout().MainViewHeight
 }
 
+func (a *App) SessionDuration() time.Duration {
+	if a.sessionStart.IsZero() {
+		return 0
+	}
+	return time.Since(a.sessionStart)
+}
+
 func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	oldTab := a.sidebarActive
 	if oldTab != item {
