@@ -197,56 +197,51 @@ func (a *App) moveListCursorTo(idx int) bool {
 
 func (a *App) stepListCursor(delta int) {
 	var cur int
+	var items int
+
 	switch a.sidebarActive {
 	case SideSearch:
 		if a.left.input.Focused() {
 			return
 		}
-		if len(a.left.tracks) == 0 {
-			return
-		}
+		items = len(a.left.tracks)
 		cur = a.left.searchCursor
 	case SideDownloads:
 		if a.left.input.Focused() {
 			return
 		}
-		if len(a.left.getFilteredLocals()) == 0 {
-			return
-		}
+		items = len(a.left.getFilteredLocals())
 		cur = a.left.dlCursor
 	case SideQueue:
+		items = len(a.playback.Queue)
 		cur = a.left.qCursor
-		if len(a.playback.Queue) == 0 {
-			return
-		}
 	case SideImport:
-		if len(a.importPanel.files) == 0 || a.importPanel.importing {
+		if a.importPanel.importing {
 			return
 		}
+		items = len(a.importPanel.files)
 		cur = a.importPanel.cursor
-		if cur+delta < 0 {
-			cur = len(a.importPanel.files) - 1
-		} else if cur+delta >= len(a.importPanel.files) {
-			cur = 0
-		} else {
-			cur += delta
-		}
-		a.moveListCursorTo(cur)
-		return
-
 	case SidePlaylists:
+		items = a.left.itemCount()
 		cur = a.left.plCursor
-		if a.left.activePlaylist != nil {
-			if len(a.left.activePlaylist.Tracks) == 0 {
-				return
-			}
-		} else if len(a.left.playlists) == 0 {
-			return
-		}
 	default:
 		return
 	}
-	a.moveListCursorTo(cur + delta)
+
+	if items == 0 {
+		return
+	}
+
+	// Con lăn dùng cùng quy tắc vòng như phím ↑/↓:
+	// từ đầu lăn lên → cuối, từ cuối lăn xuống → đầu.
+	cur += delta
+	if cur < 0 {
+		cur = items - 1
+	} else if cur >= items {
+		cur = 0
+	}
+
+	a.moveListCursorTo(cur)
 }
 
 func (a *App) tryFocusSearchInput(m tea.MouseClickMsg) bool {
