@@ -67,6 +67,12 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 curl -fsSL https://raw.githubusercontent.com/GianT404/SOM/main/scripts/install.sh | bash
 ```
 
+SOM installs to `~/.local/bin/som` on Linux. Add `~/.local/bin` to `PATH` if your shell does not already include it. After installation, updates work without `sudo`:
+
+```bash
+som --upgrade
+```
+
 
 ```powershell
 # Windows
@@ -174,10 +180,10 @@ som completion fish > ~/.config/fish/completions/som.fish
 | `--server <URL>` | Remote mode — point to a SOM backend |
 | `--api-key <KEY>` | API key for remote mode (or `SOM_API_KEY` env) |
 | `--download-dir` | Override download directory |
-| `--install` | Copy binary to `/usr/local/bin` |
+| `--install` | Install binary to `~/.local/bin` |
 | `--upgrade` | Download latest release (minisign verified) |
 | `--check-update` | Check for updates without installing |
-| `--uninstall` | Remove installed binary |
+| `--uninstall` | Remove the user-local installed binary |
 | `--update-ytdlp` | Update bundled yt-dlp |
 | `--version` | Print version |
 | `--changelog` | Print current version commits |
