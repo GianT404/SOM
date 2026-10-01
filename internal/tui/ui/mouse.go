@@ -71,6 +71,14 @@ func (a *App) listRowOrigin() (int, bool) {
 			return 0, false
 		}
 		return ct + 5, true
+	case SideLyrics:
+		if !a.right.loaded || len(a.right.lyrics.Synced) == 0 || a.right.showLangPopup {
+			return 0, false
+		}
+		// Lyrics box starts immediately inside the content row.
+		// listRowOrigin points to the first lyric content line.
+		return ct + 1, true
+
 	case SidePlaylists:
 		if a.left.activePlaylist != nil {
 			if len(a.left.activePlaylist.Tracks) == 0 {
