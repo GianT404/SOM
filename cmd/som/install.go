@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 )
@@ -161,6 +162,20 @@ func installWindows() error {
 	fmt.Println("How to add to PATH: type \"env\" in Windows Search → select \"Edit environment variables")
 	fmt.Println("for your account\" → select \"User variables\" → select \"Path\" → Edit → New → paste")
 	fmt.Println("the path above → OK all windows → open a new terminal to apply the changes.")
+	return nil
+}
+
+func fixSudoOwnership(path string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	sudoUser := os.Getenv("SUDO_USER")
+	if sudoUser == "" {
+		return nil
+	}
+	if err := exec.Command("chown", sudoUser, path).Run(); err != nil {
+		return err
+	}
 	return nil
 }
 
