@@ -50,7 +50,6 @@ type LeftPanel struct {
 	inputSearch   string
 	inputDownload string
 	inputPlaylist string
-	pinStatus     string
 
 	animTick          int
 	showDeletePopup   bool
@@ -526,9 +525,13 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				locals := p.getFilteredLocals()
 				if len(locals) > 0 && p.dlCursor >= 0 && p.dlCursor < len(locals) {
 					targetPath := locals[p.dlCursor].Path
-					p.togglePin(targetPath)
+					status := p.togglePin(targetPath)
 
 					p.scanLocalFiles()
+
+					if status != "" {
+						return p, func() tea.Msg { return PinStatusMsg{Message: status} }
+					}
 
 				}
 			}
@@ -1081,24 +1084,22 @@ func (p *LeftPanel) isPinned(path string) bool {
 	return false
 }
 
-func (p *LeftPanel) togglePin(path string) {
+func (p *LeftPanel) togglePin(path string) string {
 	for i, pth := range p.pinned {
 		if pth == path {
 			// Đã pin -> Thực hiện Unpin
 			p.pinned = append(p.pinned[:i], p.pinned[i+1:]...)
 			p.savePinned()
-			p.pinStatus = ""
-			return
+			return ""
 		}
 	}
 	// Chưa pin -> Thực hiện Pin
 	if len(p.pinned) >= 5 {
-		p.pinStatus = "Maximum 5 pinned tracks allowed."
-		return
+		return "Maximum 5 pinned tracks allowed."
 	}
 	p.pinned = append(p.pinned, path)
 	p.savePinned()
-	p.pinStatus = ""
+	return ""
 }
 
 func (p *LeftPanel) savePinned() {
