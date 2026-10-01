@@ -10,6 +10,10 @@ type SearchResultMsg struct {
 	Err    error
 }
 
+type PinStatusMsg struct {
+	Message string
+}
+
 type SuggestDebounceMsg struct {
 	Query string
 }
