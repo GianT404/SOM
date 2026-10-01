@@ -123,6 +123,35 @@ func TestSettingsToggleViaKeys(t *testing.T) {
 		t.Fatal("esc should close the settings popup")
 	}
 }
+func TestSettingsCursorWrap(t *testing.T) {
+	setTheme(themeDefault)
+	defer setTheme(themeDefault)
+	a := &App{width: 100, height: 30, playback: NewPlaybackManager(), palette: NewCommandPalette()}
+	modal := NewSettingsModal(a.settingSwitches(), a.width)
+	last := len(modal.items) - 1
+
+	modal.Update(kp(tea.KeyUp))
+	if modal.cursor != last {
+		t.Fatalf("up from first item should wrap to last, got %d", modal.cursor)
+	}
+
+	modal.Update(kp(tea.KeyDown))
+	if modal.cursor != 0 {
+		t.Fatalf("down from last item should wrap to first, got %d", modal.cursor)
+	}
+
+	modal.cursor = last
+	modal.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if modal.cursor != 0 {
+		t.Fatalf("wheel down from last item should wrap to first, got %d", modal.cursor)
+	}
+
+	modal.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if modal.cursor != last {
+		t.Fatalf("wheel up from first item should wrap to last, got %d", modal.cursor)
+	}
+}
+
 func TestSettingsPersistAcrossRestart(t *testing.T) {
 	setTheme(themeDefault)
 	defer setTheme(themeDefault)
