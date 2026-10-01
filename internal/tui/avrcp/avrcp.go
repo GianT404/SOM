@@ -3,6 +3,8 @@ package avrcp
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,6 +19,30 @@ type Server struct {
 	closed bool
 	CmdCh  chan string
 	props  map[string]map[string]dbus.Variant
+	root   *rootMethods
+}
+type rootMethods struct {
+	server *Server
+}
+
+func (r *rootMethods) Raise() *dbus.Error {
+	windowID := os.Getenv("KITTY_WINDOW_ID")
+	if windowID == "" {
+		log.Printf("[avrcp] KITTY_WINDOW_ID is not set")
+		return nil
+	}
+
+	if err := exec.Command(
+		"kitten",
+		"@",
+		"focus-window",
+		"--match",
+		"id:"+windowID,
+	).Run(); err != nil {
+		log.Printf("[avrcp] failed to focus SOM window: %v", err)
+	}
+
+	return nil
 }
 
 func New() *Server {
@@ -43,7 +69,7 @@ func New() *Server {
 		props: map[string]map[string]dbus.Variant{
 			dbusMediaPlayer2: {
 				"CanQuit":             dbus.MakeVariant(true),
-				"CanRaise":            dbus.MakeVariant(false),
+				"CanRaise":            dbus.MakeVariant(true),
 				"HasTrackList":        dbus.MakeVariant(false),
 				"Identity":            dbus.MakeVariant("SOM"),
 				"SupportedUriSchemes": dbus.MakeVariant([]string{}),
@@ -68,7 +94,7 @@ func New() *Server {
 			},
 		},
 	}
-
+	s.root = &rootMethods{server: s}
 	if err := s.setup(); err != nil {
 		log.Printf("[avrcp] setup failed: %v", err)
 		conn.Close()
@@ -79,12 +105,22 @@ func New() *Server {
 }
 
 func (s *Server) setup() error {
-	// Export player methods.
-	if err := s.conn.Export(s, dbus.ObjectPath(dbusPath), dbusPlayerIface); err != nil {
+	if err := s.conn.Export(
+		s.root,
+		dbus.ObjectPath(dbusPath),
+		dbusMediaPlayer2,
+	); err != nil {
+		return fmt.Errorf("export media player: %w", err)
+	}
+
+	if err := s.conn.Export(
+		s,
+		dbus.ObjectPath(dbusPath),
+		dbusPlayerIface,
+	); err != nil {
 		return fmt.Errorf("export player: %w", err)
 	}
 
-	// Export Properties interface (we handle GetAll/Get/Set ourselves).
 	if err := s.conn.Export(s, dbus.ObjectPath(dbusPath), dbusProperties); err != nil {
 		return fmt.Errorf("export properties: %w", err)
 	}
