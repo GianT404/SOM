@@ -86,23 +86,6 @@ func (a *App) listRowOrigin() (int, bool) {
 		// Import renderBox has one leading blank body line before the first item.
 		return ct + 2, true
 
-	case SideImport:
-		if idx >= len(a.importPanel.files) {
-			return false
-		}
-		a.importPanel.cursor = idx
-		if a.importPanel.cursor < a.importPanel.offset {
-			a.importPanel.offset = a.importPanel.cursor
-		}
-		visImport := a.importPanel.visibleRows()
-		if a.importPanel.cursor >= a.importPanel.offset+visImport {
-			a.importPanel.offset = a.importPanel.cursor - visImport + 1
-		}
-		if a.importPanel.offset < 0 {
-			a.importPanel.offset = 0
-		}
-		return true
-
 	case SidePlaylists:
 		if a.left.activePlaylist != nil {
 			if len(a.left.activePlaylist.Tracks) == 0 {
@@ -167,6 +150,23 @@ func (a *App) moveListCursorTo(idx int) bool {
 		}
 		a.left.qCursor = idx
 		clamp(&a.left.qOffset)
+		return true
+
+	case SideImport:
+		if idx >= len(a.importPanel.files) || a.importPanel.importing {
+			return false
+		}
+		a.importPanel.cursor = idx
+		if a.importPanel.cursor < a.importPanel.offset {
+			a.importPanel.offset = a.importPanel.cursor
+		}
+		visImport := a.importPanel.visibleRows()
+		if a.importPanel.cursor >= a.importPanel.offset+visImport {
+			a.importPanel.offset = a.importPanel.cursor - visImport + 1
+		}
+		if a.importPanel.offset < 0 {
+			a.importPanel.offset = 0
+		}
 		return true
 
 	case SidePlaylists:
