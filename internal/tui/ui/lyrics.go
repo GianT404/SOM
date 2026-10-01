@@ -229,10 +229,10 @@ func (r RightPanel) renderLyrics(innerW int, frame int) string {
 				if i == r.curLine && !r.manualSelect {
 					style = LyricHighlightStyle
 				} else if r.manualSelect && i == r.highlightLine {
-					highlightStyle := LyricSelectStyle.Copy().
+					selectedStyle := SelectedItemStyle.Copy().
 						Width(innerW).
 						Align(lipgloss.Center)
-					b.WriteString(highlightStyle.Render(seg) + "\n")
+					b.WriteString(selectedStyle.Render(seg) + "\n")
 					written++
 					continue
 				}
