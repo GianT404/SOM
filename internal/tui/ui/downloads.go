@@ -111,9 +111,14 @@ func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, sele
 			Render(searchBox + "\n" + listContent)
 	}
 
+	statusContent := ""
+	if p.pinStatus != "" {
+		statusContent = StatusErrStyle.Render("X " + p.pinStatus) + "\n"
+	}
+
 	return lipgloss.NewStyle().
 		Width(w).
-		Render(listContent)
+		Render(statusContent + listContent)
 }
 func countSelected(m map[string]bool) int {
 	n := 0
