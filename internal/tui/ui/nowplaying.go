@@ -36,7 +36,8 @@ type RightPanel struct {
 	showLangPopup bool
 	langCursor    int
 	highlightLine int
-	manualSelect  bool
+	manualSelect          bool
+	preferredLanguage     string
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
@@ -64,12 +65,30 @@ func (r *RightPanel) SetTrack(t *domain.Track) {
 
 func (r *RightPanel) SetLyrics(lr domain.LyricsResp) {
 	r.lyrics = lr
+	r.applyPreferredLanguage()
 	r.loaded = true
 	r.loadingLyrics = false
 	r.noLyrics = len(lr.Synced) == 0 && strings.TrimSpace(lr.Plain) == ""
 	r.curLine = 0
 	r.offset = 0
 	r.langCursor = lr.LanguageIndex()
+}
+
+func (r *RightPanel) SetPreferredLanguage(language string) {
+	r.preferredLanguage = strings.TrimSpace(language)
+}
+
+func (r *RightPanel) applyPreferredLanguage() {
+	if r.preferredLanguage == "" || len(r.lyrics.AllTracks) == 0 {
+		return
+	}
+
+	for i, track := range r.lyrics.AllTracks {
+		if track.Language == r.preferredLanguage {
+			r.lyrics.SelectLanguage(i)
+			return
+		}
+	}
 }
 
 func (r *RightPanel) SetPlaylistState(pos, total int, random bool) {
@@ -96,6 +115,10 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 				r.curLine = 0
 				r.offset = 0
 				r.showLangPopup = false
+				selectedLanguage := r.lyrics.Language
+				return r, func() tea.Msg {
+					return LyricsLanguageSelectedMsg{Language: selectedLanguage}
+				}
 			case "l", "esc":
 				r.showLangPopup = false
 			}
