@@ -1,3 +1,4 @@
+
 <p align="center">
   <img src="./assets/logo.svg" alt="SOM Logo" width="120" />
 </p>
@@ -16,17 +17,20 @@
   <img src="https://img.shields.io/badge/Expo-55-000020?logo=expo&logoColor=white" />
 </p>
 
-<p align="center">
-  <img src="./assets/thumbnail.png" alt="SOM" width="100%" />
-</p>
+## Demo audio setting & sync lyrics
 
-## Demo
+https://github.com/user-attachments/assets/cae0c1d1-9f0d-4d6e-a48d-ece479d8826d
 
-https://github.com/user-attachments/assets/b2050ea6-6621-4a2c-a366-9326a810218e
 
 ## Audio Visualizer
 
 https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
+
+## Mobile
+
+<p align="center">
+  <img src="./assets/thumbnail.png" alt="SOM" width="100%" />
+</p>
 
 ---
 
