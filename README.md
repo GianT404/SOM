@@ -45,7 +45,7 @@ https://github.com/user-attachments/assets/d7bf017b-7a73-4f7e-8d07-964e5f460249
 | Audio Presets | Bass Boost, Nightcore, Daycore, Lo-Fi via command menu |
 | Media Controls | Lock screen & notification controls (play, pause, skip, seek) |
 | Shuffle | Smart shuffle — avoids replaying recent tracks and back-to-back same artist |
-| Audio Visualizer | Live 2D bar / 3D wireframe driven by real-time system audio (`\`) |
+| Audio Visualizer | Live 2D bar wireframe driven by real-time system audio (`\`) |
 | Theme | Default (accent colors) or Mono (all-white text), configurable in Settings |
 | Mouse Support | Click sidebar, double-click to play, wheel scroll, progress bar seek |
 | Gapless Playback | Pre-decodes next track when current has <3s remaining |
@@ -126,7 +126,7 @@ npx expo start
 | `Tab` / `1`-`7` | Sidebar tabs |
 | `/` | Focus search input |
 | `:` | Command popup (add to queue,audio settings, playback, rename, delete, move to playlist, sort, file info) |
-| `\` | Audio visualizer (press `l` to toggle 2D/3D) |
+| `\` | Audio visualizer |
 | `Enter` | Play selected track |
 | `Space` | Play / pause |
 | `]` / `[` | Next / previous |
