@@ -248,7 +248,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		return nil
 	case "Show file info":
-		if target, ok := a.renameTarget(); ok {
+		if target, ok := a.selectedFileInfoTarget(); ok {
 			modal := NewInfoModal(target)
 			a.modals = append(a.modals, modal)
 			return modal.Init()
@@ -292,6 +292,64 @@ func (a *App) selectedPlaylist() (storage.Playlist, bool) {
 	}
 
 	return playlists[a.left.plCursor], true
+}
+
+func (a *App) selectedFileInfoTarget() (*LocalFile, bool) {
+	if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
+		filtered := a.left.getFilteredPlaylistTracks()
+
+		if a.left.plCursor < 0 || a.left.plCursor >= len(filtered) {
+			return nil, false
+		}
+
+		track := filtered[a.left.plCursor]
+
+		path := track.Path
+		if path == "" {
+			path = strings.TrimPrefix(track.ID, "local:")
+		}
+
+		if path == "" {
+			return nil, false
+		}
+
+		// Ưu tiên record đã load trong LeftPanel.
+		for i := range a.left.locals {
+			if a.left.locals[i].Path == path {
+				return &a.left.locals[i], true
+			}
+		}
+
+		// Fallback: lấy từ DB rồi convert storage.LocalFile -> ui.LocalFile.
+		if a.left.plStore != nil {
+			lf, err := a.left.plStore.GetLocalFile(path)
+			if err == nil && lf != nil {
+				return &LocalFile{
+					Name:      lf.Name,
+					Path:      lf.Path,
+					Artist:    lf.Artist,
+					Duration:  lf.Duration,
+					VideoID:   lf.VideoID,
+					Thumbnail: lf.Thumbnail,
+					FileSize:  lf.FileSize,
+					FileMTime: lf.FileMTime,
+					CreatedAt: lf.CreatedAt,
+				}, true
+			}
+		}
+
+		// Fallback cuối cùng: dùng metadata có trong PlaylistTrack.
+		return &LocalFile{
+			Name:      track.Title,
+			Path:      path,
+			Artist:    track.Artist,
+			Duration:  track.Duration,
+			VideoID:   strings.TrimPrefix(track.ID, "local:"),
+			Thumbnail: track.Thumbnail,
+		}, true
+	}
+
+	return a.renameTarget()
 }
 
 func (a *App) cmdOptionList() []string {
