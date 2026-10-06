@@ -94,7 +94,7 @@ func (a *App) listRowOrigin() (int, bool) {
 			if a.left.isSearchVisible() {
 				return ct + 5, true
 			}
-			return ct + 3, true
+			return ct + 2, true
 		}
 		if len(a.left.playlists) == 0 {
 			return 0, false
