@@ -310,20 +310,52 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			),
 		)
 	case ExecuteRemovePlMsg:
-		if a.left.plStore != nil && msg.PlIdx >= 0 && msg.PlIdx < len(a.left.playlists) {
-			pl := a.left.playlists[msg.PlIdx]
-			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, msg.Track.Path); err == nil {
-				for j := range pl.Tracks {
-					if pl.Tracks[j].Path == msg.Track.Path || pl.Tracks[j].ID == msg.Track.ID {
-						a.left.playlists[msg.PlIdx].Tracks = append(pl.Tracks[:j], pl.Tracks[j+1:]...)
-						break
-					}
-				}
-				a.setStatus(StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""))
-			} else {
-				a.setStatus(StatusErrStyle.Render("X Failed: " + err.Error()))
+		if a.left.plStore == nil ||
+			msg.PlIdx < 0 ||
+			msg.PlIdx >= len(a.left.playlists) {
+			break
+		}
+
+		pl := a.left.playlists[msg.PlIdx]
+
+		if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, msg.Track.Path); err != nil {
+			a.setStatus(StatusErrStyle.Render("X Failed: " + err.Error()))
+			break
+		}
+
+		// Xóa khỏi state hiện tại.
+		for j := range pl.Tracks {
+			if pl.Tracks[j].Path == msg.Track.Path ||
+				pl.Tracks[j].ID == msg.Track.ID {
+				a.left.playlists[msg.PlIdx].Tracks =
+					append(pl.Tracks[:j], pl.Tracks[j+1:]...)
+				break
 			}
 		}
+
+		if a.left.activePlaylist != nil &&
+			a.left.activePlaylist.ID == pl.ID {
+
+			tracks := a.left.getFilteredPlaylistTracks()
+
+			if len(tracks) == 0 {
+				a.left.plCursor = 0
+				a.left.plOffset = 0
+			} else {
+				if a.left.plCursor >= len(tracks) {
+					a.left.plCursor = len(tracks) - 1
+				}
+				if a.left.plCursor < 0 {
+					a.left.plCursor = 0
+				}
+
+				a.left.scrollPlIntoView()
+			}
+		}
+
+		a.setStatus(
+			StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""),
+		)
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))

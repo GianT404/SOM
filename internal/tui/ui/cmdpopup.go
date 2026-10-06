@@ -265,6 +265,38 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		a.modals = append(a.modals, modal)
 		return modal.Init()
 	case "Remove from playlist":
+		if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
+			track, ok := a.selectedTrackForPlaylist()
+			if !ok {
+				a.setStatus(StatusErrStyle.Render("X No track selected"))
+				return nil
+			}
+
+			activeID := a.left.activePlaylist.ID
+			plIdx := -1
+
+			for i := range a.left.playlists {
+				if a.left.playlists[i].ID == activeID {
+					plIdx = i
+					break
+				}
+			}
+
+			if plIdx < 0 {
+				a.setStatus(StatusErrStyle.Render("X Active playlist not found"))
+				return nil
+			}
+
+			modal := NewRemoveTrackModal(
+				[]int{plIdx},
+				a.left.playlists,
+				track,
+			)
+
+			a.modals = append(a.modals, modal)
+			return modal.Init()
+		}
+
 		track, ok := a.selectedTrackForPlaylist()
 		if ok {
 			if idxs := a.playlistsContainingSelected(); len(idxs) > 0 {
@@ -273,6 +305,7 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 				return modal.Init()
 			}
 		}
+
 		a.setStatus(StatusErrStyle.Render("X Track not in any playlist"))
 		return nil
 	}
@@ -407,13 +440,39 @@ func (a *App) playlistsContainingSelected() []int {
 }
 
 func (a *App) selectedTrackForPlaylist() (storage.PlaylistTrack, bool) {
+	if a.sidebarActive == SidePlaylists && a.left.activePlaylist != nil {
+		tracks := a.left.getFilteredPlaylistTracks()
+
+		if a.left.plCursor < 0 || a.left.plCursor >= len(tracks) {
+			return storage.PlaylistTrack{}, false
+		}
+
+		return tracks[a.left.plCursor], true
+	}
+
+	// Search result.
 	if a.sidebarActive == SideSearch && a.left.searchCursor < len(a.left.tracks) {
 		t := a.left.tracks[a.left.searchCursor]
-		return storage.PlaylistTrack{ID: t.ID, Title: t.Title, Artist: t.Artist, Duration: t.Duration}, true
+		return storage.PlaylistTrack{
+			ID:       t.ID,
+			Title:    t.Title,
+			Artist:   t.Artist,
+			Duration: t.Duration,
+		}, true
 	}
+
+	// Downloads / context đang phát.
 	if lf, ok := a.renameTarget(); ok {
-		return storage.PlaylistTrack{ID: "local:" + lf.Path, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration}, true
+		return storage.PlaylistTrack{
+			ID:        "local:" + lf.Path,
+			Title:     lf.Name,
+			Artist:    lf.Artist,
+			Duration:  lf.Duration,
+			Path:      lf.Path,
+			Thumbnail: lf.Thumbnail,
+		}, true
 	}
+
 	return storage.PlaylistTrack{}, false
 }
 
