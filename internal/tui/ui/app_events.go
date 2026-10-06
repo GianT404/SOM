@@ -260,6 +260,55 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		if c := a.runCmdOption(msg.Option); c != nil {
 			cmds = append(cmds, c)
 		}
+	case RenamePlaylistDoneMsg:
+		if msg.Err != nil {
+			a.setStatus(
+				StatusErrStyle.Render("X " + msg.Err.Error()),
+			)
+			break
+		}
+
+		updated := false
+
+		for i := range a.left.playlists {
+			if a.left.playlists[i].ID == msg.ID {
+				a.left.playlists[i].Name = msg.NewName
+				updated = true
+				break
+			}
+		}
+
+		if !updated {
+			a.setStatus(
+				StatusErrStyle.Render("X Playlist no longer exists"),
+			)
+			break
+		}
+
+		// Nếu activePlaylist đang trỏ vào slice cũ thì bind lại.
+		a.left.rebindActivePlaylist()
+
+		// Rename có thể làm playlist biến mất khỏi search hiện tại.
+		filtered := a.left.getFilteredPlaylists()
+
+		if len(filtered) == 0 {
+			a.left.plCursor = 0
+			a.left.plOffset = 0
+		} else {
+			if a.left.plCursor >= len(filtered) {
+				a.left.plCursor = len(filtered) - 1
+			}
+			if a.left.plCursor < 0 {
+				a.left.plCursor = 0
+			}
+			a.left.scrollPlIntoView()
+		}
+
+		a.setStatus(
+			StatusOKStyle.Render(
+				`> Renamed playlist to "` + msg.NewName + `"`,
+			),
+		)
 	case ExecuteRemovePlMsg:
 		if a.left.plStore != nil && msg.PlIdx >= 0 && msg.PlIdx < len(a.left.playlists) {
 			pl := a.left.playlists[msg.PlIdx]

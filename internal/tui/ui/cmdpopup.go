@@ -220,6 +220,21 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		// Lưu ý: Không đóng menu nếu lỗi, để user chọn lại
 		return nil
+	case "Rename playlist":
+		target, ok := a.selectedPlaylist()
+		if !ok {
+			a.setStatus(StatusErrStyle.Render("X No playlist selected"))
+			return nil
+		}
+
+		modal := NewRenamePlaylistModal(
+			target,
+			a.left.plStore,
+			a.width,
+		)
+
+		a.modals = append(a.modals, modal)
+		return modal.Init()
 	case "Playback speed":
 		modal := NewSpeedModal(a.activeSpeed)
 		a.modals = append(a.modals, modal)
@@ -265,20 +280,54 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 }
 
 // --- HELPER FUNC ---
+func (a *App) selectedPlaylist() (storage.Playlist, bool) {
+	if a.sidebarActive != SidePlaylists || a.left.activePlaylist != nil {
+		return storage.Playlist{}, false
+	}
+
+	playlists := a.left.getFilteredPlaylists()
+
+	if a.left.plCursor < 0 || a.left.plCursor >= len(playlists) {
+		return storage.Playlist{}, false
+	}
+
+	return playlists[a.left.plCursor], true
+}
+
 func (a *App) cmdOptionList() []string {
-	if a.sidebarActive == SideSearch || a.sidebarActive == SideQueue || a.sidebarActive == SideImport {
+	if a.sidebarActive == SideSearch ||
+		a.sidebarActive == SideQueue ||
+		a.sidebarActive == SideImport {
 		return []string{
 			"Audio settings",
 			"Playback speed",
 		}
 	}
+
 	if a.sidebarActive == SidePlaylists {
-		return []string{"Audio settings", "Playback speed", "Show file info", "Remove from playlist"}
+		if a.left.activePlaylist == nil {
+			return []string{
+				"Rename playlist",
+			}
+		}
+
+		return []string{
+			"Audio settings",
+			"Playback speed",
+			"Show file info",
+			"Remove from playlist",
+		}
 	}
+
 	opts := cmdOptions
-	if _, ok := a.selectedTrackForPlaylist(); ok && len(a.playlistsContainingSelected()) > 0 {
-		opts = append(append([]string{}, cmdOptions...), "Remove from playlist")
+	if _, ok := a.selectedTrackForPlaylist(); ok &&
+		len(a.playlistsContainingSelected()) > 0 {
+		opts = append(
+			append([]string{}, cmdOptions...),
+			"Remove from playlist",
+		)
 	}
+
 	return opts
 }
 

@@ -152,3 +152,9 @@ type MetaSavedMsg struct {
 	Track domain.Track
 	Err   error
 }
+type RenamePlaylistDoneMsg struct {
+	ID      string
+	OldName string
+	NewName string
+	Err     error
+}
