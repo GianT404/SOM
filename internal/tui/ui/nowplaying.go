@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-const lyricSyncOffset = 350 * time.Millisecond
+const lyricSyncOffset = 520 * time.Millisecond
 
 type RightPanel struct {
 	lyrics  domain.LyricsResp
@@ -30,14 +30,14 @@ type RightPanel struct {
 	random        bool
 	trackGen      uint64
 
-	loadingLyrics bool
-	noLyrics      bool
-	spinner       spinner.Model
-	showLangPopup bool
-	langCursor    int
-	highlightLine int
-	manualSelect          bool
-	preferredLanguage     string
+	loadingLyrics     bool
+	noLyrics          bool
+	spinner           spinner.Model
+	showLangPopup     bool
+	langCursor        int
+	highlightLine     int
+	manualSelect      bool
+	preferredLanguage string
 }
 
 func NewRightPanel(p *player.Player) RightPanel {
