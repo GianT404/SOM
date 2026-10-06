@@ -121,12 +121,19 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 		Width(w).
 		Render(listContent)
 }
-func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist, playingId string) string {
+
+func (p LeftPanel) renderPlaylistList(
+	innerW int,
+	filtered []storage.Playlist,
+	playingID string,
+) string {
 	if len(filtered) == 0 {
 		if p.input.Value() != "" {
 			return DimItemStyle.Render(" No matching playlists.")
 		}
-		return DimItemStyle.Render(" No playlists available. Press '/' to create a new playlist.")
+		return DimItemStyle.Render(
+			" No playlists available. Press '/' to create a new playlist.",
+		)
 	}
 
 	var b strings.Builder
@@ -139,48 +146,73 @@ func (p LeftPanel) renderPlaylistList(innerW int, filtered []storage.Playlist, p
 	idxW := 3
 	countW := 10
 
-	// spacing cố định: prefix(2) + "  "(2) + "  "(2) = 6
 	spacing := 6
 	nameW := innerW - idxW - countW - spacing
 	if nameW < 10 {
 		nameW = 10
 	}
 
-	// Header
-	header := fmt.Sprintf("  %-*s  %-*s  %*s", idxW, "#", nameW, "Name", countW, "Tracks")
+	header := fmt.Sprintf(
+		"  %-*s  %-*s  %*s",
+		idxW, "#",
+		nameW, "Name",
+		countW, "Tracks",
+	)
 
 	b.WriteString(DimItemStyle.Render(header))
 	b.WriteString("\n")
 
-	// Vẽ line
-	lineStyle := lipgloss.NewStyle().Foreground(themeCol("#7c7986"))
-	b.WriteString(lineStyle.Render(strings.Repeat("─", innerW)))
+	lineStyle := lipgloss.NewStyle().
+		Foreground(themeCol("#7c7986"))
+
+	b.WriteString(
+		lineStyle.Render(strings.Repeat("─", innerW)),
+	)
 
 	for i := p.plOffset; i < end; i++ {
 		pl := filtered[i]
 
+		isActive := p.plActiveID != "" &&
+			p.plActiveID == pl.ID
+
 		prefix := "  "
-		if i == p.plCursor {
+		if i == p.plCursor || isActive {
 			prefix = " "
 		}
 
 		idx := fmt.Sprintf("%-*d", idxW, i+1)
-		name := runewidth.FillRight(truncate(pl.Name, nameW), nameW)
+
+		name := runewidth.FillRight(
+			truncate(pl.Name, nameW),
+			nameW,
+		)
+
 		countStr := fmt.Sprintf("%d songs", len(pl.Tracks))
-		count := fmt.Sprintf("%*s", countW, countStr) // Ép lề phải
+		count := fmt.Sprintf("%*s", countW, countStr)
 
 		line := prefix + idx + "  " + name + "  " + count
 
 		b.WriteString("\n")
+
+		style := NormalItemStyle
 		if i == p.plCursor {
-			b.WriteString(SelectedItemStyle.Width(innerW).Render(line))
-		} else {
-			b.WriteString(NormalItemStyle.Width(innerW).Render(line))
+			style = SelectedItemStyle
 		}
+
+		if isActive {
+			style = style.
+				Foreground(themeCol("#fff")).
+				Bold(true)
+		}
+
+		b.WriteString(
+			style.Width(innerW).Render(line),
+		)
 	}
 
 	return b.String()
 }
+
 func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistTrack, playingID string) string {
 	if len(filtered) == 0 {
 		if len(p.activePlaylist.Tracks) == 0 {

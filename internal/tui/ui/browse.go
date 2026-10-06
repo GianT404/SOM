@@ -62,6 +62,8 @@ type LeftPanel struct {
 	suggestOffset int
 	suggestFocus  bool
 	pinned        []string
+
+	plActiveID string
 }
 
 const suggestMaxShow = 5
@@ -315,6 +317,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 						for i := range p.playlists {
 							if p.playlists[i].ID == selectedPl.ID {
 								p.activePlaylist = &p.playlists[i]
+								p.plActiveID = selectedPl.ID
 								break
 							}
 						}
@@ -348,10 +351,24 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				break
 			}
 			if p.activeTab == SidePlaylists && p.activePlaylist != nil {
+				activeID := p.activePlaylist.ID
+
 				p.activePlaylist = nil
 				p.plPreFilterID = ""
+
+				filtered := p.getFilteredPlaylists()
+
 				p.plCursor = 0
 				p.plOffset = 0
+
+				for i, pl := range filtered {
+					if pl.ID == activeID {
+						p.plCursor = i
+						break
+					}
+				}
+
+				p.scrollPlIntoView()
 			}
 
 		case "up":
