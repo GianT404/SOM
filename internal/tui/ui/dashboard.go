@@ -18,21 +18,21 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 
 	// 1. Volume
 	volPercent := int(math.Round(vol * 100))
-	volStr := styleHint("VOL", fmt.Sprintf("%d%%", volPercent))
+	volStr := StyleHint("VOL", fmt.Sprintf("%d%%", volPercent))
 
 	// 2. Speed
 	speedLabel := "1.0x"
 	if speedIdx >= 0 && speedIdx < len(playbackSpeeds) {
 		speedLabel = playbackSpeeds[speedIdx].Label
 	}
-	spdStr := styleHint("SPD", speedLabel)
+	spdStr := StyleHint("SPD", speedLabel)
 
 	// 3. Audio Setting (Preset)
 	presetName := "Normal"
 	if presetIdx >= 0 && presetIdx < len(audioPresets) {
 		presetName = audioPresets[presetIdx].Name
 	}
-	eqStr := styleHint("EQ", presetName)
+	eqStr := StyleHint("EQ", presetName)
 
 	// 4. Bitrate
 	bitrateStr := "___ kbps"
@@ -47,7 +47,7 @@ func renderDashboard(hide bool, vol float64, speedIdx int, presetIdx int, nowPla
 			bitrateStr = "Stream"
 		}
 	}
-	brStr := styleHint("BR", bitrateStr)
+	brStr := StyleHint("BR", bitrateStr)
 
 	leftColStyle := lipgloss.NewStyle().Width(14)
 

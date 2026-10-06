@@ -81,7 +81,7 @@ func renderHelpSection(sec helpSection, keyWidth int, maxDesc int) string {
 		}
 
 		key := fmt.Sprintf("%*s", keyWidth, bind[0])
-		line := styleHint(key, desc)
+		line := StyleHint(key, desc)
 
 		if i > 0 {
 			b.WriteString("\n")

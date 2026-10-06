@@ -58,15 +58,15 @@ func (m *InfoModal) View() string {
 		pathStr = m.target.Path
 	}
 
-	b.WriteString("\n  " + styleHint("Title", name))
-	b.WriteString("\n  " + styleHint("Artist", artist))
-	b.WriteString("\n  " + styleHint("Duration", durStr))
-	b.WriteString("\n  " + styleHint("Size", sizeStr))
-	b.WriteString("\n  " + styleHint("Bitrate", bitrateStr))
-	b.WriteString("\n  " + styleHint("Video ID", m.target.VideoID))
-	b.WriteString("\n  " + styleHint("Modified", formatDBTime(m.target.FileMTime)))
-	b.WriteString("\n  " + styleHint("Created", formatDBTime(m.target.CreatedAt)))
-	b.WriteString("\n  " + styleHint("Path", pathStr))
+	b.WriteString("\n  " + StyleHint("Title", name))
+	b.WriteString("\n  " + StyleHint("Artist", artist))
+	b.WriteString("\n  " + StyleHint("Duration", durStr))
+	b.WriteString("\n  " + StyleHint("Size", sizeStr))
+	b.WriteString("\n  " + StyleHint("Bitrate", bitrateStr))
+	b.WriteString("\n  " + StyleHint("Video ID", m.target.VideoID))
+	b.WriteString("\n  " + StyleHint("Modified", formatDBTime(m.target.FileMTime)))
+	b.WriteString("\n  " + StyleHint("Created", formatDBTime(m.target.CreatedAt)))
+	b.WriteString("\n  " + StyleHint("Path", pathStr))
 
 	b.WriteString("\n")
 

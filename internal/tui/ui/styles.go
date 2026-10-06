@@ -263,12 +263,23 @@ func wordWrap(text string, maxW int) []string {
 	return lines
 }
 
-func styleHint(key, val string) string {
-	k := lipgloss.NewStyle().Foreground(colorDark).Bold(true).Render(key + ":")
-	v := lipgloss.NewStyle().Foreground(colorWhite).Render(val)
-	return k + " " + v
+func StyleHint(key, val string) string {
+	return StyleHintActive(key, val, false)
 }
 
-func StyleHint(key, val string) string {
-	return styleHint(key, val)
+func StyleHintActive(key, val string, active bool) string {
+	keyStyle := lipgloss.NewStyle().
+		Foreground(colorDark).
+		Bold(true)
+
+	if active {
+		keyStyle = lipgloss.NewStyle().
+			Foreground(colorAccent).
+			Bold(true)
+	}
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(colorWhite)
+
+	return keyStyle.Render(key+":") + " " + valueStyle.Render(val)
 }

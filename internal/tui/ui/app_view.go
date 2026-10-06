@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tuilayout "som/internal/tui/layout"
+	"som/internal/tui/player"
 	"som/internal/tui/render"
 
 	tea "charm.land/bubbletea/v2"
@@ -134,22 +135,20 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 		status = "  " + a.statusMsg
 	}
 
-	rKeyStyle := lipgloss.NewStyle().Foreground(colorDark)
-	if a.playback.Random {
-		rKeyStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	}
-
 	help := "  " +
-		styleHint("tab", "nav") + "  " +
-		styleHint("enter", "play") + "  " +
-		styleHint("]", "next") + "  " +
-		styleHint("[", "prev") + "  " +
-		rKeyStyle.Render("r:") + lipgloss.NewStyle().Foreground(colorWhite).Render("random") + "  " +
-		styleHint("space", "pause") + "  " +
-		styleHint("/", "search") + "  " +
-		styleHint("esc", "settings") + "  " +
-		styleHint("alt+q", "quit")
-
+		StyleHint("tab", "nav") + "  " +
+		StyleHint("enter", "play") + "  " +
+		StyleHint("]", "next") + "  " +
+		StyleHint("[", "prev") + "  " +
+		StyleHintActive("r", "random", a.playback.Random) + "  " +
+		StyleHintActive(
+			"space",
+			"pause",
+			a.player != nil && a.player.State() == player.Paused,
+		) + "  " +
+		StyleHintActive("/", "search", a.left.input.Focused()) + "  " +
+		StyleHint("esc", "settings") + "  " +
+		StyleHint("alt+q", "quit")
 	progressBar := a.renderProgressBar(a.width)
 
 	return render.BaseFrame(
@@ -204,32 +203,32 @@ func (a *App) renderSomRow(dashboard string) string {
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = styleHint("d", "download") + "  "
+		hint = StyleHint("d", "download") + "  "
 	case SideLyrics:
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = styleHint("up/down", "select") + "  " + styleHint("l", "lyric language") + "  "
+		hint = StyleHint("up/down", "select") + "  " + StyleHint("l", "lyric language") + "  "
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
 		}
-		hint = styleHint(".", "select") + "  " + styleHint("i", "import") + "  " + styleHint("r", "rescan") + "  "
+		hint = StyleHint(".", "select") + "  " + StyleHint("i", "import") + "  " + StyleHint("r", "rescan") + "  "
 	case SideDownloads:
 		if a.moveSession != nil {
 			plName := ""
 			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
 				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
 			}
-			hint = styleHint(".", "select") + "  " + styleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + styleHint("+", "already in playlist") + "  " + styleHint("esc", "cancel")
+			hint = StyleHint(".", "select") + "  " + StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + StyleHint("+", "already in playlist") + "  " + StyleHint("esc", "cancel")
 		} else {
-			hint = styleHint("ctrl+p", "pin/unpin") + "  " + styleHint("\\", "visualizer") + "  " + styleHint("l", "lyric") + "  " + styleHint(":", "Command") + "  "
+			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHint("l", "lyric") + "  " + StyleHint(":", "Command") + "  "
 		}
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = styleHint(",", "new playlist") + "  " + styleHint("l", "lyric") + "  " + styleHint("delete", "its deletes :)") + "  "
+		hint = StyleHint(",", "new playlist") + "  " + StyleHint("l", "lyric") + "  " + StyleHint("delete", "its deletes :)") + "  "
 
 	default:
 		return dashboard

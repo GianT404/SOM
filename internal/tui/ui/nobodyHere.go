@@ -39,7 +39,7 @@ func (m *VersionModal) View() string {
 		Foreground(lipgloss.Color("#FFFFFF"))
 
 	return strings.Join([]string{
-		styleHint("Version", m.version),
+		StyleHint("Version", m.version),
 		madeByStyle.Render("Made by ミＧＩＡＮ4０４シ"),
 	}, "\n")
 }
