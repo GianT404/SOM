@@ -507,6 +507,8 @@ func (a *App) SessionDuration() time.Duration {
 func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 	oldTab := a.sidebarActive
 	if oldTab != item {
+		a.right.showLangPopup = false
+
 		saveInputForTab(&a.left, oldTab)
 		a.sidebarActive = item
 		a.left.activeTab = item
