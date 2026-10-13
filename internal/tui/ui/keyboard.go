@@ -55,15 +55,6 @@ func (a *App) handlePlaybackKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 
 func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	var cmds []tea.Cmd
-
-	if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
-		a.player.Stop()
-		if a.avrcp != nil {
-			a.avrcp.Close()
-		}
-		return tea.Quit
-	}
-
 	switch msg.String() {
 	case "esc":
 		if a.moveSession != nil {

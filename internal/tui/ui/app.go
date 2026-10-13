@@ -190,6 +190,18 @@ func (a *App) applyMoveToPlaylist() {
 }
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		switch key.String() {
+		case "alt+q", "ctrl+c":
+			if a.player != nil {
+				a.player.Stop()
+			}
+			if a.avrcp != nil {
+				a.avrcp.Close()
+			}
+			return a, tea.Quit
+		}
+	}
 	if a.booting {
 		return a.updateBoot(msg)
 	}
@@ -256,9 +268,6 @@ func (a *App) updateBoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.pendingKeys = nil
 		return a, tea.Batch(cmds...)
 	case tea.KeyPressMsg:
-		if msg.String() == "ctrl+c" || msg.String() == "alt+q" {
-			return a, tea.Quit
-		}
 		if len(a.pendingKeys) < maxPendingKeys {
 			a.pendingKeys = append(a.pendingKeys, msg)
 		}
