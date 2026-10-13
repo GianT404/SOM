@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -20,6 +22,9 @@ jobs:
 
       - name: Install ALSA dependencies (for Linux build)
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config gcc-mingw-w64-x86-64
+
+      - name: Generate embedded TUI changelog
+        run: bash scripts/generate-tui-changelog.sh "${GITHUB_REF_NAME}"
 
       - name: Build Linux amd64
         run: |

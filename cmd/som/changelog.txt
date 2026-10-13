@@ -1,0 +1,2 @@
+SOM TUI changelog is generated automatically for tagged release builds.
+Build a TUI release binary to view its embedded changelog.

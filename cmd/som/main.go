@@ -1,16 +1,15 @@
 package main
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"som/internal/domain"
@@ -26,6 +25,9 @@ import (
 )
 
 var Version = "dev"
+
+//go:embed changelog.txt
+var embeddedChangelog string
 
 func main() {
 	var serverURL string
@@ -268,58 +270,11 @@ func main() {
 	}
 }
 
-// runChangelog in các commit từ tag trước đến tag hiện tại (version hiện tại).
-func runChangelog(version string) {
-	tag := strings.TrimSpace(version)
-	if tag == "" || tag == "dev" {
-		fmt.Fprintln(os.Stderr, "changelog: no version tag available (dev build)")
+// runChangelog in changelog đã được sinh sẵn khi build release TUI.
+func runChangelog(_ string) {
+	if embeddedChangelog == "" {
+		fmt.Println("changelog: no changelog embedded in this build")
 		return
 	}
-
-	prevTag := gitTagPrev(tag)
-
-	var rangeSpec string
-	if prevTag != "" {
-		rangeSpec = prevTag + ".." + tag
-	} else {
-		rangeSpec = tag
-	}
-
-	out, err := exec.Command("git", "log", rangeSpec, "--oneline", "--no-decorate").CombinedOutput()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "changelog: git log failed: %v\n", err)
-		return
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
-		fmt.Printf("changelog: %s — no commits found\n", tag)
-		return
-	}
-
-	fmt.Printf("changelog: %s (%d commits)\n\n", tag, len(lines))
-	for _, line := range lines {
-		fmt.Println("  " + line)
-	}
-}
-
-// gitTagPrev tìm tag đứng trước currentTag theo thứ tự tạo (creatordate).
-func gitTagPrev(currentTag string) string {
-	out, err := exec.Command("git", "tag", "--sort=-creatordate").CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	tags := strings.Split(strings.TrimSpace(string(out)), "\n")
-	found := false
-	for _, t := range tags {
-		t = strings.TrimSpace(t)
-		if t == currentTag {
-			found = true
-			continue
-		}
-		if found && t != "" {
-			return t
-		}
-	}
-	return ""
+	fmt.Print(embeddedChangelog)
 }
