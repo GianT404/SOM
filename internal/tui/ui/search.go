@@ -18,9 +18,6 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 	}
 
 	inputRow := " " + p.input.View()
-	if p.loading {
-		inputRow += " " + p.spinner.View()
-	}
 
 	inputContent := lipgloss.NewStyle().Width(innerW).Render(inputRow)
 	searchBox := renderBox(w, "Search", inputContent, searchBorder)
@@ -34,12 +31,6 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 	if p.errMsg != "" {
 		resultContent = StatusErrStyle.Render("X " + p.errMsg)
 	} else if len(p.tracks) > 0 {
-		var statusLine string
-		if p.loadingStream {
-			statusLine = DimItemStyle.Render(" "+p.spinner.View()+" Loading...") + "\n"
-		} else if p.loadingDownload {
-			statusLine = DimItemStyle.Render(" "+p.spinner.View()+" Downloading...") + "\n"
-		}
 
 		// Gọi hàm dùng chung
 		list := renderSharedTrackList(
@@ -53,7 +44,7 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 			},
 			false, nil, nil,
 		)
-		resultContent = statusLine + list
+		resultContent = list
 	} else if !p.searched {
 		padLeft := (innerW) / 2
 		if padLeft < 0 {

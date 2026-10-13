@@ -669,6 +669,15 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 		}
 		return p, nil
+
+	case StreamStartedMsg:
+		if msg.Gen != p.trackGen {
+			break
+		}
+
+		p.loadingStream = false
+		return p, nil
+
 	case StreamResolvedMsg:
 		if msg.Gen != p.trackGen {
 			break

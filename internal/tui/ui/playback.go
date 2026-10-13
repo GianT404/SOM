@@ -337,6 +337,33 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 	case PlayTrackAtMsg:
 		cmds = append(cmds, pm.playTrackCmd(msg.Index, msg.Track))
 
+	case StreamStartedMsg:
+		if msg.Gen != pm.PlayerGen || pm.NowPlay == nil {
+			break
+		}
+
+		pm.SongStarted = true
+
+		track := *pm.NowPlay
+		provider, store := pm.Provider, pm.Store
+
+		cmds = append(cmds, func() tea.Msg {
+			lr, lyricsErr := getCachedLyrics(
+				provider,
+				store,
+				track.ID,
+				track.Title,
+				track.Artist,
+				track.Duration,
+			)
+
+			return StreamResolvedMsg{
+				Lyrics:    lr,
+				LyricsErr: lyricsErr,
+				Gen:       msg.Gen,
+			}
+		})
+
 	case StreamResolvedMsg:
 		if msg.Gen != pm.PlayerGen || pm.NowPlay == nil {
 			break
@@ -494,11 +521,8 @@ func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, reco
 			return nil
 		}
 
-		lr, lyricsErr := getCachedLyrics(pm.Provider, pm.Store, t.ID, t.Title, t.Artist, t.Duration)
 		return StreamResolvedMsg{
-			Lyrics:    lr,
-			LyricsErr: lyricsErr,
-			Gen:       gen,
+			Gen: gen,
 		}
 	}
 

@@ -158,3 +158,7 @@ type RenamePlaylistDoneMsg struct {
 	NewName string
 	Err     error
 }
+
+type StreamStartedMsg struct {
+	Gen uint64
+}

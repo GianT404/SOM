@@ -125,7 +125,9 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			break
 		}
 		t := msg.Track
-		a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+		if msg.IsLocal {
+			a.setStatus(StatusOKStyle.Render(">  " + t.Title))
+		}
 
 		if a.avrcp != nil {
 			a.avrcp.UpdateMetadata(t.ID, t.Title, t.Artist, "", t.Thumbnail, int64(t.Duration)*1_000_000)
@@ -356,6 +358,18 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		a.setStatus(
 			StatusOKStyle.Render("> Removed from \"" + pl.Name + "\""),
 		)
+
+	case StreamStartedMsg:
+		if a.playback != nil && msg.Gen != a.playback.PlayerGen {
+			break
+		}
+
+		if a.playback != nil && a.playback.NowPlay != nil {
+			a.setStatus(
+				StatusOKStyle.Render(">  " + a.playback.NowPlay.Title),
+			)
+		}
+
 	case DownloadDoneMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))

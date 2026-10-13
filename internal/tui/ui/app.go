@@ -349,6 +349,11 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 			a.importPanel.spinner, c = a.importPanel.spinner.Update(msg)
 			cmds = append(cmds, c)
 		}
+		if a.left.loading || a.left.loadingStream || a.left.loadingDownload {
+			var c tea.Cmd
+			a.left.spinner, c = a.left.spinner.Update(msg)
+			cmds = append(cmds, c)
+		}
 		return cmds, true, false
 
 	case tea.KeyPressMsg:

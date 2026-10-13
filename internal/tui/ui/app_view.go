@@ -131,6 +131,16 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 	sep := borderStyle.Render(sepLeft + "─" + sepRight)
 
 	status := ""
+	switch {
+	case a.sidebarActive == SideSearch && a.left.loading:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Searching...")
+	case a.sidebarActive == SideSearch && a.left.loadingStream:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Loading...")
+	case a.sidebarActive == SideSearch && a.left.loadingDownload:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Downloading...")
+	case a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second:
+		status = "  " + a.statusMsg
+	}
 	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
 		status = "  " + a.statusMsg
 	}
