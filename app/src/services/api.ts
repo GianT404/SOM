@@ -1,7 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 
-// Set via app/.env (gitignored): EXPO_PUBLIC_API_URL=https://somz.duckdns.org
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://somz.duckdns.org';
 const DEVICE_ID_KEY = 'som_device_id';
 const TOKEN_KEY = 'som_device_token';
