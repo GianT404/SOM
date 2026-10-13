@@ -1,0 +1,320 @@
+diff --git a/cmd/som/library_stats.go b/cmd/som/library_stats.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..eff034399b8306ff04f8a6a72c1a7f08af44be92
+--- /dev/null
++++ b/cmd/som/library_stats.go
+@@ -0,0 +1,68 @@
++package main
++
++import (
++	"fmt"
++	"log"
++	"os"
++
++	"som/internal/storage"
++)
++
++func runLibraryStats(downloadDir string) error {
++	if downloadDir == "" {
++		if env := os.Getenv("SOM_DOWNLOAD_DIR"); env != "" {
++			downloadDir = env
++		} else {
++			downloadDir = storage.DefaultDir()
++		}
++	}
++
++	store, err := storage.Open(downloadDir)
++	if err != nil {
++		return fmt.Errorf("open library database: %w", err)
++	}
++	defer func() {
++		if err := store.Close(); err != nil {
++			log.Printf("[storage] close warning: %v", err)
++		}
++	}()
++
++	stats, err := store.GetLibraryStats()
++	if err != nil {
++		return err
++	}
++
++	totalTracks := stats.DownloadedTracks + stats.ImportedTracks
++	totalBytes := stats.DownloadedBytes + stats.ImportedBytes
++
++	fmt.Println("SOM Library Statistics")
++	fmt.Println("----------------------")
++	fmt.Printf("Downloaded tracks   : %d (%s)\n", stats.DownloadedTracks, formatBytes(stats.DownloadedBytes))
++	fmt.Printf("Imported tracks     : %d (%s)\n", stats.ImportedTracks, formatBytes(stats.ImportedBytes))
++	fmt.Printf("Total tracks        : %d\n", totalTracks)
++	fmt.Printf("Total track size    : %s\n", formatBytes(totalBytes))
++	fmt.Printf("Playlists           : %d\n", stats.PlaylistCount)
++	fmt.Printf("Tracks in playlists : %d total entries\n", stats.PlaylistTrackCount)
++
++	if len(stats.Playlists) > 0 {
++		fmt.Println("Playlist details:")
++		for _, playlist := range stats.Playlists {
++			fmt.Printf("  - %s: %d tracks\n", playlist.Name, playlist.TrackCount)
++		}
++	}
++	return nil
++}
++
++func formatBytes(n int64) string {
++	units := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB"}
++	value := float64(n)
++	unit := 0
++	for value >= 1024 && unit < len(units)-1 {
++		value /= 1024
++		unit++
++	}
++	if unit == 0 {
++		return fmt.Sprintf("%d %s", n, units[unit])
++	}
++	return fmt.Sprintf("%.1f %s", value, units[unit])
++}
+diff --git a/cmd/som/main.go b/cmd/som/main.go
+index 86e9f4a78fba6ab53fd3ecd7ec413fac7e2bab5a..39b37d7cf439ab3f1a8ad6e5314e362b899071be 100644
+--- a/cmd/som/main.go
++++ b/cmd/som/main.go
+@@ -31,7 +31,7 @@ func main() {
+ 	var serverURL string
+ 	var apiKey string
+ 	var downloadDir string
+-	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag bool
++	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag, libraryStatsFlag bool
+ 
+ 	var rootCmd = &cobra.Command{
+ 		Use:   "som",
+@@ -138,6 +138,14 @@ func main() {
+ 				return
+ 			}
+ 
++			if libraryStatsFlag {
++				if err := runLibraryStats(downloadDir); err != nil {
++					fmt.Fprintln(os.Stderr, "Read library statistics failed:", err)
++					os.Exit(1)
++				}
++				return
++			}
++
+ 			// Chạy TUI chính
+ 			middleware.DefaultLogger = middleware.RequestLogger(
+ 				&middleware.DefaultLogFormatter{
+@@ -247,6 +255,12 @@ func main() {
+ 		false,
+ 		"show total time spent listening to music and exit",
+ 	)
++	rootCmd.Flags().BoolVar(
++		&libraryStatsFlag,
++		"stats",
++		false,
++		"show downloaded/imported tracks, playlists, and disk usage; then exit",
++	)
+ 
+ 	if err := rootCmd.Execute(); err != nil {
+ 		fmt.Fprintln(os.Stderr, err)
+diff --git a/internal/storage/library_stats.go b/internal/storage/library_stats.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..9969ca669a37c768be1a724a2f6d13754c321e83
+--- /dev/null
++++ b/internal/storage/library_stats.go
+@@ -0,0 +1,111 @@
++package storage
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++)
++
++// PlaylistLibraryStats summarizes how many local tracks each playlist contains.
++type PlaylistLibraryStats struct {
++	Name       string
++	TrackCount int
++}
++
++// LibraryStats reports on-disk audio files and playlist membership counts.
++// Downloaded tracks are the supported audio files directly inside DB.Dir().
++// Imported tracks are registered local files stored outside DB.Dir().
++type LibraryStats struct {
++	DownloadedTracks   int
++	ImportedTracks     int
++	DownloadedBytes    int64
++	ImportedBytes      int64
++	PlaylistCount      int
++	PlaylistTrackCount int
++	Playlists          []PlaylistLibraryStats
++}
++
++// GetLibraryStats calculates statistics from files currently present on disk
++// and playlist records in SQLite. File sizes are read from the filesystem so
++// the totals do not depend on potentially stale file_size metadata.
++func (db *DB) GetLibraryStats() (LibraryStats, error) {
++	var stats LibraryStats
++
++	libraryDir, err := filepath.Abs(db.dir)
++	if err != nil {
++		return stats, fmt.Errorf("resolve download directory: %w", err)
++	}
++
++	entries, err := os.ReadDir(libraryDir)
++	if err != nil {
++		return stats, fmt.Errorf("read download directory: %w", err)
++	}
++
++	// Downloads are stored in the root download directory. Count only audio
++	// files, not metadata sidecars, thumbnails, or subdirectories.
++	for _, entry := range entries {
++		if entry.IsDir() || !IsSupportedAudio(entry.Name()) {
++			continue
++		}
++
++		path := filepath.Join(libraryDir, entry.Name())
++		info, err := os.Stat(path)
++		if err != nil || !info.Mode().IsRegular() {
++			continue
++		}
++
++		stats.DownloadedTracks++
++		stats.DownloadedBytes += info.Size()
++	}
++
++	files, err := db.ListAllLocalFiles()
++	if err != nil {
++		return LibraryStats{}, fmt.Errorf("list imported tracks: %w", err)
++	}
++	for _, file := range files {
++		if !IsSupportedAudio(file.Path) {
++			continue
++		}
++
++		path, err := filepath.Abs(file.Path)
++		if err != nil || isPathWithinDir(libraryDir, path) {
++			// Files under the download directory are counted from the filesystem
++			// scan above, avoiding double-counting their database records.
++			continue
++		}
++
++		info, err := os.Stat(path)
++		if err != nil || !info.Mode().IsRegular() {
++			// Stale database entries do not count as available imported tracks.
++			continue
++		}
++
++		stats.ImportedTracks++
++		stats.ImportedBytes += info.Size()
++	}
++
++	playlists, err := db.LoadAllPlaylists()
++	if err != nil {
++		return LibraryStats{}, fmt.Errorf("load playlists: %w", err)
++	}
++	stats.PlaylistCount = len(playlists)
++	for _, playlist := range playlists {
++		trackCount := len(playlist.Tracks)
++		stats.PlaylistTrackCount += trackCount
++		stats.Playlists = append(stats.Playlists, PlaylistLibraryStats{
++			Name:       playlist.Name,
++			TrackCount: trackCount,
++		})
++	}
++
++	return stats, nil
++}
++
++func isPathWithinDir(dir, path string) bool {
++	rel, err := filepath.Rel(dir, path)
++	if err != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) {
++		return false
++	}
++	return rel != "" && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
++}
+diff --git a/internal/storage/library_stats_test.go b/internal/storage/library_stats_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..d8d439c0e72fce2e86cceb92621203a171f5428c
+--- /dev/null
++++ b/internal/storage/library_stats_test.go
+@@ -0,0 +1,71 @@
++package storage
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestGetLibraryStats(t *testing.T) {
++	downloadDir := t.TempDir()
++	importDir := t.TempDir()
++
++	downloadPath := filepath.Join(downloadDir, "download.opus")
++	importPath := filepath.Join(importDir, "imported.mp3")
++	if err := os.WriteFile(downloadPath, []byte("download-audio"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(importPath, []byte("import-audio-data"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	db, err := Open(downloadDir)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer db.Close()
++
++	if err := db.UpsertLocalFile(LocalFile{Path: downloadPath, Name: "Downloaded"}); err != nil {
++		t.Fatal(err)
++	}
++	if err := db.UpsertLocalFile(LocalFile{Path: importPath, Name: "Imported"}); err != nil {
++		t.Fatal(err)
++	}
++
++	favorites, err := db.CreatePlaylist("Favorites")
++	if err != nil {
++		t.Fatal(err)
++	}
++	mix, err := db.CreatePlaylist("Mix")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, trackPath := range []string{downloadPath, importPath} {
++		if err := db.AddTrackToPlaylist(favorites.ID, trackPath); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := db.AddTrackToPlaylist(mix.ID, downloadPath); err != nil {
++		t.Fatal(err)
++	}
++
++	stats, err := db.GetLibraryStats()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if stats.DownloadedTracks != 1 || stats.ImportedTracks != 1 {
++		t.Fatalf("unexpected track counts: downloaded=%d imported=%d", stats.DownloadedTracks, stats.ImportedTracks)
++	}
++	if got, want := stats.DownloadedBytes, int64(len("download-audio")); got != want {
++		t.Fatalf("downloaded bytes = %d, want %d", got, want)
++	}
++	if got, want := stats.ImportedBytes, int64(len("import-audio-data")); got != want {
++		t.Fatalf("imported bytes = %d, want %d", got, want)
++	}
++	if stats.PlaylistCount != 2 || stats.PlaylistTrackCount != 3 {
++		t.Fatalf("unexpected playlist stats: playlists=%d track entries=%d", stats.PlaylistCount, stats.PlaylistTrackCount)
++	}
++	if len(stats.Playlists) != 2 {
++		t.Fatalf("got %d playlist details, want 2", len(stats.Playlists))
++	}
++}
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -190,5 +190,7 @@
+ | `--update-ytdlp` | Update bundled yt-dlp |
+ | `--version` | Print version |
+ | `--changelog` | Print current version commits |
++| `--tt` | Print cumulative listening time and exit |
++| `--stats` | Print downloaded/imported track counts, playlists, and track disk usage |
+ 
+ ---

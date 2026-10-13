@@ -31,7 +31,7 @@ func main() {
 	var serverURL string
 	var apiKey string
 	var downloadDir string
-	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag bool
+	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag, libraryStatsFlag bool
 
 	var rootCmd = &cobra.Command{
 		Use:   "som",
@@ -135,6 +135,14 @@ func main() {
 					(totalSeconds/60)%60,
 					totalSeconds%60,
 				)
+				return
+			}
+
+			if libraryStatsFlag {
+				if err := runLibraryStats(downloadDir); err != nil {
+					fmt.Fprintln(os.Stderr, "Read library statistics failed:", err)
+					os.Exit(1)
+				}
 				return
 			}
 
@@ -246,6 +254,12 @@ func main() {
 		"tt",
 		false,
 		"show total time spent listening to music and exit",
+	)
+	rootCmd.Flags().BoolVar(
+		&libraryStatsFlag,
+		"stats",
+		false,
+		"show total tracks, playlists, and disk usage; then exit",
 	)
 
 	if err := rootCmd.Execute(); err != nil {

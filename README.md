@@ -191,6 +191,8 @@ som completion fish > ~/.config/fish/completions/som.fish
 | `--update-ytdlp` | Update bundled yt-dlp |
 | `--version` | Print version |
 | `--changelog` | Print current version commits |
+| `--tt` | Print cumulative listening time and exit |
+| `--stats` | Print track counts, playlists, and track disk usage |
 
 ---
 
