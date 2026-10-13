@@ -1120,8 +1120,8 @@ func (p *LeftPanel) togglePin(path string) string {
 		}
 	}
 	// Chưa pin -> Thực hiện Pin
-	if len(p.pinned) >= 5 {
-		return "Maximum 5 pinned tracks allowed."
+	if len(p.pinned) >= 12 {
+		return "Maximum 12 pinned tracks allowed."
 	}
 	p.pinned = append(p.pinned, path)
 	p.savePinned()
