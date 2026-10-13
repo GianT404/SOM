@@ -2,8 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"som/internal/domain"
+	"som/internal/storage"
 	"som/internal/tui/avrcp"
 	"som/internal/tui/player"
 
@@ -15,6 +18,7 @@ func (a *App) handleTick() tea.Cmd {
 		a.playback == nil ||
 		!a.playback.SongStarted {
 		a.playbackTickActive = false
+		a.listenTickAt = time.Time{}
 		return nil
 	}
 
@@ -26,10 +30,40 @@ func (a *App) handleTick() tea.Cmd {
 
 	if a.player.State() == player.Stopped {
 		a.playbackTickActive = false
+		a.listenTickAt = time.Time{}
 		return tea.Batch(cmds...)
 	}
 
 	if a.player.State() == player.Playing {
+		if a.left.plStore != nil {
+			now := time.Now()
+
+			if !a.listenTickAt.IsZero() {
+				a.listenRemainder += now.Sub(a.listenTickAt)
+			}
+
+			a.listenTickAt = now
+
+			seconds := int64(a.listenRemainder / time.Second)
+			if seconds > 0 {
+				a.listenRemainder -= time.Duration(seconds) * time.Second
+
+				totalSeconds, _ := strconv.ParseInt(
+					a.left.plStore.GetSetting(storage.TotalListeningTimeSettingKey),
+					10,
+					64,
+				)
+
+				a.left.plStore.SetSetting(
+					storage.TotalListeningTimeSettingKey,
+					strconv.FormatInt(totalSeconds+seconds, 10),
+				)
+			}
+		} else {
+			a.listenTickAt = time.Time{}
+		}
+
+		// Giữ nguyên logic cũ
 		if a.avrcp != nil && a.playback.NowPlay != nil {
 			a.avrcp.UpdatePosition(a.player.Position().Microseconds())
 		}

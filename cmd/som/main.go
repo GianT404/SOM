@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -30,7 +31,7 @@ func main() {
 	var serverURL string
 	var apiKey string
 	var downloadDir string
-	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag bool
+	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag bool
 
 	var rootCmd = &cobra.Command{
 		Use:   "som",
@@ -93,6 +94,47 @@ func main() {
 					fmt.Fprintln(os.Stderr, "Upgrade failed:", err)
 					os.Exit(1)
 				}
+				return
+			}
+
+			if totalTimeFlag {
+				totalTimeDir := downloadDir
+				if totalTimeDir == "" {
+					if env := os.Getenv("SOM_DOWNLOAD_DIR"); env != "" {
+						totalTimeDir = env
+					} else {
+						totalTimeDir = storage.DefaultDir()
+					}
+				}
+				if err := storage.MigrateFromLegacy(totalTimeDir); err != nil {
+					log.Printf("[storage] migration warning: %v", err)
+				}
+
+				store, err := storage.Open(totalTimeDir)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Read total listening time failed:", err)
+					os.Exit(1)
+				}
+
+				totalSeconds := int64(0)
+				if value := store.GetSetting(storage.TotalListeningTimeSettingKey); value != "" {
+					totalSeconds, err = strconv.ParseInt(value, 10, 64)
+					if err != nil || totalSeconds < 0 {
+						_ = store.Close()
+						fmt.Fprintln(os.Stderr, "Read total listening time failed: invalid value in SQLite settings")
+						os.Exit(1)
+					}
+				}
+
+				if err := store.Close(); err != nil {
+					log.Printf("[storage] close warning: %v", err)
+				}
+
+				fmt.Printf("Total listening time: %02dh %02dm %02ds\n",
+					totalSeconds/3600,
+					(totalSeconds/60)%60,
+					totalSeconds%60,
+				)
 				return
 			}
 
@@ -198,6 +240,12 @@ func main() {
 		"sync-assets",
 		false,
 		"internal: sync embedded desktop assets",
+	)
+	rootCmd.Flags().BoolVar(
+		&totalTimeFlag,
+		"tt",
+		false,
+		"show total time spent listening to music and exit",
 	)
 
 	if err := rootCmd.Execute(); err != nil {

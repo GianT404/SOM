@@ -86,6 +86,8 @@ type App struct {
 	prevLyric         string
 	currLyric         string
 	lyricAnimStart    time.Time
+	listenTickAt      time.Time
+	listenRemainder   time.Duration
 }
 type Overlay interface {
 	Init() tea.Cmd

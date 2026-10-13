@@ -253,3 +253,6 @@ func (db *DB) PutLyricsCache(key string, lyricsJSON string, isEmpty bool) error 
     `, key, lyricsJSON, expiresAt)
 	return err
 }
+
+// TotalListeningTimeSettingKey stores accumulated playback time in seconds.
+const TotalListeningTimeSettingKey = "total_listening_seconds"
