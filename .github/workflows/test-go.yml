@@ -26,10 +26,10 @@ jobs:
         with:
           go-version: "1.26"
 
-      - name: Install ALSA dependencies
+      - name: Install ALSA dependencies and D-Bus dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config
+          sudo apt-get install -y libasound2-dev pkg-config dbus-daemon dbus-bin
 
       - name: Check Go formatting
         run: |
@@ -41,7 +41,7 @@ jobs:
           fi
 
       - name: Run Go tests
-        run: go test ./...
+        run: dbus-run-session -- go test ./...
 
       - name: Run go vet
         # avrcp exposes the MPRIS D-Bus Seek method, whose signature is
