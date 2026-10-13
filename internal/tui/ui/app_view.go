@@ -217,7 +217,7 @@ func (a *App) renderSomRow(dashboard string) string {
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = StyleHint("up/down", "select") + "  " + StyleHint("l", "lyric language") + "  "
+		hint = StyleHint("up/down", "select") + "  " + StyleHintActive("l", "lyric language", a.right.showLangPopup) + "  "
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
@@ -231,13 +231,13 @@ func (a *App) renderSomRow(dashboard string) string {
 			}
 			hint = StyleHint(".", "select") + "  " + StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + StyleHint("+", "already in playlist") + "  " + StyleHint("esc", "cancel")
 		} else {
-			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHint("l", "lyric") + "  " + StyleHint(":", "Command") + "  "
+			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint(":", "Command") + "  "
 		}
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = StyleHint(",", "new playlist") + "  " + StyleHint("l", "lyric") + "  " + StyleHint("delete", "its deletes :)") + "  "
+		hint = StyleHint(",", "new playlist") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint("delete", "its deletes :)") + "  "
 
 	default:
 		return dashboard
