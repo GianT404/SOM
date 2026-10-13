@@ -6,9 +6,9 @@
 <h1 align="center">SOM</h1>
 
 <p align="center">
-  <b>Stream and play local music</b>
+  <b>Terminal music player</b>
   <br>
-  <b>Linux, Windows, Android, iOS</b>
+  <b>Supported Platforms: Linux, Windows, Android, iOS</b>
 </p>
 
 <p align="center">
