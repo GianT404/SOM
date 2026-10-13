@@ -1,0 +1,10 @@
+diff --git a/internal/tui/ui/app.go b/internal/tui/ui/app.go
+--- a/internal/tui/ui/app.go
++++ b/internal/tui/ui/app.go
+@@ -459,5 +459,6 @@
+ 		case player.Paused:
+ 			a.playbackTickActive = false
++			a.listenTickAt = time.Time{}
+ 
+ 		case player.Stopped:
+ 

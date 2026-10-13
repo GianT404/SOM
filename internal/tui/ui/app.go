@@ -458,6 +458,7 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 
 		case player.Paused:
 			a.playbackTickActive = false
+			a.listenTickAt = time.Time{}
 
 		case player.Stopped:
 
