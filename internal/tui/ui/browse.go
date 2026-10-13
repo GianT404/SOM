@@ -537,22 +537,38 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			if focused && !p.input.Focused() && p.activeTab == SideQueue {
 				return p, func() tea.Msg { return RemoveFromQueueMsg{Index: p.qCursor} }
 			}
+
 		case "ctrl+p":
 			if focused && !p.input.Focused() && p.activeTab == SideDownloads {
 				locals := p.getFilteredLocals()
 				if len(locals) > 0 && p.dlCursor >= 0 && p.dlCursor < len(locals) {
-					targetPath := locals[p.dlCursor].Path
-					status := p.togglePin(targetPath)
+					target := locals[p.dlCursor]
+					wasPinned := p.isPinned(target.Path)
+					status := p.togglePin(target.Path)
 
 					p.scanLocalFiles()
 
 					if status != "" {
-						return p, func() tea.Msg { return PinStatusMsg{Message: status} }
+						return p, func() tea.Msg {
+							return PinStatusMsg{Message: status}
+						}
 					}
 
+					message := `Pinned: ` + target.Name
+					if wasPinned {
+						message = `Unpinned: ` + target.Name
+					}
+
+					return p, func() tea.Msg {
+						return PinStatusMsg{
+							Message: message,
+							Success: true,
+						}
+					}
 				}
 			}
 			return p, nil
+
 		case "d":
 			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
 				t := p.tracks[p.searchCursor]

@@ -16,6 +16,7 @@ type LyricsLanguageSelectedMsg struct {
 
 type PinStatusMsg struct {
 	Message string
+	Success bool
 }
 
 type SuggestDebounceMsg struct {

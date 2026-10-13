@@ -274,7 +274,11 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 	case PinStatusMsg:
-		a.setStatus(StatusErrStyle.Render("X " + msg.Message))
+		if msg.Success {
+			a.setStatus(StatusOKStyle.Render(">  " + msg.Message))
+		} else {
+			a.setStatus(StatusErrStyle.Render("X  " + msg.Message))
+		}
 	case SearchResultMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
