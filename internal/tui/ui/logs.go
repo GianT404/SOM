@@ -11,11 +11,9 @@ import (
 
 var LogBuf = logbuf.New(logbuf.DefaultCapacity)
 
-func renderLogsView(logOffset int, w, h int, focused bool) string {
-	borderColor := themeCol("#7c7986")
-	if focused {
-		borderColor = themeCol("#e8593c")
-	}
+func renderLogsView(logOffset int, w, h int) string {
+	borderColor := colorWhite
+
 	innerW := w - 4
 	innerH := h - 3
 

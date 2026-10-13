@@ -44,7 +44,6 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 	mainW := layout.MainWidth
 	frame := a.animeFrame
 
-	inputNotFocused := !a.left.input.Focused()
 	playingID := ""
 	if a.playback.NowPlay != nil {
 		playingID = a.playback.NowPlay.ID
@@ -100,10 +99,10 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		mainView = lipgloss.JoinHorizontal(lipgloss.Top, tracklistView, col3View)
 
 	case SideLogs:
-		mainView = renderLogsView(a.logOffset, mainW, contentH, inputNotFocused)
+		mainView = renderLogsView(a.logOffset, mainW, contentH)
 
 	default:
-		mainView = a.renderLyricsView(mainW, contentH, inputNotFocused, frame)
+		mainView = a.renderLyricsView(mainW, contentH, frame)
 	}
 
 	return lipgloss.NewStyle().
@@ -261,7 +260,7 @@ func (a *App) renderSomRow(dashboard string) string {
 	lines[hintLine] = lines[hintLine] + strings.Repeat(" ", gap) + hint
 	return strings.Join(lines, "\n")
 }
-func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
+func (a *App) renderLyricsView(w, h, frame int) string {
 	if a.playback.NowPlay == nil {
 		return lipgloss.NewStyle().
 			Width(w).
@@ -269,8 +268,7 @@ func (a *App) renderLyricsView(w, h int, focused bool, frame int) string {
 			Render(DimItemStyle.Render(" Play a track to see lyrics..."))
 	}
 
-	borderColor := themeCol("#7c7986")
-	lyricsBox := a.right.renderLyricsBox(focused, borderColor, frame)
+	lyricsBox := a.right.renderLyricsBox(colorWhite, frame)
 	return lipgloss.NewStyle().Width(w).Render(lyricsBox)
 }
 

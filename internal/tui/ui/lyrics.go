@@ -9,10 +9,7 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-func (r RightPanel) renderLyricsBox(focused bool, borderColor color.Color, frame int) string {
-	if focused {
-		borderColor = themeCol("#e8593c")
-	}
+func (r RightPanel) renderLyricsBox(borderColor color.Color, frame int) string {
 	innerW := r.width - 4
 	if innerW < 10 {
 		innerW = 10
