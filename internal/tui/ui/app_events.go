@@ -279,6 +279,29 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		} else {
 			a.setStatus(StatusErrStyle.Render("X  " + msg.Message))
 		}
+	case RenameDoneMsg:
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render(
+				"X  Rename failed: " + msg.Err.Error(),
+			))
+			break
+		}
+
+		a.setStatus(StatusOKStyle.Render(
+			`>  Renamed title: "` + msg.NewTitle + `"`,
+		))
+
+	case DeleteDoneMsg:
+		if msg.Err != nil {
+			a.setStatus(StatusErrStyle.Render(
+				"X  Delete failed: " + msg.Err.Error(),
+			))
+			break
+		}
+
+		a.setStatus(StatusOKStyle.Render(
+			`>  Deleted: "` + msg.Name + `"`,
+		))
 	case SearchResultMsg:
 		if msg.Err != nil {
 			a.setStatus(StatusErrStyle.Render("X " + msg.Err.Error()))
