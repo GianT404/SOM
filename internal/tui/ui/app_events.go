@@ -270,7 +270,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			a.left.plStore.SetSetting(lyricsLanguageSettingKey, msg.Language)
 		}
 	case NobodyHereMsg:
-		modal := NewVersionModal(a.version)
+		modal := NewVersionModal(a.version, a.width, a.height)
 		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 	case PinStatusMsg:
