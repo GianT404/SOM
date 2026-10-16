@@ -40,13 +40,13 @@ func TestUILayoutReservesTerminalHeight(t *testing.T) {
 			if layout.TracklistWidth < 1 || layout.ThirdColumnWidth < 1 {
 				t.Fatalf("invalid columns: tracklist=%d third=%d", layout.TracklistWidth, layout.ThirdColumnWidth)
 			}
-			if available := layout.MainWidth - tracklistGap - 1; available >= thirdColMinW &&
+			if available := layout.MainWidth - 1; available >= thirdColMinW &&
 				layout.ThirdColumnWidth < thirdColMinW {
 				t.Fatalf("third column %d below preferred minimum %d when space is available",
 					layout.ThirdColumnWidth, thirdColMinW)
 			}
 
-			if got := layout.TracklistWidth + layout.ThirdColumnWidth + tracklistGap; got != layout.MainWidth {
+			if got := layout.TracklistWidth + layout.ThirdColumnWidth; got != layout.MainWidth {
 				t.Fatalf("horizontal layout uses %d columns, want %d", got, layout.MainWidth)
 			}
 
@@ -113,7 +113,7 @@ func TestUILayoutHandlesTinyTerminalWidth(t *testing.T) {
 		if layout.TracklistWidth < 1 || layout.ThirdColumnWidth < 1 {
 			t.Fatalf("width=%d invalid columns: %+v", width, layout)
 		}
-		if got := layout.TracklistWidth + layout.ThirdColumnWidth + tracklistGap; got != layout.MainWidth {
+		if got := layout.TracklistWidth + layout.ThirdColumnWidth; got != layout.MainWidth {
 			t.Fatalf("width=%d columns use %d, want %d", width, got, layout.MainWidth)
 		}
 	}

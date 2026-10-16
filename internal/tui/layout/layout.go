@@ -8,7 +8,6 @@ const (
 	minMainHeight   = 5
 	thirdColRatio   = 0.30
 	thirdColMinW    = 25
-	tracklistGap    = 1
 )
 
 type UILayout struct {
@@ -42,7 +41,7 @@ func NewUILayout(width, height, sidebarWidth, headerHeight int, hideHint bool) U
 	}
 
 	thirdColumnWidth := int(float64(mainWidth) * thirdColRatio)
-	maxThirdColumnWidth := mainWidth - tracklistGap - 1
+	maxThirdColumnWidth := mainWidth - 1
 	if maxThirdColumnWidth < 1 {
 		maxThirdColumnWidth = 1
 	}
@@ -53,7 +52,7 @@ func NewUILayout(width, height, sidebarWidth, headerHeight int, hideHint bool) U
 		thirdColumnWidth = maxThirdColumnWidth
 	}
 
-	tracklistWidth := mainWidth - thirdColumnWidth - tracklistGap
+	tracklistWidth := mainWidth - thirdColumnWidth
 
 	mainViewHeight := height -
 		headerHeight -
