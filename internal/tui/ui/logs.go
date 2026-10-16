@@ -23,7 +23,7 @@ func renderLogsView(logOffset int, w, h int) string {
 		if pad < 0 {
 			pad = 0
 		}
-		content := lipgloss.NewStyle().Width(innerW).Height(innerH).
+		content := lipgloss.NewStyle().Width(innerW).Height(innerH + 1).
 			Render(strings.Repeat(" ", pad) + "No logs yet.")
 		return renderBox(w, "Logs", content, borderColor)
 	}
