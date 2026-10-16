@@ -262,10 +262,13 @@ func (a *App) renderSomRow(dashboard string) string {
 }
 func (a *App) renderLyricsView(w, h, frame int) string {
 	if a.playback.NowPlay == nil {
-		return lipgloss.NewStyle().
-			Width(w).
-			Height(h).
-			Render(DimItemStyle.Render(" Play a track to see lyrics..."))
+		return lipgloss.Place(
+			w,
+			h,
+			lipgloss.Center,
+			lipgloss.Center,
+			DimItemStyle.Render("Play a track to see lyrics..."),
+		)
 	}
 
 	lyricsBox := a.right.renderLyricsBox(colorWhite, frame)

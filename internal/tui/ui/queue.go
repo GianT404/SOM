@@ -2,9 +2,21 @@ package ui
 
 import (
 	"som/internal/domain"
+
+	"charm.land/lipgloss/v2"
 )
 
 func (p LeftPanel) ViewQueueContent(w, h int, queue []domain.Track, playingID string) string {
+	if len(queue) == 0 {
+		return lipgloss.Place(
+			w,
+			h,
+			lipgloss.Center,
+			lipgloss.Center,
+			DimItemStyle.Render("No tracks in queue.")+"\n"+DimItemStyle.Render("Use ':' -> 'Add to queue'"),
+		)
+	}
+
 	innerW := w - 4
 
 	listContent := p.renderQueueList(innerW, queue, playingID)
@@ -13,11 +25,6 @@ func (p LeftPanel) ViewQueueContent(w, h int, queue []domain.Track, playingID st
 }
 
 func (p LeftPanel) renderQueueList(innerW int, queue []domain.Track, playingID string) string {
-	if len(queue) == 0 {
-		return DimItemStyle.Render(" No tracks in queue.") + "\n" +
-			DimItemStyle.Render(" Use ':' -> 'Add to queue'") + "\n"
-	}
-
 	return renderSharedTrackList(
 		innerW,
 		queue,
