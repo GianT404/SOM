@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,37 +43,57 @@ func suggestCmd(query string) tea.Cmd {
 
 func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd {
 	return func() tea.Msg {
+		startedAt := time.Now()
+		log.Printf("[download] started id=%s title=%q", t.ID, t.Title)
 		path, err := p.DownloadOPUS(context.Background(), t.ID, t.Title, destDir)
-		if err == nil {
-			if t.Thumbnail != "" {
-				safe := t.Title
-				for _, ch := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"} {
-					safe = strings.ReplaceAll(safe, ch, "-")
-				}
-				safe = strings.TrimSpace(safe)
-				if safe == "" {
-					safe = t.ID
-				}
-				imgPath := filepath.Join(destDir, safe+".jpg")
-				thumbCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-				req, reqErr := http.NewRequestWithContext(thumbCtx, http.MethodGet, t.Thumbnail, nil)
-				if reqErr == nil {
-					resp, errImg := http.DefaultClient.Do(req)
-					if errImg == nil {
-						if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-							if f, errF := os.Create(imgPath); errF == nil {
-								_, _ = io.Copy(f, resp.Body)
-								_ = f.Close()
-							}
-						}
-						_ = resp.Body.Close()
-					}
-				}
-				cancel()
-			}
-
-			return DownloadDoneMsg{Path: path, Err: err, Track: t}
+		if err != nil {
+			log.Printf("[download] failed error=%v id=%s title=%q elapsed=%s", err, t.ID, t.Title, time.Since(startedAt).Round(time.Millisecond))
+			return DownloadDoneMsg{Path: path, Err: err}
 		}
-		return DownloadDoneMsg{Path: path, Err: err}
+
+		if info, statErr := os.Stat(path); statErr == nil {
+			log.Printf("[download] audio saved id=%s path=%q bytes=%d elapsed=%s", t.ID, path, info.Size(), time.Since(startedAt).Round(time.Millisecond))
+		} else {
+			log.Printf("[download] audio saved id=%s path=%q elapsed=%s stat_error=%v", t.ID, path, time.Since(startedAt).Round(time.Millisecond), statErr)
+		}
+
+		if t.Thumbnail != "" {
+			safe := t.Title
+			for _, ch := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"} {
+				safe = strings.ReplaceAll(safe, ch, "-")
+			}
+			safe = strings.TrimSpace(safe)
+			if safe == "" {
+				safe = t.ID
+			}
+			imgPath := filepath.Join(destDir, safe+".jpg")
+			thumbCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			req, reqErr := http.NewRequestWithContext(thumbCtx, http.MethodGet, t.Thumbnail, nil)
+			if reqErr != nil {
+				log.Printf("[download] thumbnail request failed id=%s error=%v", t.ID, reqErr)
+			} else if resp, errImg := http.DefaultClient.Do(req); errImg != nil {
+				log.Printf("[download] thumbnail download failed id=%s error=%v", t.ID, errImg)
+			} else {
+				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					if f, errF := os.Create(imgPath); errF != nil {
+						log.Printf("[download] thumbnail save failed id=%s error=%v", t.ID, errF)
+					} else {
+						n, copyErr := io.Copy(f, resp.Body)
+						if copyErr != nil {
+							log.Printf("[download] thumbnail copy failed id=%s error=%v", t.ID, copyErr)
+						} else {
+							log.Printf("[download] thumbnail saved id=%s path=%q bytes=%d", t.ID, imgPath, n)
+						}
+						_ = f.Close()
+					}
+				} else {
+					log.Printf("[download] thumbnail request returned id=%s status=%s", t.ID, resp.Status)
+				}
+				_ = resp.Body.Close()
+			}
+			cancel()
+		}
+
+		return DownloadDoneMsg{Path: path, Track: t}
 	}
 }

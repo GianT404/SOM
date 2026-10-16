@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -433,9 +434,10 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 
 	case DownloadDoneMsg:
 		if msg.Err != nil {
+			log.Printf("[download] failed title=%q error=%v", msg.Track.Title, msg.Err)
 			a.setStatus(StatusErrStyle.Render(msg.Err.Error()))
 		} else {
-			// Cập nhật trạng thái tải xong, đang xử lý meta
+			log.Printf("[download] saving metadata title=%q path=%q", msg.Track.Title, msg.Path)
 			a.setStatus(StatusMsgStyle.Render("> Saving metadata for " + msg.Path + "..."))
 			if a.left.plStore != nil && msg.Path != "" {
 				// Dispatch lệnh chạy ngầm
@@ -444,8 +446,10 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 		}
 	case MetaSavedMsg:
 		if msg.Err != nil {
+			log.Printf("[download] metadata save failed path=%q error=%v", msg.Path, msg.Err)
 			a.setStatus(StatusErrStyle.Render("X Metadata error: " + msg.Err.Error()))
 		} else {
+			log.Printf("[download] metadata saved path=%q", msg.Path)
 			a.setStatus(StatusOKStyle.Render("Saved " + msg.Path))
 		}
 	case ImportDoneMsg:

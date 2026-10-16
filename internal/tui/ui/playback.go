@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -505,21 +506,32 @@ func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, reco
 
 	// Luồng ngầm: Đi lấy stream URL
 	resolveStreamCmd := func() tea.Msg {
+		startedAt := time.Now()
+		log.Printf("[stream] resolving id=%s title=%q", t.ID, t.Title)
 		streamInfo, err := pm.Provider.ResolveStream(ctx, t.ID)
 		if ctx.Err() != nil || gen != pm.Player.Generation() {
+			log.Printf("[stream] resolve discarded id=%s elapsed=%s", t.ID, time.Since(startedAt).Round(time.Millisecond))
 			return nil
 		}
-		if err != nil || streamInfo == nil || streamInfo.URL == "" {
+		if err != nil {
+			log.Printf("[stream] resolve failed error=%v id=%s elapsed=%s", err, t.ID, time.Since(startedAt).Round(time.Millisecond))
 			return PlaybackErrorMsg{Err: fmt.Errorf("lỗi lấy link: %v", err)}
+		}
+		if streamInfo == nil || streamInfo.URL == "" {
+			log.Printf("[stream] resolve returned empty URL id=%s elapsed=%s", t.ID, time.Since(startedAt).Round(time.Millisecond))
+			return PlaybackErrorMsg{Err: fmt.Errorf("lỗi lấy link: server trả về URL trống")}
 		}
 
 		started, err := pm.Player.PlayWithHeadersIfGeneration(streamInfo.URL, streamInfo.Headers, gen)
 		if err != nil {
+			log.Printf("[stream] playback start failed error=%v id=%s elapsed=%s", err, t.ID, time.Since(startedAt).Round(time.Millisecond))
 			return PlaybackErrorMsg{Err: err}
 		}
 		if !started {
+			log.Printf("[stream] playback start discarded id=%s elapsed=%s", t.ID, time.Since(startedAt).Round(time.Millisecond))
 			return nil
 		}
+		log.Printf("[stream] playback started id=%s title=%q elapsed=%s", t.ID, t.Title, time.Since(startedAt).Round(time.Millisecond))
 
 		return StreamResolvedMsg{
 			Gen: gen,

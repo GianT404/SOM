@@ -15,7 +15,7 @@ func renderLogsView(logOffset int, w, h int) string {
 	borderColor := colorWhite
 
 	innerW := w - 4
-	innerH := h - 3
+	innerH := h - 2
 
 	lines := LogBuf.Lines()
 	if len(lines) == 0 {
@@ -23,32 +23,48 @@ func renderLogsView(logOffset int, w, h int) string {
 		if pad < 0 {
 			pad = 0
 		}
-		content := lipgloss.NewStyle().Width(innerW).Height(innerH + 1).
+		content := lipgloss.NewStyle().Width(innerW).Height(innerH).
 			Render(strings.Repeat(" ", pad) + "No logs yet.")
 		return renderBox(w, "Logs", content, borderColor)
 	}
 
 	end := len(lines) - logOffset
-	start := end - innerH
-	if start < 0 {
-		start = 0
+	if end < 0 {
+		end = 0
+	} else if end > len(lines) {
+		end = len(lines)
 	}
-	visible := lines[start:end]
 
-	var b strings.Builder
-	for _, line := range visible {
-		trunc := line
-		if len([]rune(trunc)) > innerW {
-			trunc = string([]rune(trunc)[:innerW])
+	visible := make([]string, 0, innerH)
+	for i := end - 1; i >= 0 && len(visible) < innerH; i-- {
+		wrapped := wordWrap(lines[i], innerW)
+		for j := len(wrapped) - 1; j >= 0 && len(visible) < innerH; j-- {
+			visible = append(visible, wrapped[j])
 		}
-		b.WriteString(DimItemStyle.Width(innerW).Render(trunc))
-		b.WriteString("\n")
+	}
+	for i, j := 0, len(visible)-1; i < j; i, j = i+1, j-1 {
+		visible[i], visible[j] = visible[j], visible[i]
 	}
 
-	for i := len(visible); i < innerH; i++ {
-		b.WriteString(strings.Repeat(" ", innerW) + "\n")
+	rows := make([]string, innerH)
+	tagStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
+	for i := range rows {
+		rows[i] = strings.Repeat(" ", innerW)
+		if i < len(visible) {
+			line := visible[i]
+			start := strings.IndexByte(line, '[')
+			end := strings.IndexByte(line[start+1:], ']')
+			if start >= 0 && end >= 0 {
+				end += start + 2
+				rows[i] = DimItemStyle.Render(line[:start]) +
+					tagStyle.Render(line[start:end]) +
+					DimItemStyle.Render(line[end:])
+			} else {
+				rows[i] = DimItemStyle.Render(line)
+			}
+		}
 	}
 
-	content := b.String()
+	content := strings.Join(rows, "\n")
 	return renderBox(w, fmt.Sprintf("Logs (%d)", len(lines)), content, borderColor)
 }
