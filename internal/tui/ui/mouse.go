@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const mouseSettingKey = "mouse"
@@ -347,6 +348,9 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if !a.mouseEnabled {
 		return nil
 	}
+	if cmd, handled := a.clickGlobalHelpHint(m); handled {
+		return cmd
+	}
 	if len(a.modals) > 0 || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
 		return nil
 	}
@@ -495,4 +499,21 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	a.mouseLastClickY = m.Y
 	a.mouseLastClickTab = a.sidebarActive
 	return nil
+}
+
+func (a *App) clickGlobalHelpHint(m tea.MouseClickMsg) (tea.Cmd, bool) {
+	if m.Button != tea.MouseLeft || a.hideHint || m.Y != a.height-1 {
+		return nil, false
+	}
+
+	x := 2
+	for _, hint := range a.globalHelpHints() {
+		width := lipgloss.Width(hint.text)
+		if hint.key != 0 && m.X >= x && m.X < x+width {
+			_, cmd := a.Update(tea.KeyPressMsg{Code: hint.key})
+			return cmd, true
+		}
+		x += width + 2
+	}
+	return nil, false
 }

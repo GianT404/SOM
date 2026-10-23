@@ -144,20 +144,11 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 		status = "  " + a.statusMsg
 	}
 
-	help := "  " +
-		StyleHint("tab", "nav") + "  " +
-		StyleHint("enter", "play") + "  " +
-		StyleHint("]", "next") + "  " +
-		StyleHint("[", "prev") + "  " +
-		StyleHintActive("r", "random", a.playback.Random) + "  " +
-		StyleHintActive(
-			"space",
-			"pause",
-			a.player != nil && a.player.State() == player.Paused,
-		) + "  " +
-		StyleHintActive("/", "search", a.left.input.Focused()) + "  " +
-		StyleHint("esc", "settings") + "  " +
-		StyleHint("alt+q", "quit")
+	var helpParts []string
+	for _, hint := range a.globalHelpHints() {
+		helpParts = append(helpParts, hint.text)
+	}
+	help := "  " + strings.Join(helpParts, "  ")
 	progressBar := a.renderProgressBar(a.width)
 
 	return render.BaseFrame(
@@ -170,6 +161,25 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 		a.hideLogo,
 		a.hideHint,
 	)
+}
+
+type globalHelpHint struct {
+	text string
+	key  rune
+}
+
+func (a *App) globalHelpHints() []globalHelpHint {
+	return []globalHelpHint{
+		{text: StyleHint("tab", "nav")},
+		{text: StyleHint("enter", "play")},
+		{text: StyleHint("]", "next"), key: ']'},
+		{text: StyleHint("[", "prev"), key: '['},
+		{text: StyleHintActive("r", "random", a.playback.Random), key: 'r'},
+		{text: StyleHintActive("space", "pause", a.player != nil && a.player.State() == player.Paused), key: tea.KeySpace},
+		{text: StyleHintActive("/", "search", a.left.input.Focused()), key: '/'},
+		{text: StyleHint("esc", "settings")},
+		{text: StyleHint("alt+q", "quit")},
+	}
 }
 
 func (a *App) renderOverlayView(view string) string {
