@@ -26,7 +26,7 @@ func NewRenamePlaylistModal(
 ) *RenamePlaylistModal {
 	ti := textinput.New()
 	ti.CharLimit = 100
-	ti.Prompt = ""
+	ti.Prompt = " > "
 
 	iw := 60
 	if appWidth > 0 && appWidth-12 < iw {
@@ -91,17 +91,11 @@ func (m *RenamePlaylistModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 func (m *RenamePlaylistModal) View() string {
 	var b strings.Builder
 
-	b.WriteString("\n  ")
 	b.WriteString(m.input.View())
 
 	if m.errStr != "" {
 		b.WriteString("\n  " + m.errStr)
 	}
-
-	b.WriteString("\n\n")
-	b.WriteString(
-		DimItemStyle.Render(" (enter: rename  | esc: cancel)"),
-	)
 
 	w := m.input.Width() + 8
 	if w < 48 {
