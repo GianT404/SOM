@@ -72,7 +72,7 @@ func (p LeftPanel) ViewPlaylistsContent(w, h int, playingID string) string {
 		title = fmt.Sprintf("Playlist: %s (%d)", p.activePlaylist.Name, len(filtered))
 		listContent = lipgloss.NewStyle().
 			PaddingLeft(1).
-			Render(p.renderPlaylistDetail(innerW, filtered, playingID))
+			Render(p.renderPlaylistDetail(innerW, filtered, playingID, w, h))
 	} else {
 		filtered := p.getFilteredPlaylists()
 		title = fmt.Sprintf("Playlists (%d)", len(filtered))
@@ -213,12 +213,24 @@ func (p LeftPanel) renderPlaylistList(
 	return b.String()
 }
 
-func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistTrack, playingID string) string {
+func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistTrack, playingID string, w, h int) string {
 	if len(filtered) == 0 {
 		if len(p.activePlaylist.Tracks) == 0 {
-			return DimItemStyle.Render(" This playlist is empty. Press ':' on a track to move it here.")
+			return lipgloss.Place(
+				w,
+				h,
+				lipgloss.Center,
+				lipgloss.Center,
+				DimItemStyle.Render("This playlist is empty. Press ':' on a track to move it here."),
+			)
 		}
-		return DimItemStyle.Render(" No matching tracks.")
+		return lipgloss.Place(
+			w,
+			h,
+			lipgloss.Center,
+			lipgloss.Center,
+			DimItemStyle.Render("No matching tracks."),
+		)
 	}
 
 	return renderSharedTrackList(
