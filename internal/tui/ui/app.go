@@ -407,6 +407,17 @@ func isKeyPressMsg(msg tea.Msg) bool {
 	_, ok := msg.(tea.KeyPressMsg)
 	return ok
 }
+
+func (a *App) syncLyricAnimation(previous string) {
+	current := a.right.GetCurrentLyricLine()
+	if previous == current {
+		return
+	}
+	a.prevLyric = previous
+	a.currLyric = current
+	a.lyricAnimStart = time.Now()
+}
+
 func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -444,12 +455,7 @@ func (a *App) updateComponents(msg tea.Msg) []tea.Cmd {
 		cmds = append(cmds, c)
 	}
 
-	newLyric := a.right.GetCurrentLyricLine()
-	if oldLyric != newLyric {
-		a.prevLyric = oldLyric
-		a.currLyric = newLyric
-		a.lyricAnimStart = time.Now()
-	}
+	a.syncLyricAnimation(oldLyric)
 
 	if a.sidebarActive == SideImport {
 		if km, ok := msg.(tea.KeyMsg); ok {

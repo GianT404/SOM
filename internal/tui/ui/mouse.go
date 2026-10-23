@@ -704,8 +704,10 @@ func (a *App) clickLanguagePopup(m tea.MouseClickMsg) (tea.Cmd, bool) {
 	}
 
 	a.right.langCursor = index
+	oldLyric := a.right.GetCurrentLyricLine()
 	var cmd tea.Cmd
 	a.right, cmd = a.right.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, false, false)
+	a.syncLyricAnimation(oldLyric)
 	return cmd, true
 }
 

@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -544,17 +545,21 @@ func (a *App) renameTarget() (*LocalFile, bool) {
 }
 func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 	return func() tea.Msg {
+		fail := func(err error) tea.Msg {
+			log.Printf("[library] rename title failed old_path=%q new_title=%q error=%v", oldPath, newTitle, err)
+			return RenameDoneMsg{Err: err}
+		}
 		if newPath != oldPath {
 			if _, err := os.Stat(newPath); err == nil {
-				return RenameDoneMsg{Err: fmt.Errorf("file already exists: %s", filepath.Base(newPath))}
+				return fail(fmt.Errorf("file already exists: %s", filepath.Base(newPath)))
 			}
 			if plStore != nil {
 				if lf, err := plStore.GetLocalFile(newPath); err == nil && lf != nil {
-					return RenameDoneMsg{Err: fmt.Errorf("path taken in DB: %s", filepath.Base(newPath))}
+					return fail(fmt.Errorf("path taken in DB: %s", filepath.Base(newPath)))
 				}
 			}
 			if err := os.Rename(oldPath, newPath); err != nil {
-				return RenameDoneMsg{Err: fmt.Errorf("rename file: %w", err)}
+				return fail(fmt.Errorf("rename file: %w", err))
 			}
 		}
 
@@ -575,10 +580,11 @@ func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 
 		if plStore != nil {
 			if err := plStore.RenameLocalFile(oldPath, newPath, newTitle); err != nil {
-				return RenameDoneMsg{Err: fmt.Errorf("db update: %w", err)}
+				return fail(fmt.Errorf("db update: %w", err))
 			}
 		}
 
+		log.Printf("[library] rename title completed old_path=%q new_path=%q new_title=%q", oldPath, newPath, newTitle)
 		return RenameDoneMsg{OldPath: oldPath, NewPath: newPath, NewTitle: newTitle}
 	}
 }
@@ -586,15 +592,18 @@ func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 func deleteCmd(plStore *storage.DB, path, name string) tea.Cmd {
 	return func() tea.Msg {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Printf("[library] delete track failed path=%q title=%q error=%v", path, name, err)
 			return DeleteDoneMsg{Path: path, Name: name, Err: fmt.Errorf("delete file: %w", err)}
 		}
 		_ = os.Remove(localFileSidecar(path))
 		if plStore != nil {
 			if err := plStore.DeleteLocalFile(path); err != nil {
+				log.Printf("[library] delete track failed path=%q title=%q error=%v", path, name, err)
 				return DeleteDoneMsg{Path: path, Name: name, Err: fmt.Errorf("db delete: %w", err)}
 			}
 		}
 
+		log.Printf("[library] delete track completed path=%q title=%q", path, name)
 		return DeleteDoneMsg{Path: path, Name: name}
 	}
 }

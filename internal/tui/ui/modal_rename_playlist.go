@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"som/internal/storage"
@@ -126,23 +127,28 @@ func renamePlaylistCmd(
 ) tea.Cmd {
 	return func() tea.Msg {
 		if plStore == nil {
+			err := fmt.Errorf("playlist storage is not available")
+			log.Printf("[library] rename playlist failed id=%q old_name=%q new_name=%q error=%v", id, oldName, newName, err)
 			return RenamePlaylistDoneMsg{
 				ID:      id,
 				OldName: oldName,
 				NewName: newName,
-				Err:     fmt.Errorf("playlist storage is not available"),
+				Err:     err,
 			}
 		}
 
 		if err := plStore.RenamePlaylist(id, newName); err != nil {
+			wrappedErr := fmt.Errorf("rename playlist: %w", err)
+			log.Printf("[library] rename playlist failed id=%q old_name=%q new_name=%q error=%v", id, oldName, newName, wrappedErr)
 			return RenamePlaylistDoneMsg{
 				ID:      id,
 				OldName: oldName,
 				NewName: newName,
-				Err:     fmt.Errorf("rename playlist: %w", err),
+				Err:     wrappedErr,
 			}
 		}
 
+		log.Printf("[library] rename playlist completed id=%q old_name=%q new_name=%q", id, oldName, newName)
 		return RenamePlaylistDoneMsg{
 			ID:      id,
 			OldName: oldName,

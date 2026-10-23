@@ -112,8 +112,8 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 				}
 			case "enter":
 				r.lyrics.SelectLanguage(r.langCursor)
-				r.curLine = 0
-				r.offset = 0
+				r.manualSelect = false
+				r.syncSyncedLine(true)
 				r.showLangPopup = false
 				selectedLanguage := r.lyrics.Language
 				return r, func() tea.Msg {
@@ -219,33 +219,7 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 
 			// Tự cập nhật Lyrics
 			if r.loaded && len(r.lyrics.Synced) > 0 {
-				// Advance lyric timing slightly so displayed lyrics lead the audio.
-				elapsedSec := r.elapsed.Seconds() + lyricSyncOffset.Seconds()
-				best := 0
-				for i, line := range r.lyrics.Synced {
-					if line.Time <= elapsedSec {
-						best = i
-					}
-				}
-				if best != r.curLine {
-					r.curLine = best
-					if r.manualSelect && best != r.highlightLine {
-						r.manualSelect = false
-					}
-					lyrH := r.lyricsHeight()
-					target := r.curLine - lyrH/2
-					if target < 0 {
-						target = 0
-					}
-					maxOff := len(r.lyrics.Synced) - lyrH
-					if maxOff < 0 {
-						maxOff = 0
-					}
-					if target > maxOff {
-						target = maxOff
-					}
-					r.offset = target
-				}
+				r.syncSyncedLine(false)
 			}
 		}
 		return r, nil
@@ -295,6 +269,45 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 		return r, r.spinner.Tick
 	}
 	return r, nil
+}
+
+func (r *RightPanel) syncSyncedLine(forceScroll bool) {
+	if !r.loaded || len(r.lyrics.Synced) == 0 {
+		return
+	}
+
+	// Advance lyric timing slightly so displayed lyrics lead the audio.
+	elapsedSec := r.elapsed.Seconds() + lyricSyncOffset.Seconds()
+	best := 0
+	for i, line := range r.lyrics.Synced {
+		if line.Time <= elapsedSec {
+			best = i
+		}
+	}
+	changed := best != r.curLine
+	if changed {
+		r.curLine = best
+		if r.manualSelect && best != r.highlightLine {
+			r.manualSelect = false
+		}
+	}
+	if !changed && !forceScroll {
+		return
+	}
+
+	lyrH := r.lyricsHeight()
+	target := r.curLine - lyrH/2
+	if target < 0 {
+		target = 0
+	}
+	maxOff := len(r.lyrics.Synced) - lyrH
+	if maxOff < 0 {
+		maxOff = 0
+	}
+	if target > maxOff {
+		target = maxOff
+	}
+	r.offset = target
 }
 
 // scrollToHighlight giữ highlightLine luôn nằm trong viewport.
