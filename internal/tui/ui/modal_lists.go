@@ -83,8 +83,6 @@ func (m *SortModal) View() string {
 			b.WriteString(NormalItemStyle.Render(namePart) + "\n")
 		}
 	}
-	b.WriteString("\n")
-	b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 	return renderBox(boxW, "Sort by", b.String(), themeCol("#e8593c"))
 }
 
@@ -158,8 +156,6 @@ func (m *SpeedModal) View() string {
 			b.WriteString(NormalItemStyle.Render(namePart) + "\n")
 		}
 	}
-	b.WriteString("\n")
-	b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
 	return renderBox(boxW, "Playback speed", b.String(), themeCol("#e8593c"))
 }
 
@@ -235,7 +231,6 @@ func (m *PresetModal) View() string {
 	}
 	b.WriteString("\n")
 	activeDesc := audioPresets[m.cursor].Desc
-	b.WriteString(DimItemStyle.Render("  "+activeDesc) + "\n\n")
-	b.WriteString(DimItemStyle.Render(" (enter: apply  | esc: back)"))
+	b.WriteString(DimItemStyle.Render("  "+activeDesc) + "\n")
 	return renderBox(boxW, "Audio settings", b.String(), themeCol("#e8593c"))
 }

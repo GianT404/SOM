@@ -183,8 +183,6 @@ func (m *RemoveTrackModal) View() string {
 			b.WriteString(NormalItemStyle.Render(line) + "\n ")
 		}
 	}
-	b.WriteString("\n ")
-	b.WriteString(DimItemStyle.Render(" (enter: remove  | esc: back)"))
 	return renderBox(56, "Remove from Playlist", b.String(), themeCol("#e8593c"))
 }
 

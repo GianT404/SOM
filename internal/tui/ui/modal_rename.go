@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type RenameModal struct {
@@ -83,15 +84,6 @@ func (m *RenameModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 }
 
 func (m *RenameModal) View() string {
-	var b strings.Builder
-	b.WriteString("\n  ")
-	b.WriteString(m.input.View())
-	if m.errStr != "" {
-		b.WriteString("\n  " + m.errStr)
-	}
-	b.WriteString("\n\n")
-	b.WriteString(DimItemStyle.Render(" (enter: rename  | esc: cancel)"))
-
 	w := m.input.Width() + 8
 	if w < 48 {
 		w = 48
@@ -100,5 +92,10 @@ func (m *RenameModal) View() string {
 		w = m.width - 2
 	}
 
-	return renderBox(w, "Rename Title", b.String(), themeCol("#e8593c"))
+	innerW := w - 4
+	content := lipgloss.NewStyle().Width(innerW).Render(" " + m.input.View())
+	if m.errStr != "" {
+		content += "\n  " + m.errStr
+	}
+	return renderBox(w, "Rename Title", content, themeCol("#e8593c"))
 }

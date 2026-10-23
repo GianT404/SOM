@@ -174,8 +174,38 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 
 func (a *App) renderOverlayView(view string) string {
 	if len(a.modals) > 0 {
-		popup := a.modals[len(a.modals)-1].View()
-		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+		modal := a.modals[len(a.modals)-1]
+		popup := modal.View()
+		placed := lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+		var hints string
+		switch modal.(type) {
+		case *CmdMenuModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "close")
+		case *PresetModal, *SpeedModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "apply") + "  " + StyleHint("esc", "back")
+		case *SortModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "apply") + "  " + StyleHint("esc", "back")
+		case *RenameModal, *RenamePlaylistModal:
+			hints = StyleHint("enter", "rename") + "  " + StyleHint("esc", "cancel")
+		case *MoveCreateModal:
+			hints = StyleHint("enter", "create") + "  " + StyleHint("esc", "cancel")
+		case *DeleteModal:
+			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "back")
+		case *MovePickModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "cancel")
+		case *MoveConfirmModal:
+			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "cancel")
+		case *RemoveTrackModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "remove") + "  " + StyleHint("esc", "back")
+		}
+		if hints != "" {
+			lines := strings.Split(placed, "\n")
+			lines[len(lines)-1] = lipgloss.NewStyle().
+				Width(a.width).
+				Render(" " + hints)
+			return strings.Join(lines, "\n")
+		}
+		return placed
 	}
 	if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()
@@ -198,6 +228,18 @@ func (a *App) renderOverlayView(view string) string {
 }
 
 func (a *App) setViewCursor(v *tea.View, contentTop int) {
+	if len(a.modals) > 0 {
+		if modal, ok := a.modals[len(a.modals)-1].(*RenameModal); ok {
+			if c := modal.input.Cursor(); c != nil {
+				popup := modal.View()
+				c.Position.X += (a.width-lipgloss.Width(popup))/2 + 3
+				c.Position.Y += (a.height-lipgloss.Height(popup))/2 + 1
+				v.Cursor = c
+			}
+			return
+		}
+	}
+
 	if a.left.showPlInput && a.left.plInput.Focused() {
 		if c := a.left.plInput.Cursor(); c != nil {
 			popup := a.left.renderPlInputPopup()

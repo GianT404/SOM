@@ -65,8 +65,6 @@ func (m *DeleteModal) View() string {
 		confirmStyle = SelectedItemStyle.Foreground(deleteColor)
 	}
 	b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Delete ]")))
-	b.WriteString("\n\n")
-	b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: back)"))
 
 	return renderBox(60, "Delete Track", b.String(), themeCol("#E24B4A"))
 }

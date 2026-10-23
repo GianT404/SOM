@@ -53,8 +53,7 @@ func (m *MoveCreateModal) View() string {
 	b.WriteString(NormalItemStyle.Render("Enter name for new playlist:"))
 	b.WriteString("\n\n  ")
 	b.WriteString(m.input.View())
-	b.WriteString("\n\n ")
-	b.WriteString(DimItemStyle.Render(" (enter: create  | esc: cancel)"))
+	b.WriteString("\n")
 
 	w := m.input.Width() + 8
 	if w < 48 {
@@ -123,8 +122,6 @@ func (m *MovePickModal) View() string {
 		}
 		b.WriteString("\n ")
 	}
-	b.WriteString("\n ")
-	b.WriteString(DimItemStyle.Render(" (enter: select  | esc: cancel)"))
 	return renderBox(56, "Select Playlist", b.String(), themeCol("#e8593c"))
 }
 
@@ -172,7 +169,5 @@ func (m *MoveConfirmModal) View() string {
 		confirmStyle = SelectedItemStyle
 	}
 	b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Confirm ]")))
-	b.WriteString("\n\n")
-	b.WriteString(DimItemStyle.Render(" (enter: confirm  | esc: cancel)"))
 	return renderBox(60, "Confirm Move", b.String(), themeCol("#e8593c"))
 }
