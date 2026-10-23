@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -42,7 +43,7 @@ type LeftPanel struct {
 	plStore         *storage.DB
 	playlists       []storage.Playlist
 	activePlaylist  *storage.Playlist
-	plInput         textinput.Model
+	plInput         textarea.Model
 	showPlInput     bool
 	downloadDir     string
 	sortPref        string
@@ -66,7 +67,7 @@ type LeftPanel struct {
 	plActiveID string
 }
 
-const suggestMaxShow = 5
+const suggestMaxShow = 7
 
 func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 	ti := textinput.New()
@@ -78,10 +79,22 @@ func NewLeftPanel(prov domain.MusicProvider, downloadDir string) LeftPanel {
 	sp.Spinner = spinner.Dot
 	sp.Style = StatusMsgStyle
 
-	plInput := textinput.New()
+	plInput := textarea.New()
 	plInput.CharLimit = 50
 	plInput.Prompt = ""
+	plInput.ShowLineNumbers = false
+	plInput.SetPromptFunc(2, func(info textarea.PromptInfo) string {
+		if info.LineNumber == 0 {
+			return " > "
+		}
+		return "  "
+	})
 	plInput.SetVirtualCursor(false)
+	plInput.DynamicHeight = true
+	plInput.MinHeight = 1
+	plInput.MaxHeight = 2
+	plInput.SetWidth(35)
+	plInput.SetHeight(1)
 
 	panel := LeftPanel{
 		provider:    prov,

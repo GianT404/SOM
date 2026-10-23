@@ -2,7 +2,7 @@ package api
 
 import (
 	"bytes"
-	"context" // Thay đổi quan trọng: Thêm Context để theo sát chữ ký Interface
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"

@@ -179,7 +179,12 @@ func (a *App) renderOverlayView(view string) string {
 	}
 	if a.left.showPlInput {
 		popup := a.left.renderPlInputPopup()
-		return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+		placed := lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
+		lines := strings.Split(placed, "\n")
+		lines[len(lines)-1] = lipgloss.NewStyle().
+			Width(a.width).
+			Render(" " + StyleHint("enter", "create") + "  " + StyleHint("esc", "cancel"))
+		return strings.Join(lines, "\n")
 	}
 	if a.left.showDeletePopup {
 		popup := a.left.renderDeletePopup()
@@ -193,6 +198,16 @@ func (a *App) renderOverlayView(view string) string {
 }
 
 func (a *App) setViewCursor(v *tea.View, contentTop int) {
+	if a.left.showPlInput && a.left.plInput.Focused() {
+		if c := a.left.plInput.Cursor(); c != nil {
+			popup := a.left.renderPlInputPopup()
+			c.Position.X += (a.width-lipgloss.Width(popup))/2 + 2
+			c.Position.Y += (a.height-lipgloss.Height(popup))/2 + 1
+			v.Cursor = c
+		}
+		return
+	}
+
 	if !a.left.input.Focused() {
 		return
 	}

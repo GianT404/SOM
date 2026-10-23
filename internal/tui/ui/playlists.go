@@ -245,12 +245,8 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 }
 
 func (p LeftPanel) renderPlInputPopup() string {
-	var b strings.Builder
-	b.WriteString("\n ")
-	b.WriteString(p.plInput.View())
-	b.WriteString("\n\n")
-	b.WriteString(DimItemStyle.Render(" (enter: create  | esc: cancel)"))
-	return renderBox(40, "New Playlist", b.String(), themeCol("#e8593c"))
+	inputContent := lipgloss.NewStyle().Width(36).Render(p.plInput.View())
+	return renderBox(40, "New Playlist", inputContent, themeCol("#e8593c"))
 }
 
 func (p LeftPanel) renderDeletePopup() string {
