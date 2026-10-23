@@ -265,7 +265,7 @@ func (a *App) renderOverlayView(view string) string {
 		case *SettingsModal:
 			hints = StyleHint("↑/↓", "select") + "  " + StyleHint("←/→", "toggle") + "  " + StyleHint("esc", "close")
 			if a.mouseEnabled {
-				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "toggle")
+				hints += "  " + StyleHint("click", "toggle")
 			}
 		case *CmdMenuModal:
 			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "close")

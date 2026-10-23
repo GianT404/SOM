@@ -118,15 +118,14 @@ func (a *App) handleModalMouseClick(modal Overlay, click tea.MouseClickMsg) tea.
 				if leftW < 16 {
 					leftW = 16
 				}
-				if row%3 == 1 && click.X < boxX+2+leftW && a.modalItemClick(modal, idx) {
+				if row%3 < 2 && click.X < boxX+2+leftW {
+					a.resetModalClick()
 					activateKey = tea.KeyPressMsg{Code: tea.KeyRight}
 					_, cmd := modal.Update(activateKey)
 					return cmd
 				}
-				// A click on the description/spacing only selects the setting.
-				a.modalLastClick = modal
-				a.modalLastClickIdx = idx
-				a.modalLastClickAt = time.Now()
+				// Clicking the description or spacer selects the setting without toggling it.
+				a.resetModalClick()
 				return nil
 			}
 			idx = -1
