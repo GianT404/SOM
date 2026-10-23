@@ -224,7 +224,7 @@ func (a *App) somRowHints() []globalHelpHint {
 			{text: StyleHint("ctrl+p", "pin/unpin"), key: 'p', mod: tea.ModCtrl},
 			{text: StyleHint("\\", "visualizer"), key: '\\'},
 			{text: StyleHintActive("l", "lyric", a.right.showLangPopup), key: 'l'},
-			{text: StyleHint(":", "Command")},
+			{text: StyleHint(":", "Command"), key: ':'},
 		}
 	case SideQueue:
 		return []globalHelpHint{{text: StyleHint("delete", "remove from queue")}}
