@@ -321,7 +321,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 								startIdx = i
 							}
 						}
-						return p, func() tea.Msg { return PlayPlaylistMsg{Tracks: plTracks, Index: startIdx} }
+						return p, func() tea.Msg {
+							return PlayPlaylistMsg{Tracks: plTracks, Index: startIdx, PlaylistName: p.activePlaylist.Name}
+						}
 					}
 				} else {
 					filtered := p.getFilteredPlaylists()

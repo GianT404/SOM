@@ -263,23 +263,40 @@ func (a *App) setViewCursor(v *tea.View, contentTop int) {
 
 // render lyrics hoặc import
 func (a *App) renderSomRow(dashboard string) string {
+	if a.playingPlaylistName != "" && !a.hideLogo {
+		lines := strings.Split(dashboard, "\n")
+		if len(lines) > 0 {
+			leftWidth := lipgloss.Width(lines[0])
+			nameWidth := a.width - leftWidth - 1 - lipgloss.Width(StyleHint("Playlist", ""))
+			if nameWidth > 0 {
+				playlist := StyleHint("Playlist", truncate(a.playingPlaylistName, nameWidth)+" ")
+				gap := a.width - leftWidth - lipgloss.Width(playlist)
+				if gap < 1 {
+					gap = 1
+				}
+				lines[0] += strings.Repeat(" ", gap) + playlist
+			}
+			dashboard = strings.Join(lines, "\n")
+		}
+	}
+
 	var hint string
 	switch a.sidebarActive {
 	case SideSearch:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = StyleHint("d", "download") + "  "
+		hint = StyleHint("d", "download") + " "
 	case SideLyrics:
 		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
 			return dashboard
 		}
-		hint = StyleHint("up/down", "select") + "  " + StyleHintActive("l", "lyric language", a.right.showLangPopup) + "  "
+		hint = StyleHint("up/down", "select") + "  " + StyleHintActive("l", "lyric language", a.right.showLangPopup) + " "
 	case SideImport:
 		if a.importPanel.importing {
 			return dashboard
 		}
-		hint = StyleHint(".", "select") + "  " + StyleHint("i", "import") + "  " + StyleHint("r", "rescan") + "  "
+		hint = StyleHint(".", "select") + "  " + StyleHint("i", "import") + "  " + StyleHint("r", "rescan") + " "
 	case SideDownloads:
 		if a.moveSession != nil {
 			plName := ""
@@ -288,13 +305,13 @@ func (a *App) renderSomRow(dashboard string) string {
 			}
 			hint = StyleHint(".", "select") + "  " + StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + StyleHint("+", "already in playlist") + "  " + StyleHint("esc", "cancel")
 		} else {
-			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint(":", "Command") + "  "
+			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint(":", "Command") + " "
 		}
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
 		}
-		hint = StyleHint(",", "new playlist") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint("delete", "its deletes :)") + "  "
+		hint = StyleHint(",", "new playlist") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint("delete", "its deletes :)") + " "
 
 	default:
 		return dashboard

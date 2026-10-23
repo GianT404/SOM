@@ -72,8 +72,9 @@ const (
 )
 
 type PlayPlaylistMsg struct {
-	Tracks []domain.Track
-	Index  int
+	Tracks       []domain.Track
+	Index        int
+	PlaylistName string
 }
 
 type PlayQueueMsg struct {

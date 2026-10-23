@@ -80,6 +80,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case PlayStartedMsg:
+		a.playingPlaylistName = ""
 		t := msg.Track
 		a.activeContext = SideSearch
 		idx := -1
@@ -97,6 +98,7 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 		)
 
 	case PlayLocalMsg:
+		a.playingPlaylistName = ""
 		locals := a.left.locals
 		if len(locals) == 0 {
 			a.setStatus(StatusErrStyle.Render("X No local files found"))
@@ -142,12 +144,16 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		a.activeContext = SidePlaylists
+		a.playingPlaylistName = msg.PlaylistName
 		a.left.loadingStream = true
 		cmds = append(cmds,
 			func() tea.Msg { return SetPlaylistMsg{Tracks: msg.Tracks} },
 			a.left.spinner.Tick,
 			func() tea.Msg { return PlayTrackAtMsg{Index: msg.Index, Track: msg.Tracks[msg.Index]} },
 		)
+
+	case PlayQueueMsg:
+		a.playingPlaylistName = ""
 
 	case PlaybackErrorMsg:
 		a.setStatus(StatusErrStyle.Render("X Playback error: " + msg.Err.Error()))

@@ -45,12 +45,8 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 			false, nil, nil,
 		)
 		resultContent = list
-	} else if !p.searched {
-		padLeft := (innerW) / 2
-		if padLeft < 0 {
-			padLeft = 0
-		}
-		resultContent = strings.Repeat(" ", padLeft) + "\n"
+	} else if p.loading || !p.searched {
+		resultContent = "\n"
 	} else {
 		resultContent = DimItemStyle.Render(" No results.") + "\n"
 	}
