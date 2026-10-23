@@ -166,6 +166,7 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 type globalHelpHint struct {
 	text string
 	key  rune
+	mod  tea.KeyMod
 }
 
 func (a *App) globalHelpHints() []globalHelpHint {
@@ -180,6 +181,73 @@ func (a *App) globalHelpHints() []globalHelpHint {
 		{text: StyleHint("esc", "settings")},
 		{text: StyleHint("alt+q", "quit")},
 	}
+}
+
+func (a *App) somRowHints() []globalHelpHint {
+	switch a.sidebarActive {
+	case SideSearch:
+		if a.left.showPlInput {
+			return nil
+		}
+		return []globalHelpHint{{text: StyleHint("d", "download")}}
+	case SideLyrics:
+		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
+			return nil
+		}
+		return []globalHelpHint{
+			{text: StyleHint("up/down", "select")},
+			{text: StyleHintActive("l", "lyric language", a.right.showLangPopup), key: 'l'},
+		}
+	case SideImport:
+		if a.importPanel.importing {
+			return nil
+		}
+		return []globalHelpHint{
+			{text: StyleHint(".", "select")},
+			{text: StyleHint("i", "import")},
+			{text: StyleHint("r", "rescan")},
+		}
+	case SideDownloads:
+		if a.moveSession != nil {
+			plName := ""
+			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
+				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
+			}
+			return []globalHelpHint{
+				{text: StyleHint(".", "select")},
+				{text: StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount()))},
+				{text: StyleHint("+", "already in playlist")},
+				{text: StyleHint("esc", "cancel")},
+			}
+		}
+		return []globalHelpHint{
+			{text: StyleHint("ctrl+p", "pin/unpin"), key: 'p', mod: tea.ModCtrl},
+			{text: StyleHint("\\", "visualizer"), key: '\\'},
+			{text: StyleHintActive("l", "lyric", a.right.showLangPopup), key: 'l'},
+			{text: StyleHint(":", "Command")},
+		}
+	case SideQueue:
+		return []globalHelpHint{{text: StyleHint("delete", "remove from queue")}}
+	case SidePlaylists:
+		if a.left.showPlInput {
+			return nil
+		}
+		return []globalHelpHint{
+			{text: StyleHint(",", "new playlist")},
+			{text: StyleHintActive("l", "lyric", a.right.showLangPopup), key: 'l'},
+			{text: StyleHint("delete", "its deletes :)")},
+		}
+	default:
+		return nil
+	}
+}
+
+func renderHintItems(items []globalHelpHint) string {
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = item.text
+	}
+	return strings.Join(parts, "  ") + " "
 }
 
 func (a *App) renderOverlayView(view string) string {
@@ -290,44 +358,11 @@ func (a *App) renderSomRow(dashboard string) string {
 		}
 	}
 
-	var hint string
-	switch a.sidebarActive {
-	case SideSearch:
-		if a.left.showPlInput {
-			return dashboard
-		}
-		hint = StyleHint("d", "download") + " "
-	case SideLyrics:
-		if a.playback.NowPlay == nil || !a.right.loaded || len(a.right.lyrics.Synced) == 0 {
-			return dashboard
-		}
-		hint = StyleHint("up/down", "select") + "  " + StyleHintActive("l", "lyric language", a.right.showLangPopup) + " "
-	case SideImport:
-		if a.importPanel.importing {
-			return dashboard
-		}
-		hint = StyleHint(".", "select") + "  " + StyleHint("i", "import") + "  " + StyleHint("r", "rescan") + " "
-	case SideDownloads:
-		if a.moveSession != nil {
-			plName := ""
-			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
-				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
-			}
-			hint = StyleHint(".", "select") + "  " + StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount())) + "  " + StyleHint("+", "already in playlist") + "  " + StyleHint("esc", "cancel")
-		} else {
-			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint(":", "Command") + " "
-		}
-	case SideQueue:
-		hint = StyleHint("delete", "remove from queue") + " "
-	case SidePlaylists:
-		if a.left.showPlInput {
-			return dashboard
-		}
-		hint = StyleHint(",", "new playlist") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint("delete", "its deletes :)") + " "
-
-	default:
+	items := a.somRowHints()
+	if len(items) == 0 {
 		return dashboard
 	}
+	hint := renderHintItems(items)
 
 	lines := strings.Split(dashboard, "\n")
 	if len(lines) == 0 {

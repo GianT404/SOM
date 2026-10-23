@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	tuilayout "som/internal/tui/layout"
 )
 
 const mouseSettingKey = "mouse"
@@ -12,7 +13,7 @@ const mouseSettingKey = "mouse"
 func mouseOption() settingOpt {
 	return settingOpt{
 		title: "Mouse support",
-		desc:  "Click a sidebar tab to switch, click a row to select it (double-click to play), and scroll the wheel to move through lists / logs.",
+		desc:  "Click tabs, rows, and action hints; double-click a track to play it, and scroll lists / logs.",
 		on:    func(a *App) bool { return a.mouseEnabled },
 		apply: func(a *App, on bool) {
 			a.mouseEnabled = on
@@ -348,11 +349,17 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if !a.mouseEnabled {
 		return nil
 	}
+	if len(a.modals) > 0 || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
+		return nil
+	}
+	if cmd, handled := a.clickLanguagePopup(m); handled {
+		return cmd
+	}
 	if cmd, handled := a.clickGlobalHelpHint(m); handled {
 		return cmd
 	}
-	if len(a.modals) > 0 || a.left.showDeletePopup || a.left.showPlInput || a.palette.Visible() {
-		return nil
+	if cmd, handled := a.clickSomRowHint(m); handled {
+		return cmd
 	}
 
 	// Click lên thanh progress → tua.
@@ -501,6 +508,42 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	return nil
 }
 
+func (a *App) clickLanguagePopup(m tea.MouseClickMsg) (tea.Cmd, bool) {
+	if m.Button != tea.MouseLeft || !a.right.showLangPopup {
+		return nil, false
+	}
+
+	layout := a.uiLayout()
+	contentTop := a.somRowHeight() + 1
+	rowTop := contentTop + 1
+	visibleRows := a.right.lyricsHeight()
+	if a.sidebarActive == SideDownloads || a.sidebarActive == SidePlaylists {
+		thirdColumn := tuilayout.NewThirdColumnLayout(layout.ThirdColumnWidth, layout.MainViewHeight)
+		left := sidebarWidth + layout.TracklistWidth
+		if m.X < left || m.X >= left+thirdColumn.Width {
+			return nil, false
+		}
+		rowTop += thirdColumn.SpectrumHeight
+		visibleRows = thirdColumn.LyricsInnerHeight
+	} else if a.sidebarActive == SideLyrics {
+		if m.X < sidebarWidth || m.X >= sidebarWidth+layout.MainWidth {
+			return nil, false
+		}
+	} else {
+		return nil, false
+	}
+
+	index := m.Y - rowTop
+	if index < 0 || index >= visibleRows || index >= len(a.right.lyrics.AllTracks) {
+		return nil, false
+	}
+
+	a.right.langCursor = index
+	var cmd tea.Cmd
+	a.right, cmd = a.right.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, false, false)
+	return cmd, true
+}
+
 func (a *App) clickGlobalHelpHint(m tea.MouseClickMsg) (tea.Cmd, bool) {
 	if m.Button != tea.MouseLeft || a.hideHint || m.Y != a.height-1 {
 		return nil, false
@@ -510,7 +553,31 @@ func (a *App) clickGlobalHelpHint(m tea.MouseClickMsg) (tea.Cmd, bool) {
 	for _, hint := range a.globalHelpHints() {
 		width := lipgloss.Width(hint.text)
 		if hint.key != 0 && m.X >= x && m.X < x+width {
-			_, cmd := a.Update(tea.KeyPressMsg{Code: hint.key})
+			if hint.key != '/' {
+				a.left.input.Blur()
+				a.left.plInput.Blur()
+			}
+			_, cmd := a.Update(tea.KeyPressMsg{Code: hint.key, Mod: hint.mod})
+			return cmd, true
+		}
+		x += width + 2
+	}
+	return nil, false
+}
+
+func (a *App) clickSomRowHint(m tea.MouseClickMsg) (tea.Cmd, bool) {
+	if m.Button != tea.MouseLeft || a.hideLogo || a.somRowHeight() == 0 || m.Y != a.somRowHeight()-1 {
+		return nil, false
+	}
+
+	items := a.somRowHints()
+	x := a.width - lipgloss.Width(renderHintItems(items))
+	for _, item := range items {
+		width := lipgloss.Width(item.text)
+		if item.key != 0 && m.X >= x && m.X < x+width {
+			a.left.input.Blur()
+			a.left.plInput.Blur()
+			_, cmd := a.Update(tea.KeyPressMsg{Code: item.key, Mod: item.mod})
 			return cmd, true
 		}
 		x += width + 2
