@@ -307,6 +307,8 @@ func (a *App) renderSomRow(dashboard string) string {
 		} else {
 			hint = StyleHint("ctrl+p", "pin/unpin") + "  " + StyleHint("\\", "visualizer") + "  " + StyleHintActive("l", "lyric", a.right.showLangPopup) + "  " + StyleHint(":", "Command") + " "
 		}
+	case SideQueue:
+		hint = StyleHint("delete", "remove from queue") + " "
 	case SidePlaylists:
 		if a.left.showPlInput {
 			return dashboard
