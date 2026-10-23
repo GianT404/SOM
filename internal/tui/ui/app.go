@@ -563,6 +563,7 @@ func (a *App) switchSidebar(item SidebarItem) tea.Cmd {
 				cmds = append(cmds, a.left.input.Focus())
 			}
 		} else {
+			a.left.input.Blur()
 			a.left.searchOnEnter = false
 			a.left.suggestions = nil
 			a.left.suggestCursor = 0

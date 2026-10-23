@@ -537,7 +537,15 @@ func (a *App) handleMouseClick(m tea.MouseClickMsg) tea.Cmd {
 	if m.X < sidebarWidth {
 		tabRow := m.Y - contentTop - 1
 		if item, ok := RowToSidebarItem(tabRow); ok {
-			return a.switchSidebar(item)
+			cmd := a.switchSidebar(item)
+			if item == SideSearch {
+				focusCmd := a.left.input.Focus()
+				if cmd == nil {
+					return focusCmd
+				}
+				return tea.Batch(cmd, focusCmd)
+			}
+			return cmd
 		}
 		return nil
 	}
