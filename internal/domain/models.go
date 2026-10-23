@@ -69,6 +69,7 @@ func (l *LyricsResp) LanguageIndex() int {
 
 type ServerLyricTrack struct {
 	Language string `json:"language"`
+	Source   string `json:"source,omitempty"`
 	Lines    []struct {
 		Start float64 `json:"start"`
 		End   float64 `json:"end"`

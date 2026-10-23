@@ -73,13 +73,18 @@ func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, d
 
 	for i := 0; i < 2; i++ {
 		res := <-resCh
-		if res.err == nil && len(res.data) > 0 {
+		if res.err != nil {
+			log.Printf("[lyrics] source=%s failed id=%s error=%v", res.source, id, res.err)
+			continue
+		}
+		log.Printf("[lyrics] source=%s returned %d track(s) for %s", res.source, len(res.data), id)
+		if len(res.data) > 0 {
 			combined = append(combined, res.data...)
 		}
 	}
 
 	if len(combined) == 0 {
-		log.Printf("lyrics: none for %s (%q) in %v", id, title, time.Since(start))
+		log.Printf("[lyrics] none for %s (%q) in %v", id, title, time.Since(start))
 		return lr, fmt.Errorf("không tìm thấy lyrics")
 	}
 	seen := make(map[string]bool)
@@ -115,7 +120,7 @@ func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, d
 	for _, t := range lr.AllTracks {
 		lineCount += len(t.Synced)
 	}
-	log.Printf("lyrics: %d track(s), %d line(s) for %s in %v", len(lr.AllTracks), lineCount, id, time.Since(start))
+	log.Printf("[lyrics] %d track(s), %d line(s) for %s in %v", len(lr.AllTracks), lineCount, id, time.Since(start))
 
 	return lr, nil
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -93,6 +94,7 @@ func (c *HTTPProvider) ResolveStream(ctx context.Context, id string) (*domain.St
 }
 
 func (c *HTTPProvider) Lyrics(ctx context.Context, id, title, artist string, duration int) (domain.LyricsResp, error) {
+	startedAt := time.Now()
 	params := url.Values{"id": {id}}
 	if title != "" {
 		params.Set("title", title)
@@ -106,11 +108,13 @@ func (c *HTTPProvider) Lyrics(ctx context.Context, id, title, artist string, dur
 
 	resp, err := c.getShort(ctx, "/api/v1/lyrics", params)
 	if err != nil {
+		log.Printf("[lyrics] remote request failed id=%s title=%q error=%v", id, title, err)
 		return domain.LyricsResp{}, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[lyrics] remote response failed id=%s status=%s elapsed=%s", id, resp.Status, time.Since(startedAt).Round(time.Millisecond))
 		return domain.LyricsResp{}, fmt.Errorf("server %s", resp.Status)
 	}
 
@@ -119,9 +123,18 @@ func (c *HTTPProvider) Lyrics(ctx context.Context, id, title, artist string, dur
 	if len(bodyStr) > 0 && bodyStr[0] == '[' {
 		var tracks []domain.ServerLyricTrack
 		if err := json.Unmarshal(body, &tracks); err != nil {
+			log.Printf("[lyrics] remote response decode failed id=%s error=%v", id, err)
 			return lr, err
 		}
+		var sources []string
+		lineCount := 0
 		for _, t := range tracks {
+			source := t.Source
+			if source == "" {
+				source = t.Language
+			}
+			sources = append(sources, source)
+			lineCount += len(t.Lines)
 			lt := domain.LyricsTrack{Language: t.Language, TrackName: t.TrackName, ArtistName: t.ArtistName}
 			for _, line := range t.Lines {
 				lt.Synced = append(lt.Synced, domain.LyricLine{Time: line.Start, End: line.End, Text: line.Text})
@@ -131,10 +144,15 @@ func (c *HTTPProvider) Lyrics(ctx context.Context, id, title, artist string, dur
 		if len(lr.AllTracks) > 0 {
 			lr.SelectLanguage(0)
 		}
+		log.Printf("[lyrics] remote response id=%s tracks=%d lines=%d sources=%v elapsed=%s", id, len(tracks), lineCount, sources, time.Since(startedAt).Round(time.Millisecond))
 		return lr, nil
 	}
-	json.Unmarshal(body, &lr)
+	if err := json.Unmarshal(body, &lr); err != nil {
+		log.Printf("[lyrics] remote response decode failed id=%s error=%v", id, err)
+		return lr, err
+	}
 	lr.Normalize()
+	log.Printf("[lyrics] remote response id=%s tracks=%d elapsed=%s", id, len(lr.AllTracks), time.Since(startedAt).Round(time.Millisecond))
 	return lr, nil
 }
 

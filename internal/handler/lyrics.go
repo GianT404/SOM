@@ -101,6 +101,7 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, lr.data)
 			return
 		}
+		log.Printf("lyrics: lrclib miss for %s (err=%v)", id, lr.err)
 	case "youtube", "yt":
 		yt := fetchYT()
 		if yt.err == nil && len(yt.data) > 0 {
@@ -126,6 +127,7 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, lr.data)
 			return
 		}
+		log.Printf("lyrics: lrclib miss for %s (err=%v)", id, lr.err)
 
 		// LRCLib rỗng → dùng YouTube captions (đang chạy song song).
 		select {
@@ -136,13 +138,12 @@ func (h *LyricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, http.StatusOK, yt.data)
 				return
 			}
+			log.Printf("lyrics: youtube miss for %s (err=%v)", id, yt.err)
 		case <-ctx.Done():
+			log.Printf("lyrics: youtube timed out for %s (err=%v)", id, ctx.Err())
 		}
 	}
 
 	log.Printf("lyrics: no lyrics for %s (source=%s)", id, source)
-	// Cache cả kết quả rỗng để không phải spawn lại cho bài không có lời.
-	empty := []scraper.LyricsData{}
-	h.cache.Put(cacheKey, empty)
-	writeJSON(w, http.StatusOK, empty)
+	writeJSON(w, http.StatusOK, []scraper.LyricsData{})
 }

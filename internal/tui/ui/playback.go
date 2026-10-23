@@ -349,6 +349,7 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 		provider, store := pm.Provider, pm.Store
 
 		cmds = append(cmds, func() tea.Msg {
+			log.Printf("[lyrics] fetch started id=%s title=%q", track.ID, track.Title)
 			lr, lyricsErr := getCachedLyrics(
 				provider,
 				store,
@@ -357,6 +358,11 @@ func (pm *PlaybackManager) Update(msg tea.Msg) (*PlaybackManager, tea.Cmd) {
 				track.Artist,
 				track.Duration,
 			)
+			if lyricsErr != nil {
+				log.Printf("[lyrics] fetch failed id=%s error=%v", track.ID, lyricsErr)
+			} else {
+				log.Printf("[lyrics] fetch completed id=%s tracks=%d", track.ID, len(lr.AllTracks))
+			}
 
 			return StreamResolvedMsg{
 				Lyrics:    lr,
@@ -533,7 +539,7 @@ func (pm *PlaybackManager) playTrackCmdWithHistory(idx int, t domain.Track, reco
 		}
 		log.Printf("[stream] playback started id=%s title=%q elapsed=%s", t.ID, t.Title, time.Since(startedAt).Round(time.Millisecond))
 
-		return StreamResolvedMsg{
+		return StreamStartedMsg{
 			Gen: gen,
 		}
 	}

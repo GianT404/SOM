@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"som/internal/domain"
 	"som/internal/storage"
 )
@@ -17,17 +18,19 @@ func getCachedLyrics(p domain.MusicProvider, store *storage.DB, id, title, artis
 	cachedJSON, err := store.GetLyricsCache(cacheKey)
 	if err == nil && cachedJSON != "" {
 		var lr domain.LyricsResp
-		if json.Unmarshal([]byte(cachedJSON), &lr) == nil {
+		if json.Unmarshal([]byte(cachedJSON), &lr) == nil &&
+			(len(lr.AllTracks) > 0 || len(lr.Synced) > 0 || lr.Plain != "") {
+			log.Printf("[lyrics] local cache hit id=%s title=%q tracks=%d", id, title, len(lr.AllTracks))
 			return lr, nil
 		}
 	}
 
 	lr, err := p.Lyrics(context.Background(), id, title, artist, duration)
 
-	isEmpty := (err != nil) || (len(lr.AllTracks) == 0 && lr.Plain == "")
-
-	if lrJSON, jsonErr := json.Marshal(lr); jsonErr == nil {
-		_ = store.PutLyricsCache(cacheKey, string(lrJSON), isEmpty)
+	if err == nil && (len(lr.AllTracks) > 0 || len(lr.Synced) > 0 || lr.Plain != "") {
+		if lrJSON, jsonErr := json.Marshal(lr); jsonErr == nil {
+			_ = store.PutLyricsCache(cacheKey, string(lrJSON), false)
+		}
 	}
 
 	return lr, err
