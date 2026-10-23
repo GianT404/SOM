@@ -76,24 +76,6 @@ func (m *EscMenuModal) activate() tea.Cmd {
 	}
 }
 
-func (m *EscMenuModal) handleMouseClick(msg tea.MouseClickMsg, screenW, screenH int) tea.Cmd {
-	if msg.Button != tea.MouseLeft {
-		return nil
-	}
-
-	boxW := 30
-	boxH := lipgloss.Height(m.View())
-	boxX := (screenW - boxW) / 2
-	boxY := (screenH - boxH) / 2
-	idx := msg.Y - boxY - 2
-	if msg.X < boxX || msg.X >= boxX+boxW || idx < 0 || idx >= len(escMenuItems) {
-		return nil
-	}
-
-	m.cursor = idx
-	return m.activate()
-}
-
 func (m *EscMenuModal) View() string {
 	boxW := 30
 	innerW := boxW - 4

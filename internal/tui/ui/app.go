@@ -78,6 +78,9 @@ type App struct {
 	mouseLastClickAt  time.Time
 	mouseLastClickY   int
 	mouseLastClickTab SidebarItem
+	modalLastClickAt  time.Time
+	modalLastClickIdx int
+	modalLastClick    Overlay
 	avrcp             *avrcp.Server
 	activePreset      int
 	activeSpeed       int
@@ -294,12 +297,11 @@ func (a *App) updateModal(msg tea.Msg) (tea.Cmd, bool) {
 
 	top := len(a.modals) - 1
 	if click, ok := msg.(tea.MouseClickMsg); ok && a.mouseEnabled {
-		switch modal := a.modals[top].(type) {
-		case *SettingsModal:
-			return modal.handleMouseClick(click, a.width, a.height), true
-		case *EscMenuModal:
-			return modal.handleMouseClick(click, a.width, a.height), true
-		}
+		return a.handleModalMouseClick(a.modals[top], click), true
+	}
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.MouseWheelMsg:
+		a.resetModalClick()
 	}
 
 	var modalCmd tea.Cmd

@@ -11,6 +11,171 @@ import (
 
 const mouseSettingKey = "mouse"
 
+func (a *App) resetModalClick() {
+	a.modalLastClickAt = time.Time{}
+	a.modalLastClick = nil
+	a.modalLastClickIdx = -1
+}
+
+func (a *App) modalItemClick(modal Overlay, idx int) bool {
+	now := time.Now()
+	activate := a.modalLastClick == modal && a.modalLastClickIdx == idx && now.Sub(a.modalLastClickAt) < 350*time.Millisecond
+	if activate {
+		a.resetModalClick()
+		return true
+	}
+	a.modalLastClick = modal
+	a.modalLastClickIdx = idx
+	a.modalLastClickAt = now
+	return false
+}
+
+func modalClickRow(click tea.MouseClickMsg, screenW, screenH, boxW, boxH, rowOffset, count int) int {
+	if click.Button != tea.MouseLeft || count <= 0 {
+		return -1
+	}
+	boxX := (screenW - boxW) / 2
+	boxY := (screenH - boxH) / 2
+	if click.X < boxX || click.X >= boxX+boxW {
+		return -1
+	}
+	idx := click.Y - boxY - rowOffset
+	if idx < 0 || idx >= count {
+		return -1
+	}
+	return idx
+}
+
+func (a *App) handleModalMouseClick(modal Overlay, click tea.MouseClickMsg) tea.Cmd {
+	if click.Button != tea.MouseLeft {
+		a.resetModalClick()
+		return nil
+	}
+	if !modalContainsPoint(modal, click.X, click.Y, a.width, a.height) {
+		a.resetModalClick()
+		return func() tea.Msg { return CloseModalMsg{} }
+	}
+
+	idx := -1
+	var count, boxW, rowOffset int
+	activateKey := tea.KeyPressMsg{Code: tea.KeyEnter}
+	switch m := modal.(type) {
+	case *CmdMenuModal:
+		boxW, rowOffset, count = 40, 2, len(m.options)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *EscMenuModal:
+		boxW, rowOffset, count = 30, 2, len(escMenuItems)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *SortModal:
+		boxW, rowOffset, count = 35, 2, len(sortOptions)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *SpeedModal:
+		boxW, rowOffset, count = 35, 2, len(playbackSpeeds)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *PresetModal:
+		boxW, rowOffset, count = 55, 2, len(audioPresets)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *MovePickModal:
+		boxW, rowOffset, count = 56, 4, len(m.playlists)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *RemoveTrackModal:
+		boxW, rowOffset, count = 56, 4, len(m.idxs)
+		idx = modalClickRow(click, a.width, a.height, boxW, lipgloss.Height(m.View()), rowOffset, count)
+		if idx >= 0 {
+			m.cursor = idx
+		}
+	case *SettingsModal:
+		if click.Button != tea.MouseLeft || len(m.items) == 0 {
+			break
+		}
+		boxW, _ := m.dimensions()
+		boxH := lipgloss.Height(m.View())
+		boxX, boxY := (a.width-boxW)/2, (a.height-boxH)/2
+		row := click.Y - boxY - 1
+		if click.X >= boxX && click.X < boxX+boxW && row >= 0 {
+			idx = row / 3
+			if idx < len(m.items) {
+				m.cursor = idx
+				leftW := (boxW - 4) * 40 / 100
+				if leftW < 16 {
+					leftW = 16
+				}
+				if row%3 == 1 && click.X < boxX+2+leftW && a.modalItemClick(modal, idx) {
+					activateKey = tea.KeyPressMsg{Code: tea.KeyRight}
+					_, cmd := modal.Update(activateKey)
+					return cmd
+				}
+				// A click on the description/spacing only selects the setting.
+				a.modalLastClick = modal
+				a.modalLastClickIdx = idx
+				a.modalLastClickAt = time.Now()
+				return nil
+			}
+			idx = -1
+		}
+	case *DeleteModal:
+		boxW = 60
+		boxH := lipgloss.Height(m.View())
+		boxX, boxY := (a.width-boxW)/2, (a.height-boxH)/2
+		if click.X >= boxX+2 && click.X < boxX+boxW-2 && click.Y == boxY+4 {
+			idx = 0
+			if click.X >= boxX+31 {
+				idx = 1
+			}
+			m.cursor = idx
+		}
+	case *MoveConfirmModal:
+		boxW = 60
+		boxH := lipgloss.Height(m.View())
+		boxX, boxY := (a.width-boxW)/2, (a.height-boxH)/2
+		if click.X >= boxX+2 && click.X < boxX+boxW-2 && click.Y == boxY+4 {
+			idx = 0
+			if click.X >= boxX+31 {
+				idx = 1
+			}
+			m.cursor = idx
+		}
+	default:
+		a.resetModalClick()
+		return nil
+	}
+
+	if idx < 0 {
+		a.resetModalClick()
+		return nil
+	}
+	if a.modalItemClick(modal, idx) {
+		_, cmd := modal.Update(activateKey)
+		return cmd
+	}
+	return nil
+}
+
+func modalContainsPoint(modal Overlay, x, y, screenW, screenH int) bool {
+	view := modal.View()
+	boxW, boxH := lipgloss.Width(view), lipgloss.Height(view)
+	left, top := (screenW-boxW)/2, (screenH-boxH)/2
+	return x >= left && x < left+boxW && y >= top && y < top+boxH
+}
+
 func mouseOption() settingOpt {
 	return settingOpt{
 		title: "Mouse support",

@@ -142,34 +142,6 @@ func (m *SettingsModal) dimensions() (int, int) {
 	return boxW, leftW
 }
 
-func (m *SettingsModal) handleMouseClick(msg tea.MouseClickMsg, screenW, screenH int) tea.Cmd {
-	if msg.Button != tea.MouseLeft || len(m.items) == 0 {
-		return nil
-	}
-
-	boxW, leftW := m.dimensions()
-	boxH := lipgloss.Height(m.View())
-	boxX := (screenW - boxW) / 2
-	boxY := (screenH - boxH) / 2
-	row := msg.Y - boxY - 1
-	if msg.X < boxX || msg.X >= boxX+boxW || row < 0 {
-		return nil
-	}
-
-	idx := row / 3
-	if idx >= len(m.items) {
-		return nil
-	}
-	m.cursor = idx
-	if row%3 != 1 || msg.X >= boxX+2+leftW {
-		return nil
-	}
-
-	m.items[idx].ToggleRight()
-	value := m.items[idx].Value()
-	return func() tea.Msg { return ApplySettingMsg{Index: idx, Value: value} }
-}
-
 func (m *SettingsModal) View() string {
 	if len(m.items) == 0 {
 		return ""

@@ -260,31 +260,47 @@ func (a *App) renderOverlayView(view string) string {
 		case *EscMenuModal:
 			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "open") + "  " + StyleHint("esc", "close")
 			if a.mouseEnabled {
-				hints += "  " + StyleHint("click", "open")
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "open")
 			}
 		case *SettingsModal:
 			hints = StyleHint("↑/↓", "select") + "  " + StyleHint("←/→", "toggle") + "  " + StyleHint("esc", "close")
 			if a.mouseEnabled {
-				hints += "  " + StyleHint("click", "select/toggle")
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "toggle")
 			}
 		case *CmdMenuModal:
 			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "close")
-		case *PresetModal, *SpeedModal:
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "open")
+			}
+		case *PresetModal, *SpeedModal, *SortModal:
 			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "apply") + "  " + StyleHint("esc", "back")
-		case *SortModal:
-			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "apply") + "  " + StyleHint("esc", "back")
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "apply")
+			}
+		case *MovePickModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "cancel")
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "open")
+			}
+		case *RemoveTrackModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "remove") + "  " + StyleHint("esc", "back")
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "remove")
+			}
 		case *RenameModal, *RenamePlaylistModal:
 			hints = StyleHint("enter", "rename") + "  " + StyleHint("esc", "cancel")
 		case *MoveCreateModal:
 			hints = StyleHint("enter", "create") + "  " + StyleHint("esc", "cancel")
 		case *DeleteModal:
 			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "back")
-		case *MovePickModal:
-			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "cancel")
 		case *MoveConfirmModal:
 			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "cancel")
-		case *RemoveTrackModal:
-			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "remove") + "  " + StyleHint("esc", "back")
+		}
+		if a.mouseEnabled {
+			switch modal.(type) {
+			case *DeleteModal, *MoveConfirmModal:
+				hints += "  " + StyleHint("click", "select") + "  " + StyleHint("double-click", "confirm")
+			}
 		}
 		if hints != "" {
 			lines := strings.Split(placed, "\n")
