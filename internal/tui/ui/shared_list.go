@@ -60,7 +60,7 @@ func renderSharedTrackList[T any](
 
 		checkStr := ""
 		if showCheck {
-			checkStr = IconCheck + " "
+			checkStr = "[Saved]"
 		}
 		checkStr = runewidth.FillRight(checkStr, layout.CheckWidth)
 

@@ -2,9 +2,9 @@ package layout
 
 const (
 	tracklistTickWidth  = 4
-	tracklistCheckWidth = 2
+	tracklistCheckWidth = 8
 	tracklistIndexWidth = 3
-	tracklistTimeWidth  = 5
+	tracklistTimeWidth  = 6
 	tracklistSpacing    = 8
 	tracklistMinTextW   = 10
 	tracklistTitleRatio = 0.70
