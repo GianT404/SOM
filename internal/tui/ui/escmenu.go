@@ -41,16 +41,7 @@ func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 				m.cursor = 0
 			}
 		case "enter":
-			switch m.cursor {
-			case 0:
-				return m, func() tea.Msg { return OpenSettingsMsg{} }
-			case 1:
-				return m, func() tea.Msg { return OpenHelpMsg{} }
-			case 2:
-				return m, tea.Quit
-			case 3:
-				return m, func() tea.Msg { return NobodyHereMsg{} }
-			}
+			return m, m.activate()
 		}
 	case tea.MouseWheelMsg:
 		if msg.Button == tea.MouseWheelUp {
@@ -68,6 +59,39 @@ func (m *EscMenuModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m *EscMenuModal) activate() tea.Cmd {
+	switch m.cursor {
+	case 0:
+		return func() tea.Msg { return OpenSettingsMsg{} }
+	case 1:
+		return func() tea.Msg { return OpenHelpMsg{} }
+	case 2:
+		return tea.Quit
+	case 3:
+		return func() tea.Msg { return NobodyHereMsg{} }
+	default:
+		return nil
+	}
+}
+
+func (m *EscMenuModal) handleMouseClick(msg tea.MouseClickMsg, screenW, screenH int) tea.Cmd {
+	if msg.Button != tea.MouseLeft {
+		return nil
+	}
+
+	boxW := 30
+	boxH := lipgloss.Height(m.View())
+	boxX := (screenW - boxW) / 2
+	boxY := (screenH - boxH) / 2
+	idx := msg.Y - boxY - 2
+	if msg.X < boxX || msg.X >= boxX+boxW || idx < 0 || idx >= len(escMenuItems) {
+		return nil
+	}
+
+	m.cursor = idx
+	return m.activate()
 }
 
 func (m *EscMenuModal) View() string {

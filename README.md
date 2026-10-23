@@ -181,18 +181,17 @@ som completion fish > ~/.config/fish/completions/som.fish
 
 | Flag | Description |
 |------|-------------|
-| `--server <URL>` | Remote mode — point to a SOM backend |
-| `--api-key <KEY>` | API key for remote mode (or `SOM_API_KEY` env) |
-| `--download-dir` | Override download directory |
-| `--install` | Install binary to `~/.local/bin` |
-| `--upgrade` | Download latest release (minisign verified) |
-| `--check-update` | Check for updates without installing |
-| `--uninstall` | Remove the user-local installed binary |
-| `--update-ytdlp` | Update bundled yt-dlp |
-| `--version` | Print version |
-| `--changelog` | Print current version commits |
-| `--tt` | Print cumulative listening time and exit |
-| `--stats` | Print track counts, playlists, and track disk usage |
+| `--server <URL>` | Use a remote SOM backend |
+| `--api-key <KEY>` | Authenticate with the remote backend |
+| `--download-dir <DIR>` | Set the music library directory |
+| `--install` | Install SOM to a user-local bin directory |
+| `--upgrade` | Install the latest SOM release |
+| `--check-update` | Check for a newer release |
+| `--uninstall` | Remove the user-local SOM installation |
+| `--update-ytdlp` | Update yt-dlp and exit |
+| `--version` | Print the version and exit |
+| `--changelog` | Print the current release changelog |
+| `--stats` | Print listening time and library statistics |
 
 ---
 

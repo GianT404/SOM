@@ -293,6 +293,15 @@ func (a *App) updateModal(msg tea.Msg) (tea.Cmd, bool) {
 	}
 
 	top := len(a.modals) - 1
+	if click, ok := msg.(tea.MouseClickMsg); ok && a.mouseEnabled {
+		switch modal := a.modals[top].(type) {
+		case *SettingsModal:
+			return modal.handleMouseClick(click, a.width, a.height), true
+		case *EscMenuModal:
+			return modal.handleMouseClick(click, a.width, a.height), true
+		}
+	}
+
 	var modalCmd tea.Cmd
 	a.modals[top], modalCmd = a.modals[top].Update(msg)
 

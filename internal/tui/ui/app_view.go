@@ -178,7 +178,7 @@ func (a *App) globalHelpHints() []globalHelpHint {
 		{text: StyleHintActive("r", "random", a.playback.Random), key: 'r'},
 		{text: StyleHintActive("space", "pause", a.player != nil && a.player.State() == player.Paused), key: tea.KeySpace},
 		{text: StyleHintActive("/", "search", a.left.input.Focused()), key: '/'},
-		{text: StyleHint("esc", "settings")},
+		{text: StyleHint("esc", "settings"), key: tea.KeyEsc},
 		{text: StyleHint("alt+q", "quit")},
 	}
 }
@@ -257,6 +257,16 @@ func (a *App) renderOverlayView(view string) string {
 		placed := lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popup)
 		var hints string
 		switch modal.(type) {
+		case *EscMenuModal:
+			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "open") + "  " + StyleHint("esc", "close")
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "open")
+			}
+		case *SettingsModal:
+			hints = StyleHint("↑/↓", "select") + "  " + StyleHint("←/→", "toggle") + "  " + StyleHint("esc", "close")
+			if a.mouseEnabled {
+				hints += "  " + StyleHint("click", "select/toggle")
+			}
 		case *CmdMenuModal:
 			hints = StyleHint("↑/↓", "navigate") + "  " + StyleHint("enter", "select") + "  " + StyleHint("esc", "close")
 		case *PresetModal, *SpeedModal:

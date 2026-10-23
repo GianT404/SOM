@@ -33,7 +33,7 @@ func main() {
 	var serverURL string
 	var apiKey string
 	var downloadDir string
-	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, totalTimeFlag, libraryStatsFlag bool
+	var upgradeFlag, installFlag, versionFlag, checkUpdateFlag, uninstallFlag, updateYtdlpFlag, changelogFlag, syncAssetsFlag, statsFlag bool
 
 	var rootCmd = &cobra.Command{
 		Use:   "som",
@@ -99,7 +99,7 @@ func main() {
 				return
 			}
 
-			if totalTimeFlag {
+			if statsFlag {
 				totalTimeDir := downloadDir
 				if totalTimeDir == "" {
 					if env := os.Getenv("SOM_DOWNLOAD_DIR"); env != "" {
@@ -137,10 +137,6 @@ func main() {
 					(totalSeconds/60)%60,
 					totalSeconds%60,
 				)
-				return
-			}
-
-			if libraryStatsFlag {
 				if err := runLibraryStats(downloadDir); err != nil {
 					fmt.Fprintln(os.Stderr, "Read library statistics failed:", err)
 					os.Exit(1)
@@ -235,33 +231,27 @@ func main() {
 	}
 
 	// Đăng ký toàn bộ cờ vào Cobra (tự động ăn khớp completion)
-	rootCmd.Flags().StringVar(&serverURL, "server", "", "URL of Google Cloud backend (leave empty to run locally)")
-	rootCmd.Flags().StringVar(&apiKey, "api-key", "", "API key for --server remote mode (or set SOM_API_KEY env var)")
-	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Directory to store downloaded tracks (default: ~/.local/share/som)")
-	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "download and install the latest SOM release from GitHub")
-	rootCmd.Flags().BoolVar(&installFlag, "install", false, "install this binary to a user-local bin directory")
-	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "print the current version and exit")
-	rootCmd.Flags().BoolVar(&checkUpdateFlag, "check-update", false, "check whether a newer SOM release exists without installing")
-	rootCmd.Flags().BoolVar(&uninstallFlag, "uninstall", false, "remove the installed som binary from your machine")
-	rootCmd.Flags().BoolVar(&updateYtdlpFlag, "update-ytdlp", false, "update the yt-dlp binary to the latest version")
-	rootCmd.Flags().BoolVar(&changelogFlag, "changelog", false, "print the commits of the current version")
+	rootCmd.Flags().StringVar(&serverURL, "server", "", "Use a remote SOM backend")
+	rootCmd.Flags().StringVar(&apiKey, "api-key", "", "Authenticate with the remote backend")
+	rootCmd.Flags().StringVar(&downloadDir, "download-dir", "", "Set the music library directory")
+	rootCmd.Flags().BoolVar(&upgradeFlag, "upgrade", false, "Install the latest SOM release")
+	rootCmd.Flags().BoolVar(&installFlag, "install", false, "Install SOM to a user-local bin directory")
+	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "Print the version and exit")
+	rootCmd.Flags().BoolVar(&checkUpdateFlag, "check-update", false, "Check for a newer release")
+	rootCmd.Flags().BoolVar(&uninstallFlag, "uninstall", false, "Remove the user-local SOM installation")
+	rootCmd.Flags().BoolVar(&updateYtdlpFlag, "update-ytdlp", false, "Update yt-dlp and exit")
+	rootCmd.Flags().BoolVar(&changelogFlag, "changelog", false, "Print the current release changelog")
 	rootCmd.Flags().BoolVar(
 		&syncAssetsFlag,
 		"sync-assets",
 		false,
-		"internal: sync embedded desktop assets",
+		"Synchronize embedded desktop assets",
 	)
 	rootCmd.Flags().BoolVar(
-		&totalTimeFlag,
-		"tt",
-		false,
-		"show total time spent listening to music and exit",
-	)
-	rootCmd.Flags().BoolVar(
-		&libraryStatsFlag,
+		&statsFlag,
 		"stats",
 		false,
-		"show total tracks, playlists, and disk usage; then exit",
+		"Print listening time and library statistics",
 	)
 
 	if err := rootCmd.Execute(); err != nil {
