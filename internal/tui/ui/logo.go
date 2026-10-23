@@ -5,7 +5,7 @@ const hideLogoSettingKey = "hide_logo"
 func logoOption() settingOpt {
 	return settingOpt{
 		title: "Hide header",
-		desc:  "Hide the header banner at the top to free up its terminal rows for the current tab's content.",
+		desc:  "Hide the header banner at the top",
 		on:    func(a *App) bool { return a.hideLogo },
 		apply: func(a *App, on bool) {
 			a.hideLogo = on

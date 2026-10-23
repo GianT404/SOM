@@ -3,9 +3,10 @@ package ui
 import (
 	"time"
 
+	tuilayout "som/internal/tui/layout"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	tuilayout "som/internal/tui/layout"
 )
 
 const mouseSettingKey = "mouse"
@@ -13,7 +14,7 @@ const mouseSettingKey = "mouse"
 func mouseOption() settingOpt {
 	return settingOpt{
 		title: "Mouse support",
-		desc:  "Click tabs, rows, and action hints; double-click a track to play it, and scroll lists / logs.",
+		desc:  "Enable mouse support",
 		on:    func(a *App) bool { return a.mouseEnabled },
 		apply: func(a *App, on bool) {
 			a.mouseEnabled = on

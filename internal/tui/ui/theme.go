@@ -51,7 +51,7 @@ const themeSettingKey = "theme"
 func themeOption() settingOpt {
 	return settingOpt{
 		title:   "Theme",
-		desc:    "Default keeps the colorful palette. Mono turns text, borders and highlights white (#fff) for a clean monochrome look.",
+		desc:    "Change the color theme (Mono white and default)",
 		offText: "Default",
 		onText:  "Mono",
 		on:      func(a *App) bool { return isMono() },

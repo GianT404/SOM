@@ -5,7 +5,7 @@ const hintBarSettingKey = "hide_hint"
 func hintBarOption() settingOpt {
 	return settingOpt{
 		title: "Hide hint bar",
-		desc:  "Hide the keyboard-shortcut hint line below the progress bar to free up one terminal row. Press '?' any time to see all shortcuts.",
+		desc:  "Hide the hint line below the progress bar",
 		on:    func(a *App) bool { return a.hideHint },
 		apply: func(a *App, on bool) {
 			a.hideHint = on
