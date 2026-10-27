@@ -224,13 +224,7 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 				DimItemStyle.Render("This playlist is empty. Press ':' on a track to move it here."),
 			)
 		}
-		return lipgloss.Place(
-			w,
-			h,
-			lipgloss.Center,
-			lipgloss.Center,
-			DimItemStyle.Render("No matching tracks."),
-		)
+		return DimItemStyle.Render(" No matching tracks.") + "\n"
 	}
 
 	return renderSharedTrackList(
