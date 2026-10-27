@@ -81,9 +81,16 @@ func (db *DB) RenameLocalFileWithFS(
 		return fmt.Errorf("%w: %q", ErrDuplicateLocalName, newName)
 	}
 
-	_, err = tx.Exec("UPDATE local_files SET path = ?, name = ? WHERE path = ?", newPath, newName, oldPath)
+	result, err := tx.Exec("UPDATE local_files SET path = ?, name = ? WHERE path = ?", newPath, newName, oldPath)
 	if err != nil {
 		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return fmt.Errorf("rename local file: expected one row for %q, updated %d", oldPath, updated)
 	}
 
 	if renameFile != nil {
