@@ -34,8 +34,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev pkg-config
 
-      - name: Run Unit Tests
-        run: go test -v $(go list ./... | grep -v /tui)
+      - name: Run Backend Unit Tests
+        run: go test -v ./cmd/server ./internal/handler ./internal/scraper ./internal/cache ./internal/backend ./internal/local ./internal/domain
 
   build-and-push:
     needs: test
