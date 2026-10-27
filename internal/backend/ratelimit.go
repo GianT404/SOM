@@ -2,9 +2,11 @@ package backend
 
 import (
 	"encoding/json"
+	"math"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -73,6 +75,11 @@ func NewIPRateLimiter(rate, burst float64) *ipRateLimiter {
 }
 
 func (l *ipRateLimiter) allow(key string) bool {
+	allowed, _ := l.allowWithRetry(key)
+	return allowed
+}
+
+func (l *ipRateLimiter) allowWithRetry(key string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -80,7 +87,7 @@ func (l *ipRateLimiter) allow(key string) bool {
 	v, ok := l.visitors[key]
 	if !ok {
 		l.visitors[key] = &visitor{tokens: l.burst - 1, lastSeen: now}
-		return true
+		return true, 0
 	}
 
 	elapsed := now.Sub(v.lastSeen).Seconds()
@@ -91,10 +98,14 @@ func (l *ipRateLimiter) allow(key string) bool {
 	v.lastSeen = now
 
 	if v.tokens < 1 {
-		return false
+		if l.rate <= 0 {
+			return false, time.Minute
+		}
+		seconds := math.Ceil((1 - v.tokens) / l.rate)
+		return false, time.Duration(seconds) * time.Second
 	}
 	v.tokens--
-	return true
+	return true, 0
 }
 
 func (l *ipRateLimiter) cleanupLoop() {
@@ -122,9 +133,10 @@ func rateLimitKey(r *http.Request) string {
 
 func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !l.allow(rateLimitKey(r)) {
+		allowed, retryAfter := l.allowWithRetry(rateLimitKey(r))
+		if !allowed {
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Retry-After", "1")
+			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
 			w.WriteHeader(http.StatusTooManyRequests)
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error": "rate limit exceeded, please slow down",

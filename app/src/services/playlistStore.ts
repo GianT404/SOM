@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import api from './api';
 import { getAudioSettings } from './audioSettings';
+import { downloadAudioAtomically } from './audioDownload';
 
 const PLAYLIST_KEY = 'dm4a_offline_playlist';
 const DELETED_PLAYLIST_KEY = 'dm4a_deleted_playlist';
@@ -161,22 +162,15 @@ export const downloadAndAdd = async (
     const streamUrl = api.getStreamUrl(track.id, settings.smartSilenceSkip);
     console.log('[downloadAndAdd] Downloading via /stream for', track.id);
 
-    const downloadResumable = FileSystem.createDownloadResumable(
+    const savedUri = await downloadAudioAtomically(
         streamUrl,
         localUri,
-        { headers: await api.getStreamHeaders() },
-        (downloadProgress: any) => {
-            const written = downloadProgress.totalBytesWritten;
-            const total = downloadProgress.totalBytesExpectedToWrite;
-            console.log('[downloadAndAdd] Progress:', written, '/', total);
-            onProgress?.({ totalBytesWritten: written, totalBytesExpectedToWrite: total });
-        }
+        await api.getStreamHeaders(),
+        progress => {
+            console.log('[downloadAndAdd] Progress:', progress.totalBytesWritten, '/', progress.totalBytesExpectedToWrite);
+            onProgress?.(progress);
+        },
     );
-
-    const result = await downloadResumable.downloadAsync();
-    if (!result || !result.uri) {
-        throw new Error('Download failed');
-    }
 
     // Save track immediately so it appears in playlist right away.
     // We do NOT wait for lyrics here — they will be patched in the background.
@@ -186,7 +180,7 @@ export const downloadAndAdd = async (
         uploader: track.uploader,
         thumbnail: track.thumbnail,
         duration: track.duration,
-        localUri: result.uri,
+        localUri: savedUri,
         downloadedAt: Date.now(),
         lyrics: undefined, // filled in below once lyrics resolve
     };

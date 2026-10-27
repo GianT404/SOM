@@ -50,8 +50,8 @@ const cleanCacheTTL = 6 * time.Hour
 var cleanLocks = newKeyedLock()
 
 type lockEntry struct {
-	mu  sync.Mutex
-	ref int
+	available chan struct{}
+	ref       int
 }
 
 type keyedLock struct {
@@ -64,25 +64,44 @@ func newKeyedLock() *keyedLock {
 }
 
 func (k *keyedLock) Lock(key string) func() {
+	unlock, _ := k.LockContext(context.Background(), key)
+	return unlock
+}
+
+func (k *keyedLock) LockContext(ctx context.Context, key string) (func(), error) {
 	k.mu.Lock()
 	e, ok := k.locks[key]
 	if !ok {
-		e = &lockEntry{}
+		e = &lockEntry{available: make(chan struct{}, 1)}
+		e.available <- struct{}{}
 		k.locks[key] = e
 	}
 	e.ref++
 	k.mu.Unlock()
 
-	e.mu.Lock()
-
-	return func() {
-		e.mu.Unlock()
-		k.mu.Lock()
-		e.ref--
-		if e.ref == 0 {
-			delete(k.locks, key)
+	select {
+	case <-e.available:
+		if err := ctx.Err(); err != nil {
+			e.available <- struct{}{}
+			k.releaseRef(key, e)
+			return nil, err
 		}
-		k.mu.Unlock()
+		return func() {
+			e.available <- struct{}{}
+			k.releaseRef(key, e)
+		}, nil
+	case <-ctx.Done():
+		k.releaseRef(key, e)
+		return nil, ctx.Err()
+	}
+}
+
+func (k *keyedLock) releaseRef(key string, e *lockEntry) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	e.ref--
+	if e.ref == 0 {
+		delete(k.locks, key)
 	}
 }
 
@@ -105,6 +124,8 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	startedAt := time.Now()
+	log.Printf("stream: preparing audio for %s", id)
 
 	// Lấy title (cached 4h trong ResilientScraper) chỉ để đặt tên file.
 	info, err := h.Scraper.GetStreamInfo(r.Context(), id)
@@ -132,6 +153,7 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to prepare audio")
 		return
 	}
+	log.Printf("stream: audio prepared for %s in %s", id, time.Since(startedAt).Round(time.Millisecond))
 	serveAudioFile(w, r, path, filename)
 }
 
@@ -173,7 +195,13 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, video
 	}
 
 	// Tránh 2 request cùng lúc cùng transcode cho 1 video.
-	unlock := cleanLocks.Lock(videoID)
+	unlock, err := cleanLocks.LockContext(ctx, videoID)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			writeError(w, http.StatusGatewayTimeout, "audio processing timed out")
+		}
+		return
+	}
 	defer unlock()
 	if h.serveCachedClean(w, r, filename, cleanPath) {
 		return

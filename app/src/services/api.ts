@@ -94,24 +94,33 @@ class ApiService {
      * Thêm header X-Device-Token vào request. Khi server trả 401 (token hết
      * hạn do backend restart), xoá token và re-register một lần.
      */
-    private async fetchWithFallback(url: string, options?: RequestInit): Promise<Response> {
+    private async fetchWithFallback(
+        url: string,
+        options?: RequestInit,
+        timeoutMs: number = 10000,
+    ): Promise<Response> {
         let lastError: Error | null = null;
 
         try {
             const token = await this.ensureToken();
-            const headers: Record<string, string> = {
+            let headers: Record<string, string> = {
                 ...((options?.headers as Record<string, string>) || {}),
                 'X-Device-Token': token,
             };
-            const res = await this.fetchWithTimeout(url, { ...options, headers });
+            let res = await this.fetchWithTimeout(url, { ...options, headers }, timeoutMs);
             if (res.status === 401) {
                 await this.invalidateToken();
                 const retryToken = await this.ensureToken();
-                const retryRes = await this.fetchWithTimeout(url, {
-                    ...options,
-                    headers: { ...headers, 'X-Device-Token': retryToken },
-                });
-                return retryRes;
+                headers = { ...headers, 'X-Device-Token': retryToken };
+                res = await this.fetchWithTimeout(
+                    url,
+                    { ...options, headers },
+                    timeoutMs,
+                );
+            }
+            if (res.status === 429) {
+                await new Promise<void>(resolve => setTimeout(resolve, retryAfterMs(res.headers)));
+                res = await this.fetchWithTimeout(url, { ...options, headers }, timeoutMs);
             }
             return res;
         } catch (err) {
@@ -122,13 +131,23 @@ class ApiService {
         throw lastError || new Error('Network request failed');
     }
 
-    private async fetchWithTimeout(url: string, options?: RequestInit): Promise<Response> {
-        return Promise.race([
-            fetch(url, options),
-            new Promise<Response>((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout')), 10000)
-            ),
-        ]);
+    private async fetchWithTimeout(
+        url: string,
+        options?: RequestInit,
+        timeoutMs: number = 10000,
+    ): Promise<Response> {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } catch (error) {
+            if (controller.signal.aborted) {
+                throw new Error(`Request timed out after ${timeoutMs}ms`);
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     /**
@@ -157,7 +176,7 @@ class ApiService {
 
     async resolveUrl(videoId: string): Promise<{ url: string; title: string; safeName: string }> {
         const url = `${this.baseUrl}/api/v1/resolve?id=${encodeURIComponent(videoId)}`;
-        const res = await this.fetchWithFallback(url);
+        const res = await this.fetchWithFallback(url, undefined, 55000);
         if (!res.ok) throw new Error(`Resolve failed: ${res.status}`);
         return res.json();
     }
@@ -208,6 +227,20 @@ class ApiService {
     // isLocalBackend(): boolean {
     //     return this.baseUrl === LOCALHOST_URL;
     // }
+}
+
+function retryAfterMs(headers: Headers): number {
+    const raw = headers.get('Retry-After');
+    const seconds = Number(raw);
+    if (Number.isFinite(seconds) && seconds > 0) {
+        return Math.min(seconds, 30) * 1000;
+    }
+
+    const retryAt = raw ? Date.parse(raw) : NaN;
+    if (Number.isFinite(retryAt)) {
+        return Math.min(Math.max(retryAt - Date.now(), 1000), 30000);
+    }
+    return 1000;
 }
 
 export const api = new ApiService();

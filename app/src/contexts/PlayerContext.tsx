@@ -4,6 +4,7 @@ import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPlaylist, OfflineTrack } from '../services/playlistStore';
 import { getAudioSettings, AudioSettings } from '../services/audioSettings';
+import { downloadAudioAtomically } from '../services/audioDownload';
 import {
     initMediaControls,
     updateNowPlaying,
@@ -258,6 +259,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // --- Internal play (used by play, skipToNext, skipToPrevious) ---
     const playInternal = useCallback(async (track: Track) => {
+        let remoteCacheUri: string | null = null;
         try {
             const playId = ++currentPlayIdRef.current;
 
@@ -281,28 +283,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             // Use local downloaded file if available, otherwise cache to temp file
             let audioUri = track.localUri;
+            const settings = await getAudioSettings();
+            audioSettingsRef.current = settings;
             if (!audioUri) {
-                const tempUri = `${FileSystem.cacheDirectory}temp_${track.id}.m4a`;
-                const fileInfo = await FileSystem.getInfoAsync(tempUri);
-                if (!fileInfo.exists) {
-                    const settings = await getAudioSettings();
-                    audioSettingsRef.current = settings;
+                const cacheMode = settings.smartSilenceSkip ? 'clean' : 'original';
+                const cacheUri = `${FileSystem.cacheDirectory}stream_v2_${track.id}_${cacheMode}.ogg`;
+                const legacyCacheUri = `${FileSystem.cacheDirectory}temp_${track.id}.m4a`;
+                await FileSystem.deleteAsync(legacyCacheUri, { idempotent: true }).catch(() => undefined);
+                remoteCacheUri = cacheUri;
+                const fileInfo = await FileSystem.getInfoAsync(cacheUri);
+                if (!fileInfo.exists || typeof fileInfo.size !== 'number' || fileInfo.size < 4) {
+                    await FileSystem.deleteAsync(cacheUri, { idempotent: true });
                     const streamUrl = api.getStreamUrl(track.id, settings.smartSilenceSkip);
-                    await FileSystem.downloadAsync(streamUrl, tempUri, {
-                        headers: await api.getStreamHeaders(),
-                    });
+                    await downloadAudioAtomically(
+                        streamUrl,
+                        cacheUri,
+                        await api.getStreamHeaders(),
+                    );
                 }
-                audioUri = tempUri;
+                audioUri = cacheUri;
             }
 
             // Ensure play wasn't cancelled or superseded during download
             if (currentPlayIdRef.current !== playId) {
                 return;
             }
-
-            // Reload audio engine settings from AsyncStorage before each play
-            const settings = await getAudioSettings();
-            audioSettingsRef.current = settings;
 
             const { sound } = await Audio.Sound.createAsync(
                 { uri: audioUri },
@@ -322,6 +327,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             soundRef.current = sound;
         } catch (error) {
             console.error('Play error:', error);
+            if (remoteCacheUri) {
+                await FileSystem.deleteAsync(remoteCacheUri, { idempotent: true }).catch(() => undefined);
+            }
             setState(prev => ({ ...prev, isLoading: false }));
         }
     }, [onPlaybackStatusUpdate]);

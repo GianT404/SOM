@@ -200,8 +200,8 @@ func cacheDirArgs() []string {
 }
 
 type lockEntry struct {
-	mu  sync.Mutex
-	ref int
+	available chan struct{}
+	ref       int
 }
 
 type keyedLock struct {
@@ -214,25 +214,45 @@ func newKeyedLock() *keyedLock {
 }
 
 func (k *keyedLock) Lock(key string) func() {
+	unlock, _ := k.LockContext(context.Background(), key)
+	return unlock
+}
+
+// LockContext waits for a key lock but stops waiting when the request ends.
+func (k *keyedLock) LockContext(ctx context.Context, key string) (func(), error) {
 	k.mu.Lock()
 	e, ok := k.locks[key]
 	if !ok {
-		e = &lockEntry{}
+		e = &lockEntry{available: make(chan struct{}, 1)}
+		e.available <- struct{}{}
 		k.locks[key] = e
 	}
 	e.ref++
 	k.mu.Unlock()
 
-	e.mu.Lock()
-
-	return func() {
-		e.mu.Unlock()
-		k.mu.Lock()
-		e.ref--
-		if e.ref == 0 {
-			delete(k.locks, key)
+	select {
+	case <-e.available:
+		if err := ctx.Err(); err != nil {
+			e.available <- struct{}{}
+			k.releaseRef(key, e)
+			return nil, err
 		}
-		k.mu.Unlock()
+		return func() {
+			e.available <- struct{}{}
+			k.releaseRef(key, e)
+		}, nil
+	case <-ctx.Done():
+		k.releaseRef(key, e)
+		return nil, ctx.Err()
+	}
+}
+
+func (k *keyedLock) releaseRef(key string, e *lockEntry) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	e.ref--
+	if e.ref == 0 {
+		delete(k.locks, key)
 	}
 }
 
@@ -372,7 +392,10 @@ func cleanupStaleTempFiles() {
 }
 
 func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (string, error) {
-	unlock := downloadLocks.Lock(videoID)
+	unlock, err := downloadLocks.LockContext(ctx, videoID)
+	if err != nil {
+		return "", err
+	}
 	defer unlock()
 
 	if err := acquireYtdlpDownload(ctx); err != nil {
@@ -381,6 +404,8 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	defer releaseYtdlpDownload()
 
 	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.opus", videoID))
+	partialFile := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.part.opus", videoID))
+	partialTemplate := filepath.Join(os.TempDir(), fmt.Sprintf("dopus%s.part.%%(ext)s", videoID))
 
 	if isOpusFile(tempFile) {
 		return tempFile, nil
@@ -388,6 +413,7 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 	// Sắp tạo file mới: trước tiên dọn bớt nếu đã vượt cap.
 	cleanupStaleTempFiles()
 	_ = os.Remove(tempFile)
+	_ = os.Remove(partialFile)
 
 	var lastErr error
 	for attempt := 0; ; attempt++ {
@@ -401,9 +427,10 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 
 		args := []string{
 			"-f", "bestaudio",
+			"--socket-timeout", "20",
 			"-x", "--audio-format", "opus",
 			"--embed-metadata",
-			"-o", tempFile,
+			"-o", partialTemplate,
 			"--no-playlist",
 			"--no-part",
 		}
@@ -419,15 +446,19 @@ func (y *YtdlpScraper) DownloadAudio(ctx context.Context, videoID string) (strin
 
 		if err := cmd.Run(); err != nil {
 			lastErr = fmt.Errorf("yt-dlp download (%s): %w: %s", client, err, stderr.String())
-			_ = os.Remove(tempFile)
+			_ = os.Remove(partialFile)
 			if ytRetryable(lastErr.Error()) {
 				continue
 			}
 			return "", lastErr
 		}
-		if !isOpusFile(tempFile) {
-			_ = os.Remove(tempFile)
+		if !isOpusFile(partialFile) {
+			_ = os.Remove(partialFile)
 			return "", fmt.Errorf("yt-dlp download: output is not a playable opus file")
+		}
+		if err := os.Rename(partialFile, tempFile); err != nil {
+			_ = os.Remove(partialFile)
+			return "", fmt.Errorf("yt-dlp download: publish cached audio: %w", err)
 		}
 		markClientSuccess(client)
 		return tempFile, nil
@@ -600,6 +631,7 @@ func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*Stre
 		args := []string{
 			"--print", "%(title)s\t%(url)s\t%(http_headers)s",
 			"-f", "bestaudio",
+			"--socket-timeout", "15",
 			"--no-playlist",
 		}
 		args = append(args, ytBaseArgs()...)
