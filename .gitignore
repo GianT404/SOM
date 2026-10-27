@@ -47,6 +47,12 @@ cookies.txt
 !docs/
 !docs/*.md
 
+# Local-only Graphify installation and generated graph.
+AGENTS.md
+/.codex/
+/docs/graphify.md
+/graphify-out/
+
 
 # Desktop generated artifacts
 desktop/dist/
