@@ -59,8 +59,7 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 			if p.loadingMore {
 				label = "  " + p.spinner.View() + " Loading more..."
 			}
-			list += "
-" + style.Width(innerW).Render(label)
+			list += "\n" + style.Width(innerW).Render(label)
 		}
 		resultContent = list
 	} else if p.loading || !p.searched {
