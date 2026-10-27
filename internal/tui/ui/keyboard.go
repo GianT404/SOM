@@ -112,6 +112,8 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	case "tab":
 		if a.left.input.Focused() {
 			a.left.input.Blur()
+			next := (a.sidebarActive + 1) % sideCount
+			cmds = append(cmds, a.switchSidebar(next))
 		} else if a.left.plInput.Focused() {
 			a.left.plInput.Blur()
 			a.left.showPlInput = false
