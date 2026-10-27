@@ -112,15 +112,22 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	case "tab":
 		if a.left.input.Focused() {
 			a.left.input.Blur()
-			next := (a.sidebarActive + 1) % sideCount
-			cmds = append(cmds, a.switchSidebar(next))
+			cmds = append(cmds, a.cycleSidebar(1))
 		} else if a.left.plInput.Focused() {
 			a.left.plInput.Blur()
 			a.left.showPlInput = false
 		} else {
-			next := (a.sidebarActive + 1) % sideCount
-			cmds = append(cmds, a.switchSidebar(next))
+			cmds = append(cmds, a.cycleSidebar(1))
 		}
+	case "shift+tab":
+		if a.left.input.Focused() {
+			a.left.input.Blur()
+		}
+		if a.left.plInput.Focused() {
+			a.left.plInput.Blur()
+			a.left.showPlInput = false
+		}
+		cmds = append(cmds, a.cycleSidebar(-1))
 	case "up":
 		if a.sidebarActive == SideLogs {
 			if a.logOffset < LogBuf.Len()-1 {
@@ -159,4 +166,13 @@ func (a *App) toggleVisualizer() tea.Cmd {
 	var cmd tea.Cmd
 	a.palette, cmd = a.palette.Open()
 	return cmd
+}
+
+func (a *App) cycleSidebar(delta int) tea.Cmd {
+	count := int(sideCount)
+	index := (int(a.sidebarActive) + delta) % count
+	if index < 0 {
+		index += count
+	}
+	return a.switchSidebar(SidebarItem(index))
 }
