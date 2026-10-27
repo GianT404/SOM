@@ -211,9 +211,13 @@ func (h *StreamHandler) proxyClean(w http.ResponseWriter, r *http.Request, video
 	if err := os.Rename(partPath, cleanPath); err != nil {
 		log.Printf("stream: cache rename error for %s: %v", videoID, err)
 		_ = os.Remove(partPath)
+		writeError(w, http.StatusInternalServerError, "audio processing failed")
+		return
 	}
 
-	h.serveCachedClean(w, r, filename, cleanPath)
+	if !h.serveCachedClean(w, r, filename, cleanPath) {
+		writeError(w, http.StatusInternalServerError, "processed audio unavailable")
+	}
 }
 
 // serveCachedClean serve thẳng file clean nếu có bản còn tươi. Trả về true
