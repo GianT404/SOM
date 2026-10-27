@@ -27,6 +27,8 @@ import (
 	"som/internal/scraper"
 )
 
+const streamRequestTimeout = 20 * time.Minute
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
@@ -66,7 +68,7 @@ func main() {
 		Addr:         serverAddr(host, port),
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 5 * time.Minute, // long enough for audio proxy streaming
+		WriteTimeout: streamRequestTimeout + time.Minute,
 		IdleTimeout:  120 * time.Second,
 	}
 
@@ -148,7 +150,6 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(3 * time.Minute))
 	r.Use(corsMiddleware)
 	// gzip cho payload JSON nhỏ (search/lyrics/resolve/register). Không liệt
 	// kê audio/ogg nên endpoint /stream không bị nén (tránh buffer/độ trễ).
@@ -163,7 +164,8 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 	r.Route("/api/v1", func(r chi.Router) {
 		// Register là endpoint công khai để app xin token per-device.
 		// Rate limit riêng theo IP chống spam đăng ký.
-		r.With(registerLimiter.Middleware).Post("/auth/register", registerHandler(deviceReg))
+		r.With(middleware.Timeout(15*time.Second), registerLimiter.Middleware).
+			Post("/auth/register", registerHandler(deviceReg))
 
 		// Mọi route còn lại yêu cầu X-API-Key (key tĩnh trên server) hoặc
 		// X-Device-Token hợp lệ. Rate limit theo device_id khi đã xác thực.
@@ -171,11 +173,13 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 			r.Use(backend.AuthMiddleware(apiKey, deviceReg))
 			r.Use(generalLimiter.Middleware)
 
-			r.Get("/search", searchH.ServeHTTP)
-			r.Get("/lyrics", lyricsH.ServeHTTP)
+			r.With(middleware.Timeout(2*time.Minute)).Get("/search", searchH.ServeHTTP)
+			r.With(middleware.Timeout(15*time.Second)).Get("/lyrics", lyricsH.ServeHTTP)
 
-			r.With(heavyLimiter.Middleware).Get("/stream", streamH.ServeHTTP)
-			r.With(heavyLimiter.Middleware).Get("/resolve", resolveH.ServeHTTP)
+			r.With(middleware.Timeout(streamRequestTimeout), heavyLimiter.Middleware).
+				Get("/stream", streamH.ServeHTTP)
+			r.With(middleware.Timeout(time.Minute), heavyLimiter.Middleware).
+				Get("/resolve", resolveH.ServeHTTP)
 		})
 	})
 
