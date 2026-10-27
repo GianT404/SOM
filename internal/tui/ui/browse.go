@@ -601,6 +601,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 
 		case "/":
+			if p.activeTab != SideSearch && p.activeTab != SideDownloads && p.activeTab != SidePlaylists {
+				break
+			}
 			if !p.input.Focused() {
 				return p, p.input.Focus()
 			}
