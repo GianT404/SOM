@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,52 @@ import (
 	"strings"
 	"time"
 )
+
+var ErrDuplicateLocalName = errors.New("track title already exists")
+
+type localNameQuerier interface {
+	Query(string, ...any) (*sql.Rows, error)
+}
+
+func localNameExists(q localNameQuerier, name, exceptPath string) (bool, error) {
+	rows, err := q.Query("SELECT name FROM local_files WHERE path <> ?", exceptPath)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	want := strings.TrimSpace(name)
+	for rows.Next() {
+		var existing string
+		if err := rows.Scan(&existing); err != nil {
+			return false, err
+		}
+		if strings.EqualFold(strings.TrimSpace(existing), want) {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
+}
+
+// UniqueLocalName reserves name in usedNames and adds a numeric suffix when a
+// case-insensitive title collision exists.
+func UniqueLocalName(name string, usedNames map[string]struct{}) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "Untitled"
+	}
+	for n := 1; ; n++ {
+		candidate := name
+		if n > 1 {
+			candidate = fmt.Sprintf("%s (%d)", name, n)
+		}
+		key := strings.ToLower(strings.TrimSpace(candidate))
+		if _, exists := usedNames[key]; !exists {
+			usedNames[key] = struct{}{}
+			return candidate
+		}
+	}
+}
 
 type LocalFile struct {
 	Name      string `json:"name"`
@@ -328,18 +375,28 @@ func (db *DB) ImportFromFilesystem(dir string) (int, error) {
 		return 0, err
 	}
 
-	// Build set of already-imported paths.
+	// Build sets of already-imported paths and titles so importing a second
+	// file with the same title cannot create an ambiguous local-library entry.
 	existing := make(map[string]bool)
-	rows, err := db.conn.Query("SELECT path FROM local_files")
-	if err == nil {
-		for rows.Next() {
-			var p string
-			if rows.Scan(&p) == nil {
-				existing[p] = true
-			}
-		}
-		rows.Close()
+	usedNames := make(map[string]struct{})
+	rows, err := db.conn.Query("SELECT path, name FROM local_files")
+	if err != nil {
+		return 0, err
 	}
+	for rows.Next() {
+		var p, name string
+		if err := rows.Scan(&p, &name); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		existing[p] = true
+		usedNames[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	rows.Close()
 
 	imported := 0
 	for _, e := range entries {
@@ -383,11 +440,11 @@ func (db *DB) ImportFromFilesystem(dir string) (int, error) {
 				thumbnail = "file://" + absPath
 			}
 		}
-
 		info, err := os.Stat(localPath)
 		if err != nil {
 			continue
 		}
+		name = UniqueLocalName(name, usedNames)
 		fileSize := info.Size()
 		fileMTime := info.ModTime().Format(time.RFC3339)
 

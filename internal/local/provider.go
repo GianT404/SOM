@@ -6,11 +6,11 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"som/internal/domain"
+	"som/internal/fileutil"
 	"som/internal/scraper"
 )
 
@@ -152,11 +152,19 @@ func (p *DirectProvider) DownloadOPUS(ctx context.Context, id, title, destDir st
 	if safe == "" {
 		safe = id
 	}
-	dest := filepath.Join(destDir, safe+".opus")
-
-	if err := moveFile(tmpFile, dest); err != nil {
+	dest, err := fileutil.WriteUnique(destDir, safe, id, ".opus", func(dst io.Writer) error {
+		src, err := os.Open(tmpFile)
+		if err != nil {
+			return err
+		}
+		defer src.Close()
+		_, err = io.Copy(dst, src)
+		return err
+	})
+	if err != nil {
 		return "", err
 	}
+	_ = os.Remove(tmpFile)
 
 	log.Printf("download: %q saved to %s in %v", title, dest, time.Since(start))
 	return dest, nil
@@ -165,28 +173,4 @@ func (p *DirectProvider) DownloadOPUS(ctx context.Context, id, title, destDir st
 func sanitizeLocal(s string) string {
 	r := strings.NewReplacer("/", "-", "\\", "-", ":", "-", "*", "-", "?", "-", `"`, "-", "<", "-", ">", "-", "|", "-")
 	return strings.TrimSpace(r.Replace(s))
-}
-func moveFile(sourcePath, destPath string) error {
-	if err := os.Rename(sourcePath, destPath); err == nil {
-		return nil
-	}
-
-	inputFile, err := os.Open(sourcePath)
-	if err != nil {
-		return fmt.Errorf("couldn't open source file: %s", err)
-	}
-	defer inputFile.Close()
-
-	outputFile, err := os.Create(destPath)
-	if err != nil {
-		return fmt.Errorf("couldn't open dest file: %s", err)
-	}
-	defer outputFile.Close()
-
-	if _, err = io.Copy(outputFile, inputFile); err != nil {
-		return err
-	}
-
-	inputFile.Close()
-	return os.Remove(sourcePath)
 }

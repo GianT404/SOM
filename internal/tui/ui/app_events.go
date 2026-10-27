@@ -115,12 +115,13 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 				Duration:  lf.Duration,
 				Thumbnail: lf.Thumbnail,
 			}
-			if lf.Path == msg.Path || lf.Name == msg.Title {
+			if lf.Path == msg.Path && idx < 0 {
 				idx = i
 			}
 		}
 		if idx < 0 {
-			idx = 0
+			a.setStatus(StatusErrStyle.Render("X Track is no longer in the local library"))
+			break
 		}
 
 		a.activeContext = SideDownloads

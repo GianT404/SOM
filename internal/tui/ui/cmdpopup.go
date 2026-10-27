@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -552,12 +553,26 @@ func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 		if newPath != oldPath {
 			if _, err := os.Stat(newPath); err == nil {
 				return fail(fmt.Errorf("file already exists: %s", filepath.Base(newPath)))
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return fail(fmt.Errorf("check destination: %w", err))
 			}
 			if plStore != nil {
 				if lf, err := plStore.GetLocalFile(newPath); err == nil && lf != nil {
 					return fail(fmt.Errorf("path taken in DB: %s", filepath.Base(newPath)))
 				}
 			}
+		}
+
+		if plStore != nil {
+			var renameFile, rollbackFile func() error
+			if newPath != oldPath {
+				renameFile = func() error { return os.Rename(oldPath, newPath) }
+				rollbackFile = func() error { return os.Rename(newPath, oldPath) }
+			}
+			if err := plStore.RenameLocalFileWithFS(oldPath, newPath, newTitle, renameFile, rollbackFile); err != nil {
+				return fail(fmt.Errorf("rename track: %w", err))
+			}
+		} else if newPath != oldPath {
 			if err := os.Rename(oldPath, newPath); err != nil {
 				return fail(fmt.Errorf("rename file: %w", err))
 			}
@@ -575,12 +590,6 @@ func renameCmd(plStore *storage.DB, oldPath, newPath, newTitle string) tea.Cmd {
 					}
 					_ = os.WriteFile(newJson, out, 0o644)
 				}
-			}
-		}
-
-		if plStore != nil {
-			if err := plStore.RenameLocalFile(oldPath, newPath, newTitle); err != nil {
-				return fail(fmt.Errorf("db update: %w", err))
 			}
 		}
 

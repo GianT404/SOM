@@ -149,7 +149,9 @@ func (ip *ImportPanel) selectedCount() int {
 }
 
 type ImportDoneMsg struct {
-	Imported int
+	Imported      int
+	ImportedPaths []string
+	Err           error
 }
 
 type ImportProgressMsg struct {
@@ -159,13 +161,18 @@ type ImportProgressMsg struct {
 
 func importCmd(store *storage.DB, files []ImportFile) tea.Cmd {
 	return func() tea.Msg {
-		total := 0
-		for _, f := range files {
-			if f.Selected {
-				total++
-			}
+		existing, err := store.ListAllLocalFilesSorted("name")
+		if err != nil {
+			return ImportDoneMsg{Err: err}
 		}
+		usedNames := make(map[string]struct{}, len(existing))
+		for _, f := range existing {
+			usedNames[strings.ToLower(strings.TrimSpace(f.Name))] = struct{}{}
+		}
+
 		imported := 0
+		var importedPaths []string
+		var firstErr error
 		for _, f := range files {
 			if !f.Selected {
 				continue
@@ -173,18 +180,28 @@ func importCmd(store *storage.DB, files []ImportFile) tea.Cmd {
 			dur := storage.GetFileDuration(f.Path)
 			info, err := os.Stat(f.Path)
 			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
 				continue
 			}
-			_ = store.UpsertLocalFile(storage.LocalFile{
+			name := storage.UniqueLocalName(f.Name, usedNames)
+			if err := store.UpsertLocalFile(storage.LocalFile{
 				Path:      f.Path,
-				Name:      f.Name,
+				Name:      name,
 				Duration:  dur,
 				FileSize:  info.Size(),
 				FileMTime: info.ModTime().Format("2006-01-02T15:04:05Z07:00"),
-			})
+			}); err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
 			imported++
+			importedPaths = append(importedPaths, f.Path)
 		}
-		return ImportDoneMsg{Imported: imported}
+		return ImportDoneMsg{Imported: imported, ImportedPaths: importedPaths, Err: firstErr}
 	}
 }
 
@@ -290,12 +307,20 @@ func (a *App) handleImportDone(msg ImportDoneMsg) {
 	ip := &a.importPanel
 	ip.importing = false
 
-	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Imported %d file(s)", msg.Imported)))
+	if msg.Err != nil {
+		a.setStatus(StatusErrStyle.Render(fmt.Sprintf("X Imported %d file(s); import error: %v", msg.Imported, msg.Err)))
+	} else {
+		a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Imported %d file(s)", msg.Imported)))
+	}
 	a.left.scanLocalFiles()
 
+	importedPaths := make(map[string]bool, len(msg.ImportedPaths))
+	for _, path := range msg.ImportedPaths {
+		importedPaths[path] = true
+	}
 	var remaining []ImportFile
 	for _, f := range ip.files {
-		if !f.Selected {
+		if !importedPaths[f.Path] {
 			remaining = append(remaining, f)
 		}
 	}

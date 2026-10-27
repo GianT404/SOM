@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"som/internal/domain"
+	"som/internal/fileutil"
 )
 
 type HTTPProvider struct {
@@ -164,8 +164,6 @@ func (c *HTTPProvider) DownloadOPUS(ctx context.Context, id, title, destDir stri
 	if safe == "" {
 		safe = id
 	}
-	dest := filepath.Join(destDir, safe+".opus")
-
 	resp, err := c.getStream(ctx, "/api/v1/stream", url.Values{"id": {id}})
 	if err != nil {
 		return "", err
@@ -175,14 +173,11 @@ func (c *HTTPProvider) DownloadOPUS(ctx context.Context, id, title, destDir stri
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("server %s", resp.Status)
 	}
-	f, err := os.Create(dest)
+	dest, err := fileutil.WriteUnique(destDir, safe, id, ".opus", func(dst io.Writer) error {
+		_, err := io.Copy(dst, resp.Body)
+		return err
+	})
 	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		os.Remove(dest)
 		return "", err
 	}
 	return dest, nil

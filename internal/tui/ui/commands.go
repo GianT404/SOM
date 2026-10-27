@@ -58,15 +58,7 @@ func downloadCmd(p domain.MusicProvider, t domain.Track, destDir string) tea.Cmd
 		}
 
 		if t.Thumbnail != "" {
-			safe := t.Title
-			for _, ch := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"} {
-				safe = strings.ReplaceAll(safe, ch, "-")
-			}
-			safe = strings.TrimSpace(safe)
-			if safe == "" {
-				safe = t.ID
-			}
-			imgPath := filepath.Join(destDir, safe+".jpg")
+			imgPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".jpg"
 			thumbCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			req, reqErr := http.NewRequestWithContext(thumbCtx, http.MethodGet, t.Thumbnail, nil)
 			if reqErr != nil {

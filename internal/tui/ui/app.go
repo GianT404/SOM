@@ -297,6 +297,9 @@ func (a *App) updateModal(msg tea.Msg) (tea.Cmd, bool) {
 
 	top := len(a.modals) - 1
 	if click, ok := msg.(tea.MouseClickMsg); ok && a.mouseEnabled {
+		if modal, ok := a.modals[top].(*RenameModal); ok && modal.renaming {
+			return nil, true
+		}
 		return a.handleModalMouseClick(a.modals[top], click), true
 	}
 	switch msg.(type) {

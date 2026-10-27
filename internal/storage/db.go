@@ -56,11 +56,30 @@ func Open(dir string) (*DB, error) {
 func (db *DB) Dir() string { return db.dir }
 
 func (db *DB) RenameLocalFile(oldPath, newPath, newName string) error {
+	return db.RenameLocalFileWithFS(oldPath, newPath, newName, nil, nil)
+}
+
+// RenameLocalFileWithFS keeps the database update and filesystem rename
+// coordinated. If the database commit fails after the file was moved, it tries
+// to move the file back before returning the error.
+func (db *DB) RenameLocalFileWithFS(
+	oldPath, newPath, newName string,
+	renameFile func() error,
+	rollbackFile func() error,
+) error {
 	tx, err := db.conn.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	taken, err := localNameExists(tx, newName, oldPath)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return fmt.Errorf("%w: %q", ErrDuplicateLocalName, newName)
+	}
 
 	_, err = tx.Exec("UPDATE local_files SET path = ?, name = ? WHERE path = ?", newPath, newName, oldPath)
 	if err != nil {
@@ -73,7 +92,20 @@ func (db *DB) RenameLocalFile(oldPath, newPath, newName string) error {
 		return err
 	}
 
-	return tx.Commit()
+	if renameFile != nil {
+		if err := renameFile(); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		if rollbackFile != nil {
+			if rollbackErr := rollbackFile(); rollbackErr != nil {
+				return fmt.Errorf("commit database rename: %w; rollback file rename: %v", err, rollbackErr)
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func MigrateFromLegacy(dir string) error {

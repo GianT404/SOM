@@ -32,8 +32,7 @@ type SuggestionsMsg struct {
 type PlayStartedMsg struct{ Track domain.Track }
 
 type PlayLocalMsg struct {
-	Path  string
-	Title string
+	Path string
 }
 type DownloadDoneMsg struct {
 	Path  string
