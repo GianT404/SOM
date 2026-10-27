@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,8 +58,8 @@ func (c *HTTPProvider) doGet(ctx context.Context, hc *http.Client, path string, 
 	return hc.Do(req)
 }
 
-func (c *HTTPProvider) Search(ctx context.Context, q string) ([]domain.Track, error) {
-	resp, err := c.getShort(ctx, "/api/v1/search", url.Values{"q": {q}})
+func (c *HTTPProvider) Search(ctx context.Context, q string, offset int) ([]domain.Track, error) {
+	resp, err := c.getShort(ctx, "/api/v1/search", url.Values{"q": {q}, "offset": {strconv.Itoa(offset)}})
 	if err != nil {
 		return nil, fmt.Errorf("search request: %w", err)
 	}

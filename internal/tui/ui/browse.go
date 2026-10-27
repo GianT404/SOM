@@ -263,7 +263,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 					p.loading = true
 					p.errMsg = ""
 					p.tracks = nil
-					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q))
+					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q, 0))
 				}
 				return p, tea.Batch(cmds...)
 			}

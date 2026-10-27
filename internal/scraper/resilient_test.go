@@ -19,7 +19,7 @@ type fakeScraper struct {
 	streamResult *StreamInfo
 }
 
-func (f *fakeScraper) Search(ctx context.Context, keyword string) ([]SearchResult, error) {
+func (f *fakeScraper) Search(ctx context.Context, keyword string, offset int) ([]SearchResult, error) {
 	atomic.AddInt32(&f.searchCalls, 1)
 	if f.searchErr != nil {
 		return nil, f.searchErr
@@ -55,10 +55,10 @@ func TestResilientScraper_Search_CachesResult(t *testing.T) {
 	inner := &fakeScraper{searchResult: []SearchResult{{ID: "abc"}}}
 	s := NewResilientScraper(inner)
 
-	if _, err := s.Search(context.Background(), "khác gì đâu"); err != nil {
+	if _, err := s.Search(context.Background(), "khác gì đâu", 0); err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if _, err := s.Search(context.Background(), "khác gì đâu"); err != nil {
+	if _, err := s.Search(context.Background(), "khác gì đâu", 0); err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
@@ -67,12 +67,30 @@ func TestResilientScraper_Search_CachesResult(t *testing.T) {
 	}
 }
 
+func TestResilientScraper_Search_CachesPagesSeparately(t *testing.T) {
+	inner := &fakeScraper{searchResult: []SearchResult{{ID: "abc"}}}
+	s := NewResilientScraper(inner)
+
+	if _, err := s.Search(context.Background(), "same query", 0); err != nil {
+		t.Fatalf("first page: %v", err)
+	}
+	if _, err := s.Search(context.Background(), "same query", 7); err != nil {
+		t.Fatalf("second page: %v", err)
+	}
+	if _, err := s.Search(context.Background(), "same query", 7); err != nil {
+		t.Fatalf("cached second page: %v", err)
+	}
+	if got := atomic.LoadInt32(&inner.searchCalls); got != 2 {
+		t.Fatalf("expected each page to be fetched once, got %d calls", got)
+	}
+}
+
 func TestResilientScraper_Search_DifferentKeywordsNotCached(t *testing.T) {
 	inner := &fakeScraper{searchResult: []SearchResult{{ID: "abc"}}}
 	s := NewResilientScraper(inner)
 
-	s.Search(context.Background(), "bai hat A")
-	s.Search(context.Background(), "bai hat B")
+	s.Search(context.Background(), "bai hat A", 0)
+	s.Search(context.Background(), "bai hat B", 0)
 
 	if got := atomic.LoadInt32(&inner.searchCalls); got != 2 {
 		t.Fatalf(" %d", got)
@@ -83,15 +101,15 @@ func TestResilientScraper_Search_ExpiredCacheRefetches(t *testing.T) {
 	inner := &fakeScraper{searchResult: []SearchResult{{ID: "abc"}}}
 	s := NewResilientScraper(inner)
 
-	s.Search(context.Background(), "song X")
+	s.Search(context.Background(), "song X", 0)
 
 	s.searchMu.Lock()
-	e := s.searchCache["song X"]
+	e := s.searchCache[searchCacheKey("song X", 0)]
 	e.expiresAt = time.Now().Add(-time.Minute)
-	s.searchCache["song X"] = e
+	s.searchCache[searchCacheKey("song X", 0)] = e
 	s.searchMu.Unlock()
 
-	s.Search(context.Background(), "song X")
+	s.Search(context.Background(), "song X", 0)
 
 	if got := atomic.LoadInt32(&inner.searchCalls); got != 2 {
 		t.Fatalf("cache het han phai goi lai inner, thuc te goi %d lan", got)
@@ -103,14 +121,14 @@ func TestResilientScraper_Search_CircuitOpensAfterFailures(t *testing.T) {
 	s := NewResilientScraper(inner)
 	for i := 0; i < 5; i++ {
 		q := "query-" + string(rune('A'+i))
-		if _, err := s.Search(context.Background(), q); err == nil {
+		if _, err := s.Search(context.Background(), q, 0); err == nil {
 			t.Fatal("phai tra ve loi tu inner khi inner that bai")
 		}
 	}
 
 	callsBefore := atomic.LoadInt32(&inner.searchCalls)
 
-	_, err := s.Search(context.Background(), "query-moi-sau-khi-mo-circuit")
+	_, err := s.Search(context.Background(), "query-moi-sau-khi-mo-circuit", 0)
 	if !errors.Is(err, ErrCircuitOpen) {
 		t.Fatalf("sau 5 loi lien tiep, circuit phai mo va tra ErrCircuitOpen, got %v", err)
 	}

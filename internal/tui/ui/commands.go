@@ -16,10 +16,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func searchCmd(p domain.MusicProvider, q string) tea.Cmd {
+func searchCmd(p domain.MusicProvider, q string, offset int) tea.Cmd {
 	return func() tea.Msg {
-		tracks, err := p.Search(context.Background(), q)
-		return SearchResultMsg{Tracks: tracks, Err: err}
+		tracks, err := p.Search(context.Background(), q, offset)
+		return SearchResultMsg{Tracks: tracks, Query: q, Offset: offset, Err: err}
 	}
 }
 

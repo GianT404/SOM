@@ -506,14 +506,17 @@ type ytdlpSearchItem struct {
 	} `json:"thumbnails"`
 }
 
-// Search runs yt-dlp to find 7 results for the keyword.
-func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResult, error) {
+// Search returns one page of video results, skipping earlier matches.
+func (y *YtdlpScraper) Search(ctx context.Context, keyword string, offset int) ([]SearchResult, error) {
+	if offset < 0 || offset > MaxSearchOffset {
+		return nil, fmt.Errorf("search offset must be between 0 and %d", MaxSearchOffset)
+	}
 	if err := acquireYtdlp(ctx); err != nil {
 		return nil, err
 	}
 	defer releaseYtdlp()
 
-	query := fmt.Sprintf("ytsearch7:%s", keyword)
+	query := fmt.Sprintf("ytsearch%d:%s", offset+SearchPageSize, keyword)
 	args := []string{
 		query,
 		"--dump-json",
@@ -541,7 +544,7 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 	}
 
 	// Read results from stdout line by line (one JSON object per line).
-	resultCh := make(chan SearchResult, 7)
+	resultCh := make(chan SearchResult, SearchPageSize)
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -593,16 +596,23 @@ func (y *YtdlpScraper) Search(ctx context.Context, keyword string) ([]SearchResu
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return results, fmt.Errorf("yt-dlp search: %w: %s", err, stderr.String())
+		return nil, fmt.Errorf("yt-dlp search: %w: %s", err, stderr.String())
 	}
 
 	select {
 	case e := <-errCh:
-		return results, e
+		return nil, e
 	default:
 	}
 
-	return results, nil
+	if offset >= len(results) {
+		return []SearchResult{}, nil
+	}
+	end := offset + SearchPageSize
+	if end > len(results) {
+		end = len(results)
+	}
+	return results[offset:end], nil
 }
 
 func (y *YtdlpScraper) GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error) {

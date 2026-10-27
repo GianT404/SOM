@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
@@ -105,9 +106,14 @@ func (s *ResilientScraper) cleanupLoop() {
 	}
 }
 
-func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]SearchResult, error) {
+func searchCacheKey(keyword string, offset int) string {
+	return keyword + "\x00" + strconv.Itoa(offset)
+}
+
+func (s *ResilientScraper) Search(ctx context.Context, keyword string, offset int) ([]SearchResult, error) {
+	key := searchCacheKey(keyword, offset)
 	s.searchMu.Lock()
-	if e, ok := s.searchCache[keyword]; ok && time.Now().Before(e.expiresAt) {
+	if e, ok := s.searchCache[key]; ok && time.Now().Before(e.expiresAt) {
 		s.searchMu.Unlock()
 		return e.results, nil
 	}
@@ -120,7 +126,7 @@ func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]Search
 	// Single-flight: nếu đã có request trùng keyword đang chạy, chờ kết quả
 	// của nó thay vì spawn thêm 1 process yt-dlp nữa.
 	s.searchFlightMu.Lock()
-	if inf, ok := s.searchFlight[keyword]; ok {
+	if inf, ok := s.searchFlight[key]; ok {
 		s.searchFlightMu.Unlock()
 		// Chờ theo deadline của CHÍNH caller này, không phải deadline của
 		// caller đã tạo ra flight (caller đó có thể đã bỏ cuộc từ lâu).
@@ -132,7 +138,7 @@ func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]Search
 		}
 	}
 	inf := &searchFlight{done: make(chan struct{})}
-	s.searchFlight[keyword] = inf
+	s.searchFlight[key] = inf
 	s.searchFlightMu.Unlock()
 
 	// Context nền tách khỏi ctx của request: client hủy/timeout không được
@@ -144,19 +150,19 @@ func (s *ResilientScraper) Search(ctx context.Context, keyword string) ([]Search
 	go func() {
 		defer bgCancel()
 
-		results, err := s.inner.Search(bgCtx, keyword)
+		results, err := s.inner.Search(bgCtx, keyword, offset)
 		s.searchCB.recordResult(err)
 
 		s.searchFlightMu.Lock()
 		inf.results = results
 		inf.err = err
 		close(inf.done)
-		delete(s.searchFlight, keyword)
+		delete(s.searchFlight, key)
 		s.searchFlightMu.Unlock()
 
 		if err == nil {
 			s.searchMu.Lock()
-			s.searchCache[keyword] = searchCacheEntry{results: results, expiresAt: time.Now().Add(searchCacheTTL)}
+			s.searchCache[key] = searchCacheEntry{results: results, expiresAt: time.Now().Add(searchCacheTTL)}
 			s.searchMu.Unlock()
 		}
 	}()

@@ -14,7 +14,7 @@ import (
 
 type stubScraper struct{}
 
-func (stubScraper) Search(ctx context.Context, keyword string) ([]scraper.SearchResult, error) {
+func (stubScraper) Search(ctx context.Context, keyword string, offset int) ([]scraper.SearchResult, error) {
 	return nil, nil
 }
 func (stubScraper) GetStreamInfo(ctx context.Context, videoID string) (*scraper.StreamInfo, error) {

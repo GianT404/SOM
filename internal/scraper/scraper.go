@@ -48,9 +48,15 @@ type LyricsData struct {
 
 // Scraper abstracts the video/audio data source.
 // Implementations can wrap yt-dlp, invidious, or any other backend.
+// SearchPageSize là số kết quả trả về trong mỗi trang.
+const SearchPageSize = 7
+
+// MaxSearchOffset giới hạn số kết quả cần duyệt để tránh truy vấn quá lớn.
+const MaxSearchOffset = 10000
+
 type Scraper interface {
-	// Search returns up to 7 video results for the given keyword.
-	Search(ctx context.Context, keyword string) ([]SearchResult, error)
+	// Search returns one page of video results for the given keyword.
+	Search(ctx context.Context, keyword string, offset int) ([]SearchResult, error)
 
 	// GetStreamInfo returns the direct audio URL and title for the given video ID.
 	GetStreamInfo(ctx context.Context, videoID string) (*StreamInfo, error)

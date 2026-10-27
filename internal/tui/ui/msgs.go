@@ -7,6 +7,8 @@ import (
 
 type SearchResultMsg struct {
 	Tracks []domain.Track
+	Query  string
+	Offset int
 	Err    error
 }
 

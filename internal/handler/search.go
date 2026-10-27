@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,11 +46,20 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "q too long, max 100 characters")
 		return
 	}
+	offset := 0
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 || parsed > scraper.MaxSearchOffset {
+			writeError(w, http.StatusBadRequest, "invalid offset")
+			return
+		}
+		offset = parsed
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
 	defer cancel()
 
-	results, err := h.Scraper.Search(ctx, q)
+	results, err := h.Scraper.Search(ctx, q, offset)
 	if err != nil {
 		if errors.Is(err, scraper.ErrCircuitOpen) {
 			w.Header().Set("Retry-After", "30")

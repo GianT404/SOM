@@ -18,9 +18,9 @@ type DirectProvider struct {
 	Scraper scraper.Scraper
 }
 
-func (p *DirectProvider) Search(ctx context.Context, q string) ([]domain.Track, error) {
+func (p *DirectProvider) Search(ctx context.Context, q string, offset int) ([]domain.Track, error) {
 	start := time.Now()
-	results, err := p.Scraper.Search(ctx, q)
+	results, err := p.Scraper.Search(ctx, q, offset)
 	if err != nil {
 		log.Printf("search: error for %q after %v: %v", q, time.Since(start), err)
 		return nil, err
