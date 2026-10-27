@@ -71,9 +71,11 @@ var migrations = []migration{
 
 			_, err = tx.Exec(`
 			INSERT INTO playlist_tracks_new (playlist_id, track_id, position)
-			SELECT playlist_id, REPLACE(track_id, 'local:', ''), position 
-			FROM playlist_tracks
-			WHERE track_id LIKE 'local:%';`)
+				SELECT pt.playlist_id, REPLACE(pt.track_id, 'local:', ''), pt.position
+				FROM playlist_tracks AS pt
+				JOIN playlists AS p ON p.id = pt.playlist_id
+				JOIN local_files AS lf ON lf.path = REPLACE(pt.track_id, 'local:', '')
+				WHERE pt.track_id LIKE 'local:%';`)
 			if err != nil {
 				return err
 			}
@@ -86,6 +88,41 @@ var migrations = []migration{
 			}
 
 			_, err = tx.Exec("CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position);")
+			return err
+		},
+	},
+	{
+		// V3: Enforce foreign keys and cascade local-file path renames.
+		// Invalid historical links are omitted while rebuilding the join table.
+		version: 3,
+		up: func(tx *sql.Tx) error {
+			if _, err := tx.Exec(`
+				CREATE TABLE playlist_tracks_v3 (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE ON UPDATE CASCADE,
+					track_id TEXT NOT NULL REFERENCES local_files(path) ON DELETE CASCADE ON UPDATE CASCADE,
+					position INTEGER NOT NULL,
+					UNIQUE(playlist_id, track_id)
+				);`); err != nil {
+				return err
+			}
+
+			if _, err := tx.Exec(`
+				INSERT INTO playlist_tracks_v3 (id, playlist_id, track_id, position)
+				SELECT pt.id, pt.playlist_id, pt.track_id, pt.position
+				FROM playlist_tracks AS pt
+				JOIN playlists AS p ON p.id = pt.playlist_id
+				JOIN local_files AS lf ON lf.path = pt.track_id;`); err != nil {
+				return err
+			}
+
+			if _, err := tx.Exec("DROP TABLE playlist_tracks;"); err != nil {
+				return err
+			}
+			if _, err := tx.Exec("ALTER TABLE playlist_tracks_v3 RENAME TO playlist_tracks;"); err != nil {
+				return err
+			}
+			_, err := tx.Exec("CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position);")
 			return err
 		},
 	},

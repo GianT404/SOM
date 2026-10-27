@@ -39,7 +39,7 @@ func Open(dir string) (*DB, error) {
 	}
 
 	dbPath := filepath.Join(dir, "som.db")
-	conn, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL")
+	conn, err := sql.Open("sqlite", dbPath+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL")
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
@@ -82,12 +82,6 @@ func (db *DB) RenameLocalFileWithFS(
 	}
 
 	_, err = tx.Exec("UPDATE local_files SET path = ?, name = ? WHERE path = ?", newPath, newName, oldPath)
-	if err != nil {
-		return err
-	}
-
-	// Chỉ cập nhật khóa liên kết, mọi metadata tự động được JOIN lên UI
-	_, err = tx.Exec("UPDATE playlist_tracks SET track_id = ? WHERE track_id = ?", newPath, oldPath)
 	if err != nil {
 		return err
 	}
@@ -154,17 +148,38 @@ func MigrateFromLegacy(dir string) error {
 
 		// Update paths in the moved DB.
 		dbPath := filepath.Join(dir, "som.db")
-		conn, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL")
-		if err == nil {
-			legacyPrefix := legacy + "/"
-			newPrefix := dir + "/"
-			_, _ = conn.Exec("UPDATE local_files SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
-				legacyPrefix, newPrefix, legacyPrefix+"%")
-			_, _ = conn.Exec("UPDATE local_files SET thumbnail = REPLACE(thumbnail, ?, ?) WHERE thumbnail LIKE ?",
+		conn, err := sql.Open("sqlite", dbPath+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL")
+		if err != nil {
+			return fmt.Errorf("open migrated database %s: %w", dbPath, err)
+		}
+		if err := runMigrations(conn); err != nil {
+			_ = conn.Close()
+			return fmt.Errorf("migrate legacy database schema: %w", err)
+		}
+
+		legacyPrefix := legacy + "/"
+		newPrefix := dir + "/"
+		tx, err := conn.Begin()
+		if err != nil {
+			_ = conn.Close()
+			return fmt.Errorf("begin legacy path migration: %w", err)
+		}
+		if _, err = tx.Exec("UPDATE local_files SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
+			legacyPrefix, newPrefix, legacyPrefix+"%"); err == nil {
+			_, err = tx.Exec("UPDATE local_files SET thumbnail = REPLACE(thumbnail, ?, ?) WHERE thumbnail LIKE ?",
 				"file://"+legacyPrefix, "file://"+newPrefix, "file://"+legacyPrefix+"%")
-			_, _ = conn.Exec("UPDATE playlist_tracks SET track_id = REPLACE(track_id, ?, ?) WHERE track_id LIKE ?",
-				"local:"+legacyPrefix, "local:"+newPrefix, "local:"+legacyPrefix+"%")
-			conn.Close()
+		}
+		if err != nil {
+			_ = tx.Rollback()
+			_ = conn.Close()
+			return fmt.Errorf("migrate legacy paths in %s: %w", dbPath, err)
+		}
+		if err := tx.Commit(); err != nil {
+			_ = conn.Close()
+			return fmt.Errorf("commit legacy path migration: %w", err)
+		}
+		if err := conn.Close(); err != nil {
+			return fmt.Errorf("close migrated database: %w", err)
 		}
 
 		os.Remove(filepath.Join(legacy, ".query_cache"))
