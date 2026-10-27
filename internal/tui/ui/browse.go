@@ -20,7 +20,11 @@ type LeftPanel struct {
 	tracks          []domain.Track
 	locals          []LocalFile
 	searchCursor    int
-	searchOffset    int
+	searchOffset     int
+	searchNextOffset int
+	searchQuery      string
+	hasMore          bool
+	loadingMore      bool
 	dlCursor        int
 	dlOffset        int
 	dlPreFilterPath string
@@ -256,11 +260,17 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				p.suggestions = nil
 				p.suggestFocus = false
 				p.suggestCursor = 0
-				if q == "" || p.loading {
+				if q == "" || p.loading || p.loadingMore {
 					return p, nil
 				}
 				if p.searchOnEnter {
 					p.loading = true
+					p.loadingMore = false
+					p.hasMore = false
+					p.searchQuery = q
+					p.searchNextOffset = 0
+					p.searchCursor = 0
+					p.searchOffset = 0
 					p.errMsg = ""
 					p.tracks = nil
 					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q, 0))
@@ -269,7 +279,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 			if p.input.Focused() {
 				q := strings.TrimSpace(p.input.Value())
-				if q == "" || p.loading {
+				if q == "" || p.loading || p.loadingMore {
 					return p, nil
 				}
 				p.suggestions = nil
@@ -277,9 +287,15 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				p.suggestCursor = 0
 				if p.searchOnEnter {
 					p.loading = true
+					p.loadingMore = false
+					p.hasMore = false
+					p.searchQuery = q
+					p.searchNextOffset = 0
+					p.searchCursor = 0
+					p.searchOffset = 0
 					p.errMsg = ""
 					p.tracks = nil
-					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q))
+					cmds = append(cmds, p.spinner.Tick, searchCmd(p.provider, q, 0))
 				}
 				return p, tea.Batch(cmds...)
 			}
@@ -288,7 +304,14 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			}
 
 			if p.activeTab == SideSearch {
-				if len(p.tracks) > 0 && p.searchCursor < len(p.tracks) {
+				if p.hasMore && p.searchCursor == len(p.tracks) {
+					if p.loadingMore {
+						return p, nil
+					}
+					p.loadingMore = true
+					return p, tea.Batch(p.spinner.Tick, searchCmd(p.provider, p.searchQuery, p.searchNextOffset))
+				}
+				if len(p.tracks) > 0 && p.searchCursor >= 0 && p.searchCursor < len(p.tracks) {
 					t := p.tracks[p.searchCursor]
 					return p, func() tea.Msg { return PlayStartedMsg{Track: t} }
 				}
@@ -412,16 +435,10 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				case SideSearch:
 					if p.searchCursor > 0 {
 						p.searchCursor--
-						if p.searchCursor < p.searchOffset {
-							p.searchOffset = p.searchCursor
-						}
 					} else {
-						// Vòng từ đỉnh xuống đáy
 						p.searchCursor = items - 1
-						if p.searchCursor >= p.searchOffset+p.visibleRows() {
-							p.searchOffset = p.searchCursor - p.visibleRows() + 1
-						}
 					}
+					p.scrollSearchIntoView()
 				case SideDownloads:
 					if p.dlCursor > 0 {
 						p.dlCursor--
@@ -496,14 +513,11 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 				case SideSearch:
 					if p.searchCursor < items-1 {
 						p.searchCursor++
-						if p.searchCursor >= p.searchOffset+p.visibleRows() {
-							p.searchOffset++
-						}
 					} else {
-						// Vòng từ đáy lên đỉnh
 						p.searchCursor = 0
 						p.searchOffset = 0
 					}
+					p.scrollSearchIntoView()
 				case SideDownloads:
 					if p.dlCursor < items-1 {
 						p.dlCursor++
@@ -611,22 +625,52 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 		}
 
 	case SearchResultMsg:
-		p.loading = false
-		p.searched = true
-		p.searchCursor = 0
-		p.searchOffset = 0
-		if msg.Err != nil {
-			p.errMsg = msg.Err.Error()
-			p.tracks = nil
-		} else {
+		if msg.Query != p.searchQuery {
+			break
+		}
+		if msg.Offset == 0 {
+			p.loading = false
+			p.searched = true
+			p.searchCursor = 0
+			p.searchOffset = 0
+			p.searchNextOffset = len(msg.Tracks)
+			if msg.Err != nil {
+				p.errMsg = msg.Err.Error()
+				p.tracks = nil
+				p.hasMore = false
+				break
+			}
+			p.errMsg = ""
 			p.tracks = msg.Tracks
-			// Kết quả đã hiển thị → blur input để con trỏ rơi vào list kết
-			// quả (border box kết quả cũng được highlight).
+			p.hasMore = len(msg.Tracks) == searchPageSize
 			p.input.Blur()
 			p.suggestions = nil
 			p.suggestFocus = false
 			p.suggestCursor = 0
 			p.suggestOffset = 0
+		} else {
+			p.loadingMore = false
+			if msg.Err != nil {
+				break
+			}
+			p.errMsg = ""
+			seen := make(map[string]struct{}, len(p.tracks)+len(msg.Tracks))
+			for _, track := range p.tracks {
+				seen[track.ID] = struct{}{}
+			}
+			for _, track := range msg.Tracks {
+				if _, ok := seen[track.ID]; ok {
+					continue
+				}
+				seen[track.ID] = struct{}{}
+				p.tracks = append(p.tracks, track)
+			}
+			p.searchNextOffset = msg.Offset + len(msg.Tracks)
+			p.hasMore = len(msg.Tracks) == searchPageSize
+			if !p.hasMore && p.searchCursor >= len(p.tracks) {
+				p.searchCursor = maxInt(len(p.tracks)-1, 0)
+			}
+			p.scrollSearchIntoView()
 		}
 
 	case SuggestDebounceMsg:
@@ -960,8 +1004,30 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 
 // --- HELPER FUNCTIONS ---
 
+func (p *LeftPanel) scrollSearchIntoView() {
+	visible := p.visibleRows()
+	if visible < 1 {
+		visible = 1
+	}
+	if p.hasMore && p.searchCursor == len(p.tracks) {
+		p.searchOffset = maxInt(len(p.tracks)-visible+1, 0)
+		return
+	}
+	if p.searchCursor < p.searchOffset {
+		p.searchOffset = p.searchCursor
+	} else if p.searchCursor >= p.searchOffset+visible {
+		p.searchOffset = p.searchCursor-visible+1
+	}
+	if p.searchOffset < 0 {
+		p.searchOffset = 0
+	}
+}
+
 func (p LeftPanel) itemCount() int {
 	if p.activeTab == SideSearch {
+		if p.hasMore {
+			return len(p.tracks) + 1
+		}
 		return len(p.tracks)
 	} else if p.activeTab == SideDownloads {
 		return len(p.getFilteredLocals())

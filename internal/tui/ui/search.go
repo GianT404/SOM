@@ -8,6 +8,8 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+const searchPageSize = 7
+
 func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 	innerW := w - 4
 
@@ -31,19 +33,35 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 	if p.errMsg != "" {
 		resultContent = StatusErrStyle.Render("X " + p.errMsg)
 	} else if len(p.tracks) > 0 {
-
-		// Gọi hàm dùng chung
+		visibleRows := p.visibleRows()
+		showLoadMore := p.hasMore && len(p.tracks) < p.searchOffset+visibleRows
+		listRows := visibleRows
+		if showLoadMore && listRows > 1 {
+			listRows--
+		}
 		list := renderSharedTrackList(
 			innerW,
 			p.tracks,
 			p.searchCursor,
 			p.searchOffset,
-			p.visibleRows(),
+			listRows,
 			func(i int, t domain.Track) (string, string, string, int, bool, bool, int) {
 				return t.Title, t.Artist, t.ID, t.Duration, p.isDownloaded(t), t.ID == playingID && playingID != "", i + 1
 			},
 			false, nil, nil,
 		)
+		if showLoadMore {
+			label := "  Load more..."
+			style := DimItemStyle
+			if p.searchCursor == len(p.tracks) {
+				style = SelectedItemStyle
+			}
+			if p.loadingMore {
+				label = "  " + p.spinner.View() + " Loading more..."
+			}
+			list += "
+" + style.Width(innerW).Render(label)
+		}
 		resultContent = list
 	} else if p.loading || !p.searched {
 		resultContent = "\n"
