@@ -177,13 +177,6 @@ som completion fish > ~/.config/fish/completions/som.fish
 
 ---
 
-## Codebase Graph
-
-The repository includes a [Graphify knowledge graph and Codex skill](docs/graphify.md)
-for navigating code relationships.
-
----
-
 ## CLI Flags
 
 | Flag | Description |
