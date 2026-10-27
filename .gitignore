@@ -46,6 +46,15 @@ cookies.txt
 !README.md
 !docs/
 !docs/*.md
+!AGENTS.md
+!.codex/skills/graphify/
+!.codex/skills/graphify/**
+
+# Graphify generated data: keep the queryable graph, ignore local extraction cache.
+/graphify-out/
+!/graphify-out/
+/graphify-out/*
+!/graphify-out/graph.json
 
 
 # Desktop generated artifacts

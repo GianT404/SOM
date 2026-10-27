@@ -674,6 +674,15 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 
 	case RenameDoneMsg:
 		if msg.Err == nil {
+			if msg.OldPath != msg.NewPath {
+				for i, path := range p.pinned {
+					if path == msg.OldPath {
+						p.pinned[i] = msg.NewPath
+						p.savePinned()
+						break
+					}
+				}
+			}
 			p.scanLocalFiles()
 			if p.plStore != nil {
 				if pls, err := p.plStore.LoadAllPlaylists(); err == nil {
