@@ -107,10 +107,14 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 					r.langCursor--
 				}
 			case "down", "j":
-				if r.langCursor < len(r.lyrics.AllTracks)-1 {
+				if r.langCursor < len(r.lyrics.AllTracks) {
 					r.langCursor++
 				}
 			case "enter":
+				if r.langCursor == len(r.lyrics.AllTracks) {
+					r.showLangPopup = false
+					return r, func() tea.Msg { return OpenLyricsSearchMsg{} }
+				}
 				r.lyrics.SelectLanguage(r.langCursor)
 				r.manualSelect = false
 				r.syncSyncedLine(true)
@@ -181,7 +185,7 @@ func (r RightPanel) Update(msg tea.Msg, focused bool, allowLanguagePopup bool) (
 
 		switch msg.String() {
 		case "l":
-			if (focused || allowLanguagePopup) && len(r.lyrics.AllTracks) > 0 {
+			if focused || allowLanguagePopup {
 				r.langCursor = r.lyrics.LanguageIndex()
 				r.showLangPopup = true
 			}

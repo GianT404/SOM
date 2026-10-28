@@ -165,3 +165,18 @@ type RenamePlaylistDoneMsg struct {
 type StreamStartedMsg struct {
 	Gen uint64
 }
+
+
+type OpenLyricsSearchMsg struct{}
+
+type ManualLyricsSearchResultsMsg struct {
+	Query string
+	RequestID uint64
+	Results []domain.LyricsSearchResult
+	Err error
+}
+
+type ManualLyricsChosenMsg struct {
+	VideoID string
+	Result domain.LyricsSearchResult
+}

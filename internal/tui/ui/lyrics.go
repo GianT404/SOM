@@ -91,13 +91,24 @@ func (r RightPanel) renderLangPopupHeight(innerW, lyrH int) string {
 	}
 
 	written := len(r.lyrics.AllTracks)
-
 	if written == 0 {
 		b.WriteString(DimItemStyle.Render("(no languages available)"))
+		b.WriteString("\n")
 		written++
 	}
-
 	b.WriteString("\n")
+	written++
+
+	line := "  Search lyrics on LRCLib..."
+	pad := innerW - runewidth.StringWidth(line)
+	if pad < 0 {
+		pad = 0
+	}
+	if r.langCursor == len(r.lyrics.AllTracks) {
+		b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)))
+	} else {
+		b.WriteString(DimItemStyle.Render(line))
+	}
 	written++
 
 	for written < lyrH {

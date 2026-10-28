@@ -9,9 +9,25 @@ import (
 	"som/internal/storage"
 )
 
+const manualLyricsOverridePrefix = "lyrics_manual_override:"
+
+func manualLyricsOverrideKey(id string) string {
+	return manualLyricsOverridePrefix + id
+}
+
 func getCachedLyrics(p domain.MusicProvider, store *storage.DB, id, title, artist string, duration int) (domain.LyricsResp, error) {
 	if store == nil {
 		return p.Lyrics(context.Background(), id, title, artist, duration)
+	}
+	if id != "" {
+		if saved := store.GetSetting(manualLyricsOverrideKey(id)); saved != "" {
+			var lr domain.LyricsResp
+			if json.Unmarshal([]byte(saved), &lr) == nil &&
+				(len(lr.AllTracks) > 0 || len(lr.Synced) > 0 || lr.Plain != "") {
+				log.Printf("[lyrics] manual override hit id=%s title=%q", id, lr.Title)
+				return lr, nil
+			}
+		}
 	}
 	cacheKey := fmt.Sprintf("%s|%s|%s", id, title, artist)
 

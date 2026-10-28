@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -272,6 +273,57 @@ func (a *App) handleAudioEvents(msg tea.Msg) tea.Cmd {
 func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case OpenLyricsSearchMsg:
+		if a.playback == nil || a.playback.NowPlay == nil {
+			a.setStatus(StatusErrStyle.Render("X Play a track before searching lyrics"))
+			break
+		}
+		searcher, ok := a.provider.(domain.LyricsSearchProvider)
+		if !ok {
+			a.setStatus(StatusErrStyle.Render("X Lyrics search is unavailable for this provider"))
+			break
+		}
+		modal := NewLyricsSearchModal(searcher, *a.playback.NowPlay, a.width, a.height)
+		a.modals = append(a.modals, modal)
+		cmds = append(cmds, modal.Init())
+
+	case ManualLyricsChosenMsg:
+		if a.playback == nil || a.playback.NowPlay == nil || a.playback.NowPlay.ID != msg.VideoID {
+			if len(a.modals) > 0 {
+				a.modals = a.modals[:len(a.modals)-1]
+			}
+			a.setStatus(StatusErrStyle.Render("X Track changed before lyrics were applied"))
+			break
+		}
+		result := msg.Result
+		lyricTrack := result.Lyrics
+		lyricTrack.Language = "lrclib"
+		if lyricTrack.TrackName == "" {
+			lyricTrack.TrackName = result.TrackName
+		}
+		if lyricTrack.ArtistName == "" {
+			lyricTrack.ArtistName = result.ArtistName
+		}
+		lr := domain.LyricsResp{
+			Title: result.TrackName, Artist: result.ArtistName, VideoID: msg.VideoID,
+			AllTracks: []domain.LyricsTrack{lyricTrack},
+		}
+		lr.SelectLanguage(0)
+		a.right.SetLyrics(lr)
+		if a.left.plStore != nil {
+			if raw, err := json.Marshal(lr); err == nil {
+				a.left.plStore.SetSetting(manualLyricsOverrideKey(msg.VideoID), string(raw))
+			}
+		}
+		if len(a.modals) > 0 {
+			a.modals = a.modals[:len(a.modals)-1]
+		}
+		label := result.TrackName
+		if result.ArtistName != "" {
+			label += " — " + result.ArtistName
+		}
+		a.setStatus(StatusOKStyle.Render("> Lyrics applied: " + label))
+
 	case LyricsLanguageSelectedMsg:
 		a.right.SetPreferredLanguage(msg.Language)
 		if a.left.plStore != nil && msg.Language != "" {
