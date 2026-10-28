@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"som/internal/domain"
 	"som/internal/storage"
@@ -599,10 +600,9 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			return p, nil
 
 		case "d":
-			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading {
+			if focused && !p.input.Focused() && p.activeTab == SideSearch && len(p.tracks) > 0 && p.searchCursor < len(p.tracks) && !p.loading && !p.loadingDownload {
 				t := p.tracks[p.searchCursor]
-				p.loadingDownload = true
-				return p, tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, p.downloadDir))
+				return p, p.requestDownload(t)
 			}
 
 		case ",":
@@ -1086,6 +1086,21 @@ func (p *LeftPanel) scrollPlIntoView() {
 	if p.plOffset < 0 {
 		p.plOffset = 0
 	}
+}
+
+var errTrackAlreadyDownloaded = errors.New("Track already downloaded")
+
+// requestDownload rejects tracks already present in the library before invoking
+// the provider, preventing a second file/entry for the same track.
+func (p *LeftPanel) requestDownload(t domain.Track) tea.Cmd {
+	if p.isDownloaded(t) || (p.plStore != nil && p.plStore.IsDownloaded(t.ID, t.Title, t.Duration)) {
+		return func() tea.Msg {
+			return DownloadDoneMsg{Track: t, Err: errTrackAlreadyDownloaded}
+		}
+	}
+
+	p.loadingDownload = true
+	return tea.Batch(p.spinner.Tick, downloadCmd(p.provider, t, p.downloadDir))
 }
 
 func (p LeftPanel) isDownloaded(t domain.Track) bool {
