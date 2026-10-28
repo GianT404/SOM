@@ -4,100 +4,141 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 )
 
-// lyricsCandidate là 1 phương án (track, artist) để thử tìm trên LRCLib,
-// kèm nguồn gốc (để log/debug biết candidate nào match).
+// lyricsCandidate carries the origin and confidence of one LRCLib search
+// hypothesis. Higher priority candidates are attempted first.
 type lyricsCandidate struct {
-	track  string
-	artist string
-	source string // "metadata" | "title"
+	track    string
+	artist   string
+	source   string
+	priority int
 }
 
-// buildCandidateList gộp candidate từ 2 nguồn thành 1 danh sách theo thứ tự ưu tiên:
-//  1. YouTube Music metadata (nếu có) - độ tin cậy cao nhất, thử trước
-//  2. Parse từ raw title (splitDash/splitPipe/...) - fallback bắt buộc, vì rất
-//     nhiều video (nhạc rap/indie tự upload) không có metadata YouTube Music.
-//
-// Đây là điểm khác với flow "metadata -> LRCLib, fail thì thôi": coi title-parsing
-// là 1 phần của cùng pipeline chứ không phải nhánh riêng, để không bỏ sót các
-// video thiếu metadata (rất phổ biến trong thực tế).
 func buildCandidateList(meta MusicMetadata, rawTitle string) []lyricsCandidate {
 	var out []lyricsCandidate
-	seen := map[string]bool{}
+	byKey := make(map[string]int)
 
-	add := func(track, artist, source string) {
+	add := func(track, artist, source string, priority int) {
 		track = normalizeSpaces(track)
 		artist = normalizeSpaces(artist)
-		key := strings.ToLower(track + "|" + artist)
-		if track == "" || seen[key] {
+		if track == "" {
 			return
 		}
-		seen[key] = true
-		out = append(out, lyricsCandidate{track, artist, source})
+
+		key := strings.ToLower(track + "|" + artist)
+		if index, ok := byKey[key]; ok {
+			if priority > out[index].priority {
+				out[index].priority = priority
+				out[index].source = source
+			}
+			return
+		}
+		byKey[key] = len(out)
+		out = append(out, lyricsCandidate{
+			track:    track,
+			artist:   artist,
+			source:   source,
+			priority: priority,
+		})
 	}
 
 	if meta.Track != "" {
-		add(meta.Track, meta.Artist, "metadata")
+		add(meta.Track, meta.Artist, "metadata", 130)
+	}
+	for _, parsed := range buildTitleCandidates(rawTitle, meta.Artist) {
+		add(parsed.track, parsed.artist, "title:"+parsed.source, parsed.priority)
 	}
 
-	for _, c := range buildTitleCandidates(rawTitle, meta.Artist) {
-		add(c.track, c.artist, "title")
-	}
-
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].priority > out[j].priority
+	})
 	return out
 }
 
-// FetchLyrics là entrypoint DUY NHẤT để lấy lyrics từ LRCLib.
-//
-// Pipeline: build danh sách candidate (metadata trước, title-parsing sau) ->
-// chạy SONG SONG tối đa maxLRCLibCandidates candidate (mỗi candidate thử
-// /api/get rồi /api/search, chấm điểm và validate confidence) -> trả kết quả
-// tin cậy đầu tiên tìm được, hoặc lỗi nếu không candidate nào đủ tin cậy.
-//
-// Song song + giới hạn số candidate giúp không cháy toàn bộ budget HTTP của
-// request vào LRCLib (trước đây thử tuần tự hàng chục candidate, mỗi candidate
-// 2 call HTTP).
-const maxLRCLibCandidates = 5
+// FetchLyrics evaluates high-confidence hypotheses in small parallel batches.
+// It ranks successful candidates by parser priority rather than returning the
+// first network response, while keeping total concurrency and request time bounded.
+const (
+	maxLRCLibCandidates = 8
+	lyricsCandidateBatchSize = 3
+)
 
 func FetchLyrics(ctx context.Context, meta MusicMetadata, rawTitle string, durationSec float64) ([]LyricsData, error) {
 	candidates := buildCandidateList(meta, rawTitle)
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("lrclib: không có candidate nào (thiếu cả metadata và title)")
+		return nil, fmt.Errorf("lrclib: no usable title candidates (metadata and title are empty)")
 	}
 	if len(candidates) > maxLRCLibCandidates {
 		candidates = candidates[:maxLRCLibCandidates]
 	}
 
-	// Cancel các request LRCLib còn dang dở ngay khi tìm thấy kết quả đầu tiên.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	type candResult struct {
-		cand lyricsCandidate
-		data []LyricsData
-		err  error
-	}
-	results := make(chan candResult, len(candidates))
-	for _, c := range candidates {
-		go func(c lyricsCandidate) {
-			data, err := lookupLRCLibCandidate(ctx, c.track, c.artist, durationSec)
-			results <- candResult{cand: c, data: data, err: err}
-		}(c)
+		candidate lyricsCandidate
+		index     int
+		data      []LyricsData
+		err       error
 	}
 
 	var lastErr error
-	for i := 0; i < len(candidates); i++ {
-		r := <-results
-		if r.err == nil && len(r.data) > 0 {
-			log.Printf("lrclib: matched via %s candidate track=%q artist=%q", r.cand.source, r.cand.track, r.cand.artist)
-			return r.data, nil
+	for start := 0; start < len(candidates); start += lyricsCandidateBatchSize {
+		end := start + lyricsCandidateBatchSize
+		if end > len(candidates) {
+			end = len(candidates)
 		}
-		if r.err != nil {
-			lastErr = r.err
+		batch := candidates[start:end]
+		results := make(chan candResult, len(batch))
+
+		for i, candidate := range batch {
+			go func(candidate lyricsCandidate, index int) {
+				data, err := lookupLRCLibCandidate(ctx, candidate.track, candidate.artist, durationSec)
+				results <- candResult{
+					candidate: candidate,
+					index:     index,
+					data:      data,
+					err:       err,
+				}
+			}(candidate, i)
+		}
+
+		var best *candResult
+		for range batch {
+			select {
+			case result := <-results:
+				if result.err != nil {
+					lastErr = result.err
+					continue
+				}
+				if len(result.data) == 0 {
+					continue
+				}
+				if best == nil ||
+					result.candidate.priority > best.candidate.priority ||
+					(result.candidate.priority == best.candidate.priority && result.index < best.index) {
+					copy := result
+					best = &copy
+				}
+			case <-ctx.Done():
+				return nil, fmt.Errorf("lrclib: lookup canceled or timed out for %q: %w", rawTitle, ctx.Err())
+			}
+		}
+
+		if best != nil {
+			log.Printf(
+				"lrclib: matched via %s candidate track=%q artist=%q priority=%d",
+				best.candidate.source,
+				best.candidate.track,
+				best.candidate.artist,
+				best.candidate.priority,
+			)
+			return best.data, nil
 		}
 	}
 
-	return nil, fmt.Errorf("lrclib: không tìm thấy lyrics đủ tin cậy cho %q (%w)", rawTitle, lastErr)
+	if lastErr != nil {
+		return nil, fmt.Errorf("lrclib: no confident match for %q (%w)", rawTitle, lastErr)
+	}
+	return nil, fmt.Errorf("lrclib: no confident match for %q", rawTitle)
 }
