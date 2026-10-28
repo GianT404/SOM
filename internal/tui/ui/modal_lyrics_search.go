@@ -30,18 +30,18 @@ type LyricsSearchModal struct {
 	player       *player.Player
 	previewPanel *RightPanel
 	track        domain.Track
-	input    textinput.Model
-	stage    lyricsSearchStage
-	results  []domain.LyricsSearchResult
-	cursor   int
-	preview  int
-	offset   int
-	width    int
-	height   int
-	query    string
-	err      string
-	loading  bool
-	request  uint64
+	input        textinput.Model
+	stage        lyricsSearchStage
+	results      []domain.LyricsSearchResult
+	cursor       int
+	preview      int
+	offset       int
+	width        int
+	height       int
+	query        string
+	err          string
+	loading      bool
+	request      uint64
 }
 
 func NewLyricsSearchModal(provider domain.LyricsSearchProvider, track domain.Track, width, height int, p *player.Player) *LyricsSearchModal {
@@ -248,10 +248,10 @@ func (m *LyricsSearchModal) modalWidth() int {
 
 func (m *LyricsSearchModal) renderSearchBox(width, innerW int) string {
 	borderColor := themeCol("#7c7986")
-	text := "> " + LyricNormalStyle.Render(m.query)
+	text := " > " + LyricNormalStyle.Render(m.query)
 	if m.stage == lyricsSearchInput {
 		borderColor = themeCol("#e8593c")
-		text = "> " + m.input.View()
+		text = " > " + m.input.View()
 		if m.err != "" {
 			text += "\n" + StatusErrStyle.Render(m.err)
 		}
@@ -264,7 +264,7 @@ func (m *LyricsSearchModal) renderResultsBox(width, innerW int) string {
 	var b strings.Builder
 	switch {
 	case m.loading:
-		b.WriteString(StatusMsgStyle.Render("Searching LRCLib..."))
+		b.WriteString(StatusMsgStyle.Render("Searching..."))
 	case len(m.results) == 0:
 		message := m.err
 		if message == "" {
@@ -290,7 +290,7 @@ func (m *LyricsSearchModal) renderResultsBox(width, innerW int) string {
 				if pad < 0 {
 					pad = 0
 				}
-				b.WriteString(SelectedItemStyle.Render(line + strings.Repeat(" ", pad)) + "\n")
+				b.WriteString(SelectedItemStyle.Render(line+strings.Repeat(" ", pad)) + "\n")
 			} else {
 				b.WriteString(LyricNormalStyle.Render(line) + "\n")
 			}
@@ -356,9 +356,6 @@ func (m *LyricsSearchModal) renderPreview(width, innerW int, searchBox string) s
 	b.WriteString("  " + runewidth.Truncate(title+" — "+artist, innerW-2, "…") + "\n")
 
 	kind := "Plain lyrics (not time-synced)"
-	if len(result.Lyrics.Synced) > 0 {
-		kind = "Synced lyrics · follows playback"
-	}
 	b.WriteString("  " + DimItemStyle.Render(kind) + "\n\n")
 
 	m.previewPanel.SetSize(width, m.previewVisibleRows()+2)
