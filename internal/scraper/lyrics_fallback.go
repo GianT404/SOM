@@ -69,40 +69,49 @@ func buildTitleCandidates(rawTitle, artist string) []candidate {
 		return nil
 	}
 
-	// Xóa hậu tố nhận diện được nhưng giữ title gốc làm phương án dự phòng.
+	// Xóa noise đã biết rồi phân tích phần title còn lại.
 	cleaned := stripTrailingContextSegments(cleanTitleNoise(raw))
+	searchTitle := cleaned
+	artistHint := cleanArtistCandidate(artist)
 
 	// Tách nghệ sĩ ở cuối title, ví dụ "Song / Artist".
-	if track, suffixArtist, ok := splitSuffixArtist(cleaned, "/", "／"); ok {
+	if track, suffixArtist, ok := splitSuffixArtist(searchTitle, "/", "／"); ok {
 		track = stripTrailingContextSegments(track)
 		add(track, suffixArtist, "slash_suffix", 125)
 		addParentheticalVariants(track, suffixArtist, add, 121)
+		searchTitle = track
+		if artistHint == "" {
+			artistHint = cleanArtistCandidate(suffixArtist)
+		}
 	}
 
 	// Tách title và nghệ sĩ theo dấu |, bỏ phần kênh ở cuối.
-	if track, suffixArtist := splitPipe(cleaned); suffixArtist != "" && !isContextNoise(suffixArtist) {
+	if track, suffixArtist := splitPipe(searchTitle); suffixArtist != "" && !isContextNoise(suffixArtist) {
 		add(track, suffixArtist, "pipe", 115)
 		addParentheticalVariants(track, suffixArtist, add, 111)
+		if artistHint == "" {
+			artistHint = cleanArtistCandidate(suffixArtist)
+		}
 		if artist != "" {
 			add(track, artist, "pipe_metadata_artist", 108)
 		}
+		searchTitle = track
 	}
 
 	// Nhận diện cú pháp tiếng Nhật: Artist「Track」.
 	if track, parsedArtist := splitJapaneseBracket(raw); track != "" {
-		add(track, firstOf(parsedArtist, artist), "japanese_bracket", 118)
-		addParentheticalVariants(track, firstOf(parsedArtist, artist), add, 114)
+		add(track, firstOf(parsedArtist, artistHint), "japanese_bracket", 118)
+		addParentheticalVariants(track, firstOf(parsedArtist, artistHint), add, 114)
 	}
 
-	artistHint := cleanArtistCandidate(artist)
-	hasStructure := strings.ContainsAny(cleaned, "|/／") ||
-		strings.Contains(cleaned, " - ") ||
-		strings.Contains(cleaned, " – ") ||
-		strings.Contains(cleaned, " — ")
+	hasStructure := strings.ContainsAny(searchTitle, "|/／") ||
+		strings.Contains(searchTitle, " - ") ||
+		strings.Contains(searchTitle, " – ") ||
+		strings.Contains(searchTitle, " — ")
 
 	// Thử cả hai chiều khi gặp dấu gạch ngang vì thứ tự không cố định.
 	for _, separator := range []string{" - ", " – ", " — "} {
-		parts := strings.SplitN(cleaned, separator, 2)
+		parts := strings.SplitN(searchTitle, separator, 2)
 		if len(parts) != 2 {
 			continue
 		}
@@ -152,9 +161,9 @@ func buildTitleCandidates(rawTitle, artist string) []candidate {
 	if hasStructure {
 		wholePriority = 35
 	}
-	add(cleaned, artist, "clean_title", wholePriority)
+	add(searchTitle, artistHint, "clean_title", wholePriority)
 	if !hasStructure {
-		addParentheticalVariants(cleaned, artist, add, wholePriority-2)
+		addParentheticalVariants(searchTitle, artistHint, add, wholePriority-2)
 	}
 
 	// Luôn giữ một bản nguyên văn ở độ ưu tiên thấp nhất.
