@@ -13,8 +13,23 @@ func TestBuildTitleCandidates_AnimePianoTitle(t *testing.T) {
 	requireCandidate(t, candidates, "Kawaki wo Ameku", "Minami")
 	requireCandidate(t, candidates, "Crying for Rain (Kawaki wo Ameku)", "Minami")
 
-	// Good hypotheses must survive the LRCLib candidate cap.
 	for _, track := range []string{"Crying for Rain", "Kawaki wo Ameku"} {
+		index := candidateIndex(candidates, track, "Minami")
+		if index >= maxLRCLibCandidates {
+			t.Errorf("candidate %q + %q at index %d, beyond max candidate count %d", track, "Minami", index, maxLRCLibCandidates)
+		}
+	}
+}
+
+func TestBuildTitleCandidates_CoverCreditSuffix(t *testing.T) {
+	title := "Minami (美波) - Crying for Rain (カワキヲアメク) Live Band Cover by AARCADE"
+	candidates := buildTitleCandidates(title, "")
+
+	requireCandidate(t, candidates, "Crying for Rain", "Minami")
+	requireCandidate(t, candidates, "カワキヲアメク", "Minami")
+	requireCandidate(t, candidates, "Crying for Rain (カワキヲアメク)", "Minami")
+
+	for _, track := range []string{"Crying for Rain", "カワキヲアメク"} {
 		index := candidateIndex(candidates, track, "Minami")
 		if index >= maxLRCLibCandidates {
 			t.Errorf("candidate %q + %q at index %d, beyond max candidate count %d", track, "Minami", index, maxLRCLibCandidates)
@@ -31,36 +46,48 @@ func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
 		wantArtist string
 	}{
 		{
-			name:       "artist dash song with video noise",
-			title:      "Minami - Kawaki wo Ameku (Official Music Video) [1080p]",
-			wantTrack:  "Kawaki wo Ameku",
+			name: "artist dash song with video noise",
+			title: "Minami - Kawaki wo Ameku (Official Music Video) [1080p]",
+			wantTrack: "Kawaki wo Ameku",
 			wantArtist: "Minami",
 		},
 		{
-			name:       "song pipe artist and channel",
-			title:      "夜に駆ける | YOASOBI | YOASOBI Official Channel",
-			wantTrack:  "夜に駆ける",
+			name: "song pipe artist and channel",
+			title: "夜に駆ける | YOASOBI | YOASOBI Official Channel",
+			wantTrack: "夜に駆ける",
 			wantArtist: "YOASOBI",
 		},
 		{
-			name:       "Japanese bracket format",
-			title:      "【MV】Minami「カワキヲアメク」",
-			wantTrack:  "カワキヲアメク",
+			name: "Japanese bracket format",
+			title: "【MV】Minami「カワキヲアメク」",
+			wantTrack: "カワキヲアメク",
 			wantArtist: "Minami",
 		},
 		{
-			name:       "context suffix removed without dropping title",
-			title:      "Crying for Rain (Kawaki wo Ameku) - Domestic na Kanojo OP",
-			artist:     "Minami",
-			wantTrack:  "Crying for Rain (Kawaki wo Ameku)",
+			name: "context suffix removed without dropping title",
+			title: "Crying for Rain (Kawaki wo Ameku) - Domestic na Kanojo OP",
+			artist: "Minami",
+			wantTrack: "Crying for Rain (Kawaki wo Ameku)",
 			wantArtist: "Minami",
 		},
 		{
-			name:       "fullwidth parentheses preserve romanized alias",
-			title:      "Song Title（Romanized Title） [Official Audio]",
-			artist:     "Artist",
-			wantTrack:  "Romanized Title",
+			name: "fullwidth parentheses preserve romanized alias",
+			title: "Song Title（Romanized Title） [Official Audio]",
+			artist: "Artist",
+			wantTrack: "Romanized Title",
 			wantArtist: "Artist",
+		},
+		{
+			name: "version suffix removed",
+			title: "Song Title Piano Cover by Channel Name",
+			artist: "Artist",
+			wantTrack: "Song Title",
+			wantArtist: "Artist",
+		},
+		{
+			name: "noise words inside actual title are preserved",
+			title: "Cover Me in Rain",
+			wantTrack: "Cover Me in Rain",
 		},
 	}
 

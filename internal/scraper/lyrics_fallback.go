@@ -14,16 +14,14 @@ type candidate struct {
 	priority int
 }
 
-// buildTitleCandidates generates independent search hypotheses. It intentionally
-// keeps the raw title as a low-priority fallback instead of trusting one parser
-// to understand every YouTube title convention.
+// Tạo các cặp track/nghệ sĩ theo nhiều quy tắc, không phụ thuộc một mẫu title.
 func buildTitleCandidates(rawTitle, artist string) []candidate {
 	var out []candidate
 	byKey := make(map[string]int)
 
 	add := func(track, art, source string, priority int) {
 		track = cleanTrackCandidate(track)
-		art = normalizeSpaces(art)
+		art = cleanArtistCandidate(art)
 		if track == "" {
 			return
 		}
@@ -46,84 +44,121 @@ func buildTitleCandidates(rawTitle, artist string) []candidate {
 		})
 	}
 
+	addRaw := func(track, art string) {
+		track = normalizeSpaces(track)
+		art = cleanArtistCandidate(art)
+		if track == "" {
+			return
+		}
+		key := strings.ToLower(track + "|" + art)
+		if index, ok := byKey[key]; ok {
+			if out[index].priority < 1 {
+				out[index].source = "raw_fallback"
+				out[index].priority = 1
+			}
+			return
+		}
+		byKey[key] = len(out)
+		out = append(out, candidate{
+			track: track, artist: art, source: "raw_fallback", priority: 1,
+		})
+	}
+
 	raw := normalizeSpaces(rawTitle)
 	if raw == "" {
 		return nil
 	}
 
-	// Explicit suffixes are usually more informative than a generic dash
-	// split: "Song / Artist" and "Song | Artist | Channel".
-	withoutBracketNoise := stripNoiseParens(raw)
-	if trackPart, suffixArtist, ok := splitSuffixArtist(withoutBracketNoise, "/", "／"); ok {
-		trackPart = stripTrailingContextSegments(trackPart)
-		add(trackPart, suffixArtist, "slash_suffix", 120)
-		addParentheticalVariants(trackPart, suffixArtist, add, 112)
-		// Some uploaders use the inverse convention; retain it as a fallback.
-		add(suffixArtist, trackPart, "slash_reverse", 55)
+	// Xóa hậu tố nhận diện được nhưng giữ title gốc làm phương án dự phòng.
+	cleaned := stripTrailingContextSegments(cleanTitleNoise(raw))
+
+	// Tách nghệ sĩ ở cuối title, ví dụ "Song / Artist".
+	if track, suffixArtist, ok := splitSuffixArtist(cleaned, "/", "／"); ok {
+		track = stripTrailingContextSegments(track)
+		add(track, suffixArtist, "slash_suffix", 125)
+		addParentheticalVariants(track, suffixArtist, add, 121)
 	}
 
-	if trackPart, suffixArtist := splitPipe(raw); suffixArtist != "" && !isContextNoise(suffixArtist) {
-		add(trackPart, suffixArtist, "pipe", 108)
+	// Tách title và nghệ sĩ theo dấu |, bỏ phần kênh ở cuối.
+	if track, suffixArtist := splitPipe(cleaned); suffixArtist != "" && !isContextNoise(suffixArtist) {
+		add(track, suffixArtist, "pipe", 115)
+		addParentheticalVariants(track, suffixArtist, add, 111)
 		if artist != "" {
-			add(trackPart, artist, "pipe_metadata_artist", 104)
+			add(track, artist, "pipe_metadata_artist", 108)
 		}
-		addParentheticalVariants(trackPart, firstOf(suffixArtist, artist), add, 100)
 	}
 
-	// Japanese title convention: Artist「Track」, optionally prefixed by 【MV】.
-	if trackPart, parsedArtist := splitJapaneseBracket(raw); trackPart != "" {
-		add(trackPart, firstOf(parsedArtist, artist), "japanese_bracket", 110)
-		add(trackPart, artist, "japanese_bracket_metadata_artist", 105)
+	// Nhận diện cú pháp tiếng Nhật: Artist「Track」.
+	if track, parsedArtist := splitJapaneseBracket(raw); track != "" {
+		add(track, firstOf(parsedArtist, artist), "japanese_bracket", 118)
+		addParentheticalVariants(track, firstOf(parsedArtist, artist), add, 114)
 	}
 
-	// Remove only recognizable video/arrangement context. A parenthesized alias
-	// that does not contain noise keywords is preserved and also searched alone.
-	cleaned := stripTrailingContextSegments(stripNoiseParens(raw))
-	cleaned = removeTrashKeywords(cleaned)
-	if cleaned != "" {
-		add(cleaned, artist, "clean_title", 96)
-		addParentheticalVariants(cleaned, artist, add, 94)
-	}
+	artistHint := cleanArtistCandidate(artist)
+	hasStructure := strings.ContainsAny(cleaned, "|/／") ||
+		strings.Contains(cleaned, " - ") ||
+		strings.Contains(cleaned, " – ") ||
+		strings.Contains(cleaned, " — ")
 
-	// Dash titles are ambiguous ("Artist - Song", "Song - Artist", "Song -
-	// Anime OP"). Try both orientations, preferring the one supported by a known
-	// artist or by the conservative legacy length heuristic.
+	// Thử cả hai chiều khi gặp dấu gạch ngang vì thứ tự không cố định.
 	for _, separator := range []string{" - ", " – ", " — "} {
 		parts := strings.SplitN(cleaned, separator, 2)
 		if len(parts) != 2 {
 			continue
 		}
+
 		left := cleanTrackCandidate(stripTrailingContextSegments(parts[0]))
 		right := cleanTrackCandidate(stripTrailingContextSegments(parts[1]))
 		if left == "" || right == "" {
 			continue
 		}
 
+		leftArtist := cleanArtistCandidate(left)
+		rightArtist := cleanArtistCandidate(right)
+		var track, parsedArtist string
+		priority := 105
+		source := "dash_length_heuristic"
+
 		switch {
-		case artist != "" && sameTitle(left, artist):
-			add(right, artist, "dash_known_artist_left", 116)
-		case artist != "" && sameTitle(right, artist):
-			add(left, artist, "dash_known_artist_right", 116)
+		case artistHint != "" && sameTitle(leftArtist, artistHint):
+			track, parsedArtist, source = right, artistHint, "dash_known_artist_left"
+		case artistHint != "" && sameTitle(rightArtist, artistHint):
+			track, parsedArtist, source = left, artistHint, "dash_known_artist_right"
 		default:
 			if utf8.RuneCountInString(left) <= utf8.RuneCountInString(right) {
-				add(right, left, "dash_length_heuristic", 82)
-				add(left, right, "dash_reverse", 68)
+				track, parsedArtist = right, leftArtist
 			} else {
-				add(left, right, "dash_length_heuristic", 82)
-				add(right, left, "dash_reverse", 68)
+				track, parsedArtist = left, rightArtist
 			}
 		}
 
-		// The supplied artist may come from the uploader rather than the
-		// recording metadata, so try both title halves with it at lower priority.
-		add(left, artist, "dash_left_with_hint", 76)
-		add(right, artist, "dash_right_with_hint", 74)
+		add(track, parsedArtist, source, priority)
+		addParentheticalVariants(track, parsedArtist, add, priority-2)
+
+		// Giữ chiều ngược và gợi ý artist từ client ở mức ưu tiên thấp hơn.
+		if sameTitle(track, left) {
+			add(right, leftArtist, "dash_reverse", 70)
+			add(left, artistHint, "dash_left_with_hint", 65)
+			add(right, artistHint, "dash_right_with_hint", 64)
+		} else {
+			add(left, rightArtist, "dash_reverse", 70)
+			add(left, artistHint, "dash_left_with_hint", 65)
+			add(right, artistHint, "dash_right_with_hint", 64)
+		}
 	}
 
-	// Always retain a cleaned whole-title search and the untouched input for
-	// uncommon naming conventions that our heuristics do not recognize.
-	add(removeTrashKeywords(stripNoiseParens(raw)), artist, "clean_fallback", 45)
-	add(raw, artist, "raw_fallback", 5)
+	// Title không có cấu trúc rõ ràng được ưu tiên hơn title còn nhiều thành phần.
+	wholePriority := 92
+	if hasStructure {
+		wholePriority = 35
+	}
+	add(cleaned, artist, "clean_title", wholePriority)
+	if !hasStructure {
+		addParentheticalVariants(cleaned, artist, add, wholePriority-2)
+	}
+
+	// Luôn giữ một bản nguyên văn ở độ ưu tiên thấp nhất.
+	addRaw(raw, artist)
 
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].priority > out[j].priority
@@ -131,11 +166,9 @@ func buildTitleCandidates(rawTitle, artist string) []candidate {
 	return out
 }
 
+// Tạo thêm candidate từ tên bài và alias đặt trong ngoặc.
 func addParentheticalVariants(title, artist string, add func(string, string, string, int), priority int) {
 	for _, match := range regexTitleAliases.FindAllStringSubmatch(title, -1) {
-		if len(match) < 2 {
-			continue
-		}
 		alias := match[1]
 		if alias == "" && len(match) > 2 {
 			alias = match[2]
@@ -144,8 +177,8 @@ func addParentheticalVariants(title, artist string, add func(string, string, str
 		if alias == "" || isContextNoise(alias) {
 			continue
 		}
-		base := regexTitleAliases.ReplaceAllString(title, "")
-		base = cleanTrackCandidate(base)
+
+		base := cleanTrackCandidate(regexTitleAliases.ReplaceAllString(title, ""))
 		if base != "" {
 			add(base, artist, "title_without_alias", priority)
 		}
@@ -153,6 +186,7 @@ func addParentheticalVariants(title, artist string, add func(string, string, str
 	}
 }
 
+// Tách nghệ sĩ ở hậu tố nếu phần cuối trông giống tên người/nghệ danh.
 func splitSuffixArtist(title string, separators ...string) (track, artist string, ok bool) {
 	bestIndex, bestSeparator := -1, ""
 	for _, separator := range separators {
@@ -172,14 +206,7 @@ func splitSuffixArtist(title string, separators ...string) (track, artist string
 	return left, right, true
 }
 
-func isLikelyArtist(value string) bool {
-	value = normalizeSpaces(value)
-	if value == "" || isContextNoise(value) || utf8.RuneCountInString(value) > 48 {
-		return false
-	}
-	return len(strings.Fields(value)) <= 5
-}
-
+// Loại các cụm hậu tố thường chỉ mô tả video, bản phối hoặc kênh đăng.
 func stripTrailingContextSegments(title string) string {
 	title = normalizeSpaces(title)
 	for title != "" {
@@ -188,7 +215,7 @@ func stripTrailingContextSegments(title string) string {
 			break
 		}
 		suffix := strings.TrimSpace(title[index+len(separator):])
-		if !isContextNoise(suffix) {
+		if !isContextOnlySegment(suffix) {
 			break
 		}
 		title = normalizeSpaces(title[:index])
@@ -206,49 +233,64 @@ func lastTitleSeparator(title string) (int, string) {
 	return bestIndex, bestSeparator
 }
 
+// Chuẩn hóa title, chỉ xóa cụm nhiễu đã nhận diện được.
+func cleanTitleNoise(title string) string {
+	title = stripNoiseParens(title)
+	title = regexVersionSuffix.ReplaceAllString(title, "")
+	title = removeTrashKeywords(title)
+	return normalizeSpaces(title)
+}
+
+func cleanTrackCandidate(title string) string {
+	return normalizeSpaces(stripTrailingContextSegments(cleanTitleNoise(title)))
+}
+
+// Bỏ alias trong ngoặc khỏi artist để không gửi cả tên phiên âm vào LRCLib.
+func cleanArtistCandidate(artist string) string {
+	artist = regexTitleAliases.ReplaceAllString(artist, "")
+	return normalizeSpaces(artist)
+}
+
+func isLikelyArtist(value string) bool {
+	value = normalizeSpaces(value)
+	if value == "" || isContextNoise(value) || utf8.RuneCountInString(value) > 48 {
+		return false
+	}
+	return len(strings.Fields(value)) <= 5
+}
+
 func isContextNoise(value string) bool {
 	return regexContextNoise.MatchString(value)
 }
 
-func cleanTrackCandidate(value string) string {
-	value = stripNoiseParens(value)
-	value = removeTrashKeywords(value)
-	return normalizeSpaces(value)
+// Chỉ loại hẳn một đoạn khi toàn bộ đoạn đó là metadata hoặc hậu tố nhiễu.
+func isContextOnlySegment(value string) bool {
+	value = normalizeSpaces(value)
+	return regexAnimeContextOnly.MatchString(value) ||
+		regexMetadataOnly.MatchString(value) ||
+		regexVersionOnly.MatchString(value) ||
+		regexChannelOnly.MatchString(value)
 }
 
 func sameTitle(a, b string) bool {
 	return strings.EqualFold(normalizeSpaces(a), normalizeSpaces(b))
 }
 
-// splitPipe supports "Song | Artist" and "Song | Artist | Channel/Label".
+// Tách "Song | Artist", bỏ các phần sau thường là kênh hoặc label.
 func splitPipe(title string) (track, artist string) {
-	clean := regexNoisyParens.ReplaceAllString(title, "")
 	var parts []string
-	for _, part := range strings.Split(clean, "|") {
+	for _, part := range strings.Split(title, "|") {
 		if part = strings.TrimSpace(part); part != "" {
 			parts = append(parts, part)
 		}
 	}
-	if len(parts) == 0 {
+	if len(parts) < 2 {
 		return "", ""
-	}
-	if len(parts) == 1 {
-		return parts[0], ""
 	}
 	return parts[0], parts[1]
 }
 
-// splitJapaneseBracket handles 【MV】Artist「Track」 and Artist「Track」.
-var (
-	regexJaTitle      = regexp.MustCompile(`「([^」]+)」`)
-	regexJaBracket    = regexp.MustCompile(`【[^】]*】`)
-	regexTitleAliases = regexp.MustCompile(`\(([^()]+)\)|（([^（）]+)）`)
-	regexNoisyParens  = regexp.MustCompile(`(?i)\s*[\(\[【][^\)\]】]*(official|video|mv|m/v|music|audio|lyric|visualizer|live|4k|hd|1080p|720p|prod|cover|remix|amv|piano|arrangement|version|ver\.?|instrumental|karaoke|creditless)[^\)\]】]*[\)\]】]`)
-	regexTrashWords   = regexp.MustCompile(`(?i)\b(official music video|official video|official audio|lyric video|music video|full version|visualizer|lyrics?|official|audio|4k|1080p|720p|hd|creditless)\b`)
-	regexContextNoise = regexp.MustCompile(`(?i)\b(?:op|ed)\s*\d*\b|\b(?:opening|ending)(?:\s+(?:theme|song|credits?))?\b|\b(?:official|lyrics?|visualizer|piano|instrumental|karaoke|cover|remix|arrangement|1080p|720p|4k|amv|creditless)\b`)
-	regexSpaces       = regexp.MustCompile(`\s+`)
-)
-
+// Tách title dạng Artist「Track」, có thể kèm 【MV】 ở đầu.
 func splitJapaneseBracket(title string) (track, artist string) {
 	match := regexJaTitle.FindStringSubmatch(title)
 	if match == nil {
@@ -257,17 +299,16 @@ func splitJapaneseBracket(title string) (track, artist string) {
 	track = strings.TrimSpace(match[1])
 	artist = regexJaBracket.ReplaceAllString(title, "")
 	artist = regexJaTitle.ReplaceAllString(artist, "")
-	artist = strings.TrimSpace(artist)
-	artist = cleanTrackCandidate(artist)
+	artist = cleanArtistCandidate(artist)
 	return track, artist
 }
 
-func stripNoiseParens(value string) string {
-	return normalizeSpaces(regexNoisyParens.ReplaceAllString(value, ""))
+func stripNoiseParens(title string) string {
+	return normalizeSpaces(regexNoisyParens.ReplaceAllString(title, ""))
 }
 
-func removeTrashKeywords(value string) string {
-	return normalizeSpaces(regexTrashWords.ReplaceAllString(value, ""))
+func removeTrashKeywords(title string) string {
+	return normalizeSpaces(regexTrashWords.ReplaceAllString(title, ""))
 }
 
 func firstOf(value, fallback string) string {
@@ -281,3 +322,19 @@ func normalizeSpaces(value string) string {
 	value = regexSpaces.ReplaceAllString(value, " ")
 	return strings.Trim(value, " -|,.")
 }
+
+// Các danh sách từ khóa chỉ nhắm vào metadata phổ biến, không xóa từ giữa title.
+var (
+	regexJaTitle = regexp.MustCompile(`「([^」]+)」`)
+	regexJaBracket = regexp.MustCompile(`【[^】]*】`)
+	regexTitleAliases = regexp.MustCompile(`\(([^()]+)\)|（([^（）]+)）`)
+	regexNoisyParens = regexp.MustCompile(`(?i)\s*[\(\[【][^\)\]】]*(official|video|mv|m/v|music|audio|lyric|visualizer|live|4k|hd|1080p|720p|prod|cover|remix|amv|piano|arrangement|version|ver\.?|instrumental|karaoke|creditless|nightcore|slowed|sped\s*up|lo[ -]?fi)[^\)\]】]*[\)\]】]`)
+	regexTrashWords = regexp.MustCompile(`(?i)\b(official music video|official video|official audio|lyric video|music video|full version|visualizer|lyrics?|official|audio|4k|1080p|720p|hd|creditless)\b`)
+	regexVersionSuffix = regexp.MustCompile(`(?i)\s+(?:live\s+band\s+cover|live\s+cover|piano\s+cover|guitar\s+cover|acoustic\s+cover|cover(?:\s+version)?|instrumental(?:\s+version)?|karaoke(?:\s+version)?|remix|nightcore|slowed(?:\s*(?:\+|and)?\s*reverb)?|sped\s*up|speed\s*up|bass\s+boosted|8d(?:\s+audio)?|lo[\s-]?fi|orchestral\s+version)(?:\s+by\s+.+)?\s*$`)
+	regexContextNoise = regexp.MustCompile(`(?i)\b(?:op|ed)\s*\d*\b|\b(?:opening|ending)(?:\s+(?:theme|song|credits?))?\b|\b(?:official|lyrics?|visualizer|piano|instrumental|karaoke|cover|remix|arrangement|1080p|720p|4k|amv|creditless|nightcore|slowed|sped\s*up|channel|topic)\b`)
+	regexAnimeContextOnly = regexp.MustCompile(`(?i)^(?:.*\s+)?(?:op|ed)\s*\d*$`)
+	regexMetadataOnly = regexp.MustCompile(`(?i)^(?:official\s+)?(?:music\s+)?(?:video|mv|m/v|audio|lyrics?|lyric\s+video|visualizer|1080p|720p|4k|hd|creditless)$`)
+	regexVersionOnly = regexp.MustCompile(`(?i)^(?:live\s+band\s+cover|live\s+cover|piano\s+cover|guitar\s+cover|acoustic\s+cover|cover(?:\s+version)?|instrumental(?:\s+version)?|karaoke(?:\s+version)?|remix|nightcore|slowed(?:\s*(?:\+|and)?\s*reverb)?|sped\s*up|speed\s*up|bass\s+boosted|8d(?:\s+audio)?|lo[\s-]?fi|orchestral\s+version)(?:\s+by\s+.+)?$`)
+	regexChannelOnly = regexp.MustCompile(`(?i)^(?:.*\s+)?(?:official\s+)?(?:youtube\s+)?channel$`)
+	regexSpaces = regexp.MustCompile(`\s+`)
+)

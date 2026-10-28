@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-// lyricsCandidate carries the origin and confidence of one LRCLib search
-// hypothesis. Higher priority candidates are attempted first.
 type lyricsCandidate struct {
 	track    string
 	artist   string
@@ -17,13 +15,14 @@ type lyricsCandidate struct {
 	priority int
 }
 
+// Tạo candidate từ metadata và title đã phân tích, rồi sắp theo độ ưu tiên.
 func buildCandidateList(meta MusicMetadata, rawTitle string) []lyricsCandidate {
 	var out []lyricsCandidate
 	byKey := make(map[string]int)
 
 	add := func(track, artist, source string, priority int) {
 		track = normalizeSpaces(track)
-		artist = normalizeSpaces(artist)
+		artist = cleanArtistCandidate(artist)
 		if track == "" {
 			return
 		}
@@ -38,10 +37,7 @@ func buildCandidateList(meta MusicMetadata, rawTitle string) []lyricsCandidate {
 		}
 		byKey[key] = len(out)
 		out = append(out, lyricsCandidate{
-			track:    track,
-			artist:   artist,
-			source:   source,
-			priority: priority,
+			track: track, artist: artist, source: source, priority: priority,
 		})
 	}
 
@@ -58,11 +54,9 @@ func buildCandidateList(meta MusicMetadata, rawTitle string) []lyricsCandidate {
 	return out
 }
 
-// FetchLyrics evaluates high-confidence hypotheses in small parallel batches.
-// It ranks successful candidates by parser priority rather than returning the
-// first network response, while keeping total concurrency and request time bounded.
+// FetchLyrics thử lần lượt từng nhóm candidate; trong nhóm chọn ứng viên ưu tiên cao nhất.
 const (
-	maxLRCLibCandidates = 8
+	maxLRCLibCandidates     = 8
 	lyricsCandidateBatchSize = 3
 )
 
