@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,6 +42,17 @@ func (h *LyricsSearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 	results, err := scraper.SearchLRCLib(ctx, query, limit)
 	if err != nil {
+		var upstreamErr *scraper.LRCLibHTTPError
+		if errors.As(err, &upstreamErr) &&
+			(upstreamErr.StatusCode == http.StatusTooManyRequests || upstreamErr.StatusCode >= 500) {
+			retryAfter := upstreamErr.RetryAfter
+			if retryAfter == "" {
+				retryAfter = "2"
+			}
+			w.Header().Set("Retry-After", retryAfter)
+			writeError(w, http.StatusServiceUnavailable, "LRCLib is temporarily unavailable; retry later")
+			return
+		}
 		writeError(w, http.StatusBadGateway, "LRCLib search unavailable")
 		return
 	}

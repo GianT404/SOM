@@ -288,25 +288,97 @@ func fetchLRCLibGet(ctx context.Context, reqURL string) (*lrclibTrack, error) {
 }
 
 // fetchLRCLibSearch does a GET and decodes an array of lrclibTrack.
+const (
+	lrclibSearchMaxAttempts = 3
+	lrclibRetryMaxWait      = 1500 * time.Millisecond
+)
+
+// LRCLibHTTPError giữ status và thời gian retry do upstream trả về.
+type LRCLibHTTPError struct {
+	StatusCode int
+	RetryAfter string
+}
+
+func (e *LRCLibHTTPError) Error() string {
+	return fmt.Sprintf("lrclib search: HTTP %d", e.StatusCode)
+}
+
 func fetchLRCLibSearch(ctx context.Context, reqURL string) ([]lrclibTrack, error) {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	req.Header.Set("Lrclib-Client", "SOM/1.0 (https://github.com/GianT404/SOM)")
+	return fetchLRCLibSearchWithClient(ctx, lrclibHTTPClient, reqURL)
+}
 
-	resp, err := lrclibHTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+func fetchLRCLibSearchWithClient(ctx context.Context, client *http.Client, reqURL string) ([]lrclibTrack, error) {
+	for attempt := 1; attempt <= lrclibSearchMaxAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Lrclib-Client", "SOM/1.0 (https://github.com/GianT404/SOM)")
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("lrclib search: HTTP %d", resp.StatusCode)
-	}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			var tracks []lrclibTrack
+			if err := json.NewDecoder(resp.Body).Decode(&tracks); err != nil {
+				return nil, fmt.Errorf("lrclib search: decode error: %w", err)
+			}
+			return tracks, nil
+		}
 
-	var tracks []lrclibTrack
-	if err := json.NewDecoder(resp.Body).Decode(&tracks); err != nil {
-		return nil, fmt.Errorf("lrclib search: decode error: %w", err)
+		upstreamErr := &LRCLibHTTPError{
+			StatusCode: resp.StatusCode,
+			RetryAfter: strings.TrimSpace(resp.Header.Get("Retry-After")),
+		}
+		_ = resp.Body.Close()
+		if !isRetryableLRCLibStatus(resp.StatusCode) || attempt == lrclibSearchMaxAttempts {
+			return nil, upstreamErr
+		}
+
+		delay, ok := lrclibRetryDelay(upstreamErr.RetryAfter, attempt)
+		if !ok {
+			return nil, upstreamErr
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return nil, ctx.Err()
+		}
 	}
-	return tracks, nil
+	return nil, fmt.Errorf("lrclib search: retry attempts exhausted")
+}
+
+func isRetryableLRCLibStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status >= 500
+}
+
+func lrclibRetryDelay(retryAfter string, attempt int) (time.Duration, bool) {
+	delay := time.Duration(attempt*250) * time.Millisecond
+	if retryAfter != "" {
+		if seconds, err := strconv.Atoi(retryAfter); err == nil {
+			delay = time.Duration(seconds) * time.Second
+		} else if at, err := http.ParseTime(retryAfter); err == nil {
+			delay = time.Until(at)
+			if delay < 0 {
+				delay = 0
+			}
+		} else {
+			return 0, false
+		}
+	}
+	if delay > lrclibRetryMaxWait {
+		return 0, false
+	}
+	return delay, true
 }
 
 // lrclibTrackToLyricsData converts a lrclibTrack into our internal format.
