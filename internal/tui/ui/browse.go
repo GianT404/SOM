@@ -813,7 +813,7 @@ func (p LeftPanel) Update(msg tea.Msg, focused bool, nowPlay *domain.Track) (Lef
 			p.scanLocalFiles()
 		}
 	case spinner.TickMsg:
-		if p.loading || p.loadingDownload || p.loadingStream {
+		if p.loading || p.loadingDownload || p.loadingStream || p.loadingMore {
 			var cmd tea.Cmd
 			p.spinner, cmd = p.spinner.Update(msg)
 			cmds = append(cmds, cmd)

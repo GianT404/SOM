@@ -375,7 +375,7 @@ func (a *App) updateSystem(msg tea.Msg) ([]tea.Cmd, bool, bool) {
 			a.importPanel.spinner, c = a.importPanel.spinner.Update(msg)
 			cmds = append(cmds, c)
 		}
-		if a.left.loading || a.left.loadingStream || a.left.loadingDownload {
+		if a.left.loading || a.left.loadingStream || a.left.loadingDownload || a.left.loadingMore {
 			var c tea.Cmd
 			a.left.spinner, c = a.left.spinner.Update(msg)
 			cmds = append(cmds, c)

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"charm.land/bubbles/v2/spinner"
 	"som/internal/domain"
 	"som/internal/storage"
 )
@@ -144,5 +145,22 @@ func TestDeleteCmdReportsFilesystemFailure(t *testing.T) {
 	}
 	if res.Err == nil {
 		t.Fatal("expected filesystem deletion error")
+	}
+}
+
+func TestSpinnerKeepsTickingWhileLoadingMore(t *testing.T) {
+	a := &App{
+		left: LeftPanel{
+			loadingMore: true,
+			spinner:     spinner.New(),
+		},
+	}
+
+	cmds, handled, stop := a.updateSystem(spinner.TickMsg{})
+	if !handled || stop {
+		t.Fatalf("updateSystem handled=%v stop=%v, want handled=true stop=false", handled, stop)
+	}
+	if len(cmds) == 0 || cmds[0] == nil {
+		t.Fatal("spinner tick should schedule the next animation tick while loading more")
 	}
 }
