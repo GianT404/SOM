@@ -280,4 +280,4 @@ func firstOf(value, fallback string) string {
 func normalizeSpaces(value string) string {
 	value = regexSpaces.ReplaceAllString(value, " ")
 	return strings.Trim(value, " -|,.")
-)
+}
