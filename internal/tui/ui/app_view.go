@@ -296,7 +296,9 @@ func (a *App) renderOverlayView(view string) string {
 		case *MoveConfirmModal:
 			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "cancel")
 		case *LyricsSearchModal:
-			hints = modal.Hints()
+			if lyricsModal, ok := modal.(*LyricsSearchModal); ok {
+				hints = lyricsModal.Hints()
+			}
 		}
 		if a.mouseEnabled {
 			switch modal.(type) {
