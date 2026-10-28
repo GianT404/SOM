@@ -295,6 +295,8 @@ func (a *App) renderOverlayView(view string) string {
 			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "back")
 		case *MoveConfirmModal:
 			hints = StyleHint("←/→", "select") + "  " + StyleHint("enter", "confirm") + "  " + StyleHint("esc", "cancel")
+		case *LyricsSearchModal:
+			hints = modal.Hints()
 		}
 		if a.mouseEnabled {
 			switch modal.(type) {
@@ -341,6 +343,17 @@ func (a *App) setViewCursor(v *tea.View, contentTop int) {
 				v.Cursor = c
 			}
 			return
+		if modal, ok := a.modals[len(a.modals)-1].(*LyricsSearchModal); ok {
+			if modal.stage == lyricsSearchInput && modal.input.Focused() {
+				if c := modal.input.Cursor(); c != nil {
+					popup := modal.View()
+					c.Position.X += (a.width-lipgloss.Width(popup))/2 + 4
+					c.Position.Y += (a.height-lipgloss.Height(popup))/2 + 1
+					v.Cursor = c
+				}
+			}
+			return
+		}
 		}
 	}
 

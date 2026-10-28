@@ -181,6 +181,7 @@ func (m *LyricsSearchModal) searchAgain() tea.Cmd {
 	m.results, m.err = nil, ""
 	m.preview = -1
 	m.previewPanel = nil
+	m.input.Blur()
 	m.loading = true
 	m.stage = lyricsSearchResults
 	return manualLyricsSearchCmd(m.provider, m.query, m.request)
@@ -222,34 +223,55 @@ func (m *LyricsSearchModal) previewVisibleRows() int {
 }
 
 func (m *LyricsSearchModal) View() string {
+	width := m.modalWidth()
+	innerW := width - 4
+
+	searchBox := m.renderSearchBox(width, innerW)
+	switch m.stage {
+	case lyricsSearchInput:
+		return searchBox
+	case lyricsSearchPreview:
+		return m.renderPreview(width, innerW, searchBox)
+	default:
+		resultsBox := m.renderResultsBox(width, innerW)
+		return lipgloss.JoinVertical(lipgloss.Left, searchBox, resultsBox)
+	}
+}
+
+func (m *LyricsSearchModal) modalWidth() int {
 	width := minInt(maxInt(m.width-8, 48), 78)
 	if m.width <= 0 {
-		width = 68
+		return 68
 	}
-	innerW := width - 4
-	var b strings.Builder
-	b.WriteString("  Track: " + m.track.Title + "\n")
+	return width
+}
 
+func (m *LyricsSearchModal) renderSearchBox(width, innerW int) string {
+	borderColor := themeCol("#7c7986")
+	text := "> " + LyricNormalStyle.Render(m.query)
 	if m.stage == lyricsSearchInput {
-		b.WriteString("\n  LRCLib query\n  " + m.input.View() + "\n")
+		borderColor = themeCol("#e8593c")
+		text = "> " + m.input.View()
 		if m.err != "" {
-			b.WriteString("\n  " + StatusErrStyle.Render(m.err) + "\n")
+			text += "\n" + StatusErrStyle.Render(m.err)
 		}
-		b.WriteString("\n  Enter: search   Esc: close")
-		return renderBox(width, "Search Lyrics on LRCLib", lipgloss.NewStyle().Width(innerW).Render(b.String()), themeCol("#e8593c"))
 	}
+	content := lipgloss.NewStyle().Width(innerW).Render(text)
+	return renderBox(width, "Search", content, borderColor)
+}
 
-	if m.stage == lyricsSearchPreview {
-		return m.renderPreview(width, innerW)
-	}
-
-	b.WriteString("\n  Query: " + m.query + "\n")
-	if m.loading {
-		b.WriteString("\n  Searching LRCLib...\n")
-	} else if len(m.results) == 0 {
-		b.WriteString("\n  " + StatusErrStyle.Render(m.err) + "\n\n  Esc: edit query   r: retry")
-	} else {
-		b.WriteString("\n")
+func (m *LyricsSearchModal) renderResultsBox(width, innerW int) string {
+	var b strings.Builder
+	switch {
+	case m.loading:
+		b.WriteString(StatusMsgStyle.Render("Searching LRCLib..."))
+	case len(m.results) == 0:
+		message := m.err
+		if message == "" {
+			message = "No lyrics found. Try another title or artist."
+		}
+		b.WriteString(StatusErrStyle.Render(message))
+	default:
 		end := m.offset + m.visibleRows()
 		if end > len(m.results) {
 			end = len(m.results)
@@ -273,9 +295,26 @@ func (m *LyricsSearchModal) View() string {
 				b.WriteString(LyricNormalStyle.Render(line) + "\n")
 			}
 		}
-		b.WriteString("\n  Up/Down: select   Enter: preview   Esc: edit query")
 	}
-	return renderBox(width, "Search Lyrics on LRCLib", lipgloss.NewStyle().Width(innerW).Render(strings.TrimSuffix(b.String(), "\n")), themeCol("#e8593c"))
+	content := strings.TrimSuffix(b.String(), "\n")
+	return renderBox(width, "Results", lipgloss.NewStyle().Width(innerW).Render(content), themeCol("#7c7986"))
+}
+
+func (m *LyricsSearchModal) Hints() string {
+	switch m.stage {
+	case lyricsSearchInput:
+		return StyleHint("enter", "search") + "  " + StyleHint("esc", "close")
+	case lyricsSearchPreview:
+		return StyleHint("enter", "apply & save") + "  " + StyleHint("esc", "back")
+	default:
+		if m.loading {
+			return StyleHint("esc", "edit search")
+		}
+		if len(m.results) == 0 {
+			return StyleHint("esc", "edit search") + "  " + StyleHint("r", "retry")
+		}
+		return StyleHint("↑/↓", "select") + "  " + StyleHint("enter", "preview") + "  " + StyleHint("esc", "edit search") + "  " + StyleHint("r", "retry")
+	}
 }
 
 func (m *LyricsSearchModal) beginPreview() {
@@ -303,11 +342,12 @@ func (m *LyricsSearchModal) beginPreview() {
 	m.stage = lyricsSearchPreview
 }
 
-func (m *LyricsSearchModal) renderPreview(width, innerW int) string {
+func (m *LyricsSearchModal) renderPreview(width, innerW int, searchBox string) string {
 	var b strings.Builder
 	if m.preview < 0 || m.preview >= len(m.results) || m.previewPanel == nil {
-		b.WriteString("  No result selected.\n\n  Esc: back to results")
-		return renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(b.String()), themeCol("#e8593c"))
+		b.WriteString("  No result selected.")
+		previewBox := renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(b.String()), themeCol("#7c7986"))
+		return lipgloss.JoinVertical(lipgloss.Left, searchBox, previewBox)
 	}
 
 	result := m.results[m.preview]
@@ -322,9 +362,9 @@ func (m *LyricsSearchModal) renderPreview(width, innerW int) string {
 	b.WriteString("  " + DimItemStyle.Render(kind) + "\n\n")
 
 	m.previewPanel.SetSize(width, m.previewVisibleRows()+2)
-	b.WriteString(m.previewPanel.renderLyrics(innerW, 0) + "\n")
-	b.WriteString("\n  Enter: apply & save   Esc: back to results")
-	return renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(strings.TrimSuffix(b.String(), "\n")), themeCol("#e8593c"))
+	b.WriteString(m.previewPanel.renderLyrics(innerW, 0))
+	previewBox := renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(strings.TrimSuffix(b.String(), "\n")), themeCol("#7c7986"))
+	return lipgloss.JoinVertical(lipgloss.Left, searchBox, previewBox)
 }
 
 func manualLyricsResponse(videoID string, result domain.LyricsSearchResult) domain.LyricsResp {

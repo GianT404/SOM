@@ -77,3 +77,30 @@ func TestLyricsSearchModalEscapeFromPreviewReturnsToResults(t *testing.T) {
 		t.Fatal("Esc back to results should not emit a command")
 	}
 }
+
+
+func TestLyricsSearchModalUsesSeparateSearchAndResultsBoxes(t *testing.T) {
+	modal := NewLyricsSearchModal(nil, domain.Track{ID: "video-1", Title: "Current track"}, 90, 30, nil)
+	modal.stage = lyricsSearchResults
+	modal.query = "chosen query"
+	modal.input.SetValue("chosen query")
+	modal.results = []domain.LyricsSearchResult{{TrackName: "Candidate", ArtistName: "Artist"}}
+
+	view := modal.View()
+	for _, want := range []string{"Search", "Results", "> chosen query", "Candidate"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("View() missing %q", want)
+		}
+	}
+	if strings.Contains(view, "Search Lyrics on LRCLib") {
+		t.Error("View() still uses the old modal title")
+	}
+	if strings.Contains(view, "Query:") {
+		t.Error("View() still uses the Query label")
+	}
+
+	hints := modal.Hints()
+	if !strings.Contains(hints, StyleHint("enter", "preview")) {
+		t.Error("results hints should use StyleHint for Enter preview")
+	}
+}
