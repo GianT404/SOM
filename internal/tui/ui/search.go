@@ -56,9 +56,6 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 			if p.searchCursor == len(p.tracks) {
 				style = SelectedItemStyle
 			}
-			if p.loadingMore {
-				label = "  " + p.spinner.View() + " Loading more..."
-			}
 			list += "\n" + style.Width(innerW).Render(label)
 		}
 		resultContent = list

@@ -111,6 +111,29 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		Render(mainView)
 }
 
+func (a *App) renderStatusLine() string {
+	status := ""
+	switch {
+	case a.sidebarActive == SideSearch && a.left.loading:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Searching...")
+	case a.sidebarActive == SideSearch && a.left.loadingMore:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Loading more...")
+	case a.sidebarActive == SideSearch && a.left.loadingStream:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Loading...")
+	case a.sidebarActive == SideSearch && a.left.loadingDownload:
+		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Downloading...")
+	}
+
+	// Keep the active load operation visible instead of letting a previous
+	// transient status message overwrite its animation.
+	loadingSearch := a.sidebarActive == SideSearch &&
+		(a.left.loading || a.left.loadingMore || a.left.loadingStream || a.left.loadingDownload)
+	if !loadingSearch && a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
+		status = "  " + a.statusMsg
+	}
+	return status
+}
+
 func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) string {
 	dashboard := renderDashboard(
 		a.hideLogo,
@@ -129,20 +152,7 @@ func (a *App) renderBaseView(layout tuilayout.UILayout, contentRow string) strin
 	}
 	sep := borderStyle.Render(sepLeft + "─" + sepRight)
 
-	status := ""
-	switch {
-	case a.sidebarActive == SideSearch && a.left.loading:
-		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Searching...")
-	case a.sidebarActive == SideSearch && a.left.loadingStream:
-		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Loading...")
-	case a.sidebarActive == SideSearch && a.left.loadingDownload:
-		status = "  " + StatusMsgStyle.Render(a.left.spinner.View()+" Downloading...")
-	case a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second:
-		status = "  " + a.statusMsg
-	}
-	if a.statusMsg != "" && time.Since(a.statusAt) < 3*time.Second {
-		status = "  " + a.statusMsg
-	}
+	status := a.renderStatusLine()
 
 	var helpParts []string
 	for _, hint := range a.globalHelpHints() {
