@@ -15,3 +15,8 @@ type MusicProvider interface {
 	ResolveStream(ctx context.Context, id string) (*StreamInfo, error)
 	DownloadOPUS(ctx context.Context, id, title, destDir string) (string, error)
 }
+
+
+type LyricsSearchProvider interface {
+	SearchLyrics(ctx context.Context, query string, limit int) ([]LyricsSearchResult, error)
+}

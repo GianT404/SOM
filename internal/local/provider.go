@@ -40,6 +40,29 @@ func (p *DirectProvider) Search(ctx context.Context, q string, offset int) ([]do
 	return tracks, nil
 }
 
+func (p *DirectProvider) SearchLyrics(ctx context.Context, query string, limit int) ([]domain.LyricsSearchResult, error) {
+	results, err := scraper.SearchLRCLib(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.LyricsSearchResult, 0, len(results))
+	for _, result := range results {
+		lyrics := domain.LyricsTrack{
+			Language: "lrclib", Plain: result.Plain,
+			TrackName: result.TrackName, ArtistName: result.ArtistName,
+		}
+		for _, line := range result.Synced {
+			lyrics.Synced = append(lyrics.Synced, domain.LyricLine{Time: line.Start, End: line.End, Text: line.Text})
+		}
+		out = append(out, domain.LyricsSearchResult{
+			ID: result.ID, TrackName: result.TrackName, ArtistName: result.ArtistName,
+			AlbumName: result.AlbumName, Duration: result.Duration, HasSynced: result.HasSynced,
+			Lyrics: lyrics,
+		})
+	}
+	return out, nil
+}
+
 func (p *DirectProvider) Lyrics(ctx context.Context, id, title, artist string, duration int) (domain.LyricsResp, error) {
 	start := time.Now()
 	var lr domain.LyricsResp

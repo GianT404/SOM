@@ -35,15 +35,23 @@ type StreamInfo struct {
 
 // LyricsData maps a subtitle language to its parsed lyrics.
 type LyricsData struct {
-	Language string      `json:"language"`
-	Lines    []LyricLine `json:"lines"`
+	Language   string      `json:"language"`
+	Lines      []LyricLine `json:"lines"`
+	TrackName  string      `json:"trackName,omitempty"`
+	ArtistName string      `json:"artistName,omitempty"`
+	Source     string      `json:"source,omitempty"`
+}
 
-	TrackName  string `json:"trackName,omitempty"`
-	ArtistName string `json:"artistName,omitempty"`
-
-	// Source cho biết lyrics đến từ đâu ("lrclib" hoặc "youtube"), để client
-	// có thể chọn hiển thị theo nguồn.
-	Source string `json:"source,omitempty"`
+// LRCLibSearchResult chứa một kết quả lyrics tìm thủ công.
+type LRCLibSearchResult struct {
+	ID         int
+	TrackName  string
+	ArtistName string
+	AlbumName  string
+	Duration   int
+	HasSynced  bool
+	Synced     []LyricLine
+	Plain      string
 }
 
 // Scraper abstracts the video/audio data source.

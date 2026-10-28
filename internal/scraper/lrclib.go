@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -347,4 +348,80 @@ func lrclibTrackToLyricsData(t lrclibTrack) []LyricsData {
 	}
 
 	return result
+}
+
+
+func SearchLRCLib(ctx context.Context, query string, limit int) ([]LRCLibSearchResult, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("lrclib: query is empty")
+	}
+	if len(query) > 100 {
+		return nil, fmt.Errorf("lrclib: query is too long")
+	}
+	if limit < 1 || limit > 7 {
+		limit = 7
+	}
+	ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
+	defer cancel()
+	tracks, err := fetchLRCLibSearch(ctx, lrclibBase+"/api/search?"+url.Values{"q": {query}}.Encode())
+	if err != nil {
+		return nil, fmt.Errorf("lrclib search: %w", err)
+	}
+	return rankLRCLibSearchResults(query, tracks, limit), nil
+}
+
+// Xếp kết quả có lyrics đồng bộ trước, sau đó theo độ liên quan.
+func rankLRCLibSearchResults(query string, tracks []lrclibTrack, limit int) []LRCLibSearchResult {
+	type rankedResult struct {
+		result LRCLibSearchResult
+		score float64
+		index int
+	}
+	ranked := make([]rankedResult, 0, len(tracks))
+	seen := make(map[string]struct{}, len(tracks))
+	for i, track := range tracks {
+		synced := parseLRC(track.SyncedLyrics)
+		plain := strings.TrimSpace(track.PlainLyrics)
+		if len(synced) == 0 && plain == "" {
+			continue
+		}
+		key := fmt.Sprintf("%s|%s|%d", strings.ToLower(track.TrackName), strings.ToLower(track.ArtistName), int(track.Duration))
+		if track.ID > 0 {
+			key = strconv.Itoa(track.ID)
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		ranked = append(ranked, rankedResult{
+			result: LRCLibSearchResult{
+				ID: track.ID, TrackName: track.TrackName, ArtistName: track.ArtistName,
+				AlbumName: track.AlbumName, Duration: int(track.Duration),
+				HasSynced: len(synced) > 0, Synced: synced, Plain: plain,
+			},
+			score: nameScore(query, "", track.TrackName+" "+track.ArtistName, ""),
+			index: i,
+		})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].result.HasSynced != ranked[j].result.HasSynced {
+			return ranked[i].result.HasSynced
+		}
+		if ranked[i].score != ranked[j].score {
+			return ranked[i].score > ranked[j].score
+		}
+		return ranked[i].index < ranked[j].index
+	})
+	if limit < 1 || limit > 7 {
+		limit = 7
+	}
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	results := make([]LRCLibSearchResult, len(ranked))
+	for i := range ranked {
+		results[i] = ranked[i].result
+	}
+	return results
 }

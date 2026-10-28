@@ -78,3 +78,14 @@ type ServerLyricTrack struct {
 	TrackName  string `json:"trackName"`
 	ArtistName string `json:"artistName"`
 }
+
+
+type LyricsSearchResult struct {
+	ID int `json:"id"`
+	TrackName string `json:"trackName"`
+	ArtistName string `json:"artistName"`
+	AlbumName string `json:"albumName,omitempty"`
+	Duration int `json:"duration"`
+	HasSynced bool `json:"hasSynced"`
+	Lyrics LyricsTrack `json:"lyrics"`
+}
