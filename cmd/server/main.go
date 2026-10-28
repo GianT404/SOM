@@ -142,6 +142,7 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 	searchH := &handler.SearchHandler{Scraper: sc}
 	streamH := handler.NewStreamHandler(sc)
 	lyricsH := &handler.LyricsHandler{Scraper: sc}
+	lyricsSearchH := &handler.LyricsSearchHandler{}
 	resolveH := &handler.ResolveHandler{Scraper: sc}
 
 	generalLimiter := backend.NewIPRateLimiter(2, 20)
@@ -175,6 +176,7 @@ func newRouter(sc *scraper.ResilientScraper, apiKey string, deviceReg *backend.D
 
 			r.With(middleware.Timeout(2*time.Minute)).Get("/search", searchH.ServeHTTP)
 			r.With(middleware.Timeout(15*time.Second)).Get("/lyrics", lyricsH.ServeHTTP)
+			r.With(middleware.Timeout(10*time.Second)).Get("/lyrics/search", lyricsSearchH.ServeHTTP)
 
 			r.With(middleware.Timeout(streamRequestTimeout), heavyLimiter.Middleware).
 				Get("/stream", streamH.ServeHTTP)

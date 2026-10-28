@@ -75,6 +75,31 @@ func (c *HTTPProvider) Search(ctx context.Context, q string, offset int) ([]doma
 	return tracks, nil
 }
 
+func (c *HTTPProvider) SearchLyrics(ctx context.Context, query string, limit int) ([]domain.LyricsSearchResult, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("lyrics search query is empty")
+	}
+	if limit < 1 || limit > 7 {
+		limit = 7
+	}
+	params := url.Values{"q": {query}, "limit": {strconv.Itoa(limit)}}
+	resp, err := c.getShort(ctx, "/api/v1/lyrics/search", params)
+	if err != nil {
+		return nil, fmt.Errorf("lyrics search request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("lyrics search: server %s - %s", resp.Status, truncateMsg(body))
+	}
+	var results []domain.LyricsSearchResult
+	if err := json.Unmarshal(body, &results); err != nil {
+		return nil, fmt.Errorf("lyrics search decode: %w", err)
+	}
+	return results, nil
+}
+
 func (c *HTTPProvider) ResolveStream(ctx context.Context, id string) (*domain.StreamInfo, error) {
 	resp, err := c.getShort(ctx, "/api/v1/resolve", url.Values{"id": {id}})
 	if err != nil {
