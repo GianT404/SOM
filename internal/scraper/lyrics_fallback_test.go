@@ -99,6 +99,24 @@ func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
 	}
 }
 
+func TestBuildTitleCandidates_QuotedTrack(t *testing.T) {
+	title := "Don't say " + string(rune(34)) + "lazy" + string(rune(34))
+	candidates := buildTitleCandidates(title, "")
+	requireCandidate(t, candidates, "Don't say lazy", "")
+}
+
+func TestBuildTitleCandidates_StripsAnimeAndLyricsMetadata(t *testing.T) {
+	title := "Don't say lazy [ending 1 K-on] [FULL version] ~ Lyrics English - Romaji - 日本語 - 한국어 - 中文 / Sub Español"
+	candidates := buildTitleCandidates(title, "")
+	requireCandidate(t, candidates, "Don't say lazy", "")
+
+	for _, candidate := range candidates {
+		if strings.EqualFold(candidate.artist, "Sub Español") {
+			t.Fatalf("subtitle language was incorrectly detected as artist: %+v", candidate)
+		}
+	}
+}
+
 func TestBuildTitleCandidates_RetainsOriginalAsFallback(t *testing.T) {
 	rawTitle := "Some Song [Fan Upload] / Random Channel"
 	candidates := buildTitleCandidates(rawTitle, "")

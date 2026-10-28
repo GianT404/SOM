@@ -244,12 +244,16 @@ func lastTitleSeparator(title string) (int, string) {
 
 // Chuẩn hóa title, chỉ xóa cụm nhiễu đã nhận diện được.
 func cleanTitleNoise(title string) string {
+	// Cắt phần ngôn ngữ phụ đề thường được nối sau dấu phân cách.
+	title = regexLyricsLanguageSuffix.ReplaceAllString(title, "")
+	title = regexSubLanguageSuffix.ReplaceAllString(title, "")
 	title = stripNoiseParens(title)
 	title = regexVersionSuffix.ReplaceAllString(title, "")
 	title = removeTrashKeywords(title)
+	title = strings.ReplaceAll(title, string(rune(34)), "")
+	title = strings.NewReplacer("“", "", "”", "", "„", "", "‟", "", "＂", "").Replace(title)
 	return normalizeSpaces(title)
 }
-
 func cleanTrackCandidate(title string) string {
 	return normalizeSpaces(stripTrailingContextSegments(cleanTitleNoise(title)))
 }
@@ -337,10 +341,12 @@ var (
 	regexJaTitle = regexp.MustCompile(`「([^」]+)」`)
 	regexJaBracket = regexp.MustCompile(`【[^】]*】`)
 	regexTitleAliases = regexp.MustCompile(`\(([^()]+)\)|（([^（）]+)）`)
-	regexNoisyParens = regexp.MustCompile(`(?i)\s*[\(\[【][^\)\]】]*(official|video|mv|m/v|music|audio|lyric|visualizer|live|4k|hd|1080p|720p|prod|cover|remix|amv|piano|arrangement|version|ver\.?|instrumental|karaoke|creditless|nightcore|slowed|sped\s*up|lo[ -]?fi)[^\)\]】]*[\)\]】]`)
+	regexNoisyParens = regexp.MustCompile(`(?i)\s*[\(\[【][^\)\]】]*(official|video|mv|m/v|music|audio|lyric|visualizer|live|4k|hd|1080p|720p|prod|cover|remix|amv|piano|arrangement|version|ver\.?|instrumental|karaoke|creditless|nightcore|slowed|sped\s*up|lo[ -]?fi|opening|ending)[^\)\]】]*[\)\]】]`)
 	regexTrashWords = regexp.MustCompile(`(?i)\b(official music video|official video|official audio|lyric video|music video|full version|visualizer|lyrics?|official|audio|4k|1080p|720p|hd|creditless)\b`)
 	regexVersionSuffix = regexp.MustCompile(`(?i)\s+(live\s+band\s+cover|live\s+cover|piano\s+cover|guitar\s+cover|acoustic\s+cover|cover(\s+version)?|instrumental(\s+version)?|karaoke(\s+version)?|remix|nightcore|slowed(\s*(\+|and)?\s*reverb)?|sped\s*up|speed\s*up|bass\s+boosted|8d(\s+audio)?|lo[\s-]?fi|orchestral\s+version)(\s+by\s+.+)?\s*$`)
 	regexContextNoise = regexp.MustCompile(`(?i)\b(op|ed)\s*\d*\b|\b(opening|ending)(\s+(theme|song|credits?))?\b|\b(official|lyrics?|visualizer|piano|instrumental|karaoke|cover|remix|arrangement|1080p|720p|4k|amv|creditless|nightcore|slowed|sped\s*up|channel|topic)\b`)
+	regexLyricsLanguageSuffix = regexp.MustCompile(`(?i)\s+(~|\||｜|-|–|—)\s*(lyrics?|subtitles?)\b.*$`)
+	regexSubLanguageSuffix = regexp.MustCompile(`(?i)\s*/\s*sub(titles?)?\b.*$`)
 	regexAnimeContextOnly = regexp.MustCompile(`(?i)^(.*\s+)?(op|ed)\s*\d*$`)
 	regexMetadataOnly = regexp.MustCompile(`(?i)^(official\s+)?(music\s+)?(video|mv|m/v|audio|lyrics?|lyric\s+video|visualizer|1080p|720p|4k|hd|creditless)$`)
 	regexVersionOnly = regexp.MustCompile(`(?i)^(live\s+band\s+cover|live\s+cover|piano\s+cover|guitar\s+cover|acoustic\s+cover|cover(\s+version)?|instrumental(\s+version)?|karaoke(\s+version)?|remix|nightcore|slowed(\s*(\+|and)?\s*reverb)?|sped\s*up|speed\s*up|bass\s+boosted|8d(\s+audio)?|lo[\s-]?fi|orchestral\s+version)(\s+by\s+.+)?$`)
