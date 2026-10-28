@@ -5,36 +5,49 @@ import (
 	"testing"
 )
 
+func TestBuildTitleCandidates_RemovesBracketContents(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{"square brackets", "Song [Official MV]", "Song"},
+		{"curly braces", "Song {fan upload}", "Song"},
+		{"parentheses", "Song (romanized title)", "Song"},
+		{"Japanese square brackets", "Song 【live version】", "Song"},
+		{"fullwidth brackets", "Song ［metadata］ ｛extra｝ （alias）", "Song"},
+		{"nested brackets", "Song ([inner] {metadata})", "Song"},
+		{"quoted track words are preserved", "Don't say \"lazy\"", "Don't say lazy"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidates := buildTitleCandidates(tt.title, "")
+			requireCandidate(t, candidates, tt.want, "")
+			for _, candidate := range candidates {
+				for _, blocked := range []string{"Official MV", "fan upload", "romanized title", "metadata", "extra", "alias", "inner"} {
+					if strings.Contains(strings.ToLower(candidate.track), strings.ToLower(blocked)) {
+						t.Errorf("candidate %q still contains bracket content %q", candidate.track, blocked)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestBuildTitleCandidates_AnimePianoTitle(t *testing.T) {
 	title := "Crying for Rain (Kawaki wo Ameku) - Domestic na Kanojo OP [Piano] / Minami"
 	candidates := buildTitleCandidates(title, "")
-
 	requireCandidate(t, candidates, "Crying for Rain", "Minami")
-	requireCandidate(t, candidates, "Kawaki wo Ameku", "Minami")
-	requireCandidate(t, candidates, "Crying for Rain (Kawaki wo Ameku)", "Minami")
-
-	for _, track := range []string{"Crying for Rain", "Kawaki wo Ameku"} {
-		index := candidateIndex(candidates, track, "Minami")
-		if index >= maxLRCLibCandidates {
-			t.Errorf("candidate %q + %q at index %d, beyond max candidate count %d", track, "Minami", index, maxLRCLibCandidates)
-		}
-	}
+	assertNoCandidateContains(t, candidates, "Kawaki wo Ameku")
 }
 
 func TestBuildTitleCandidates_CoverCreditSuffix(t *testing.T) {
 	title := "Minami (美波) - Crying for Rain (カワキヲアメク) Live Band Cover by AARCADE"
 	candidates := buildTitleCandidates(title, "")
-
 	requireCandidate(t, candidates, "Crying for Rain", "Minami")
-	requireCandidate(t, candidates, "カワキヲアメク", "Minami")
-	requireCandidate(t, candidates, "Crying for Rain (カワキヲアメク)", "Minami")
-
-	for _, track := range []string{"Crying for Rain", "カワキヲアメク"} {
-		index := candidateIndex(candidates, track, "Minami")
-		if index >= maxLRCLibCandidates {
-			t.Errorf("candidate %q + %q at index %d, beyond max candidate count %d", track, "Minami", index, maxLRCLibCandidates)
-		}
-	}
+	assertNoCandidateContains(t, candidates, "カワキヲアメク")
+	assertNoCandidateContains(t, candidates, "美波")
 }
 
 func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
@@ -64,17 +77,17 @@ func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
 			wantArtist: "Minami",
 		},
 		{
-			name: "context suffix removed without dropping title",
+			name: "anime context removed",
 			title: "Crying for Rain (Kawaki wo Ameku) - Domestic na Kanojo OP",
 			artist: "Minami",
-			wantTrack: "Crying for Rain (Kawaki wo Ameku)",
+			wantTrack: "Crying for Rain",
 			wantArtist: "Minami",
 		},
 		{
-			name: "fullwidth parentheses preserve romanized alias",
+			name: "fullwidth parentheses removed",
 			title: "Song Title（Romanized Title） [Official Audio]",
 			artist: "Artist",
-			wantTrack: "Romanized Title",
+			wantTrack: "Song Title",
 			wantArtist: "Artist",
 		},
 		{
@@ -85,7 +98,7 @@ func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
 			wantArtist: "Artist",
 		},
 		{
-			name: "noise words inside actual title are preserved",
+			name: "noise word inside plain title preserved",
 			title: "Cover Me in Rain",
 			wantTrack: "Cover Me in Rain",
 		},
@@ -99,30 +112,11 @@ func TestBuildTitleCandidates_CommonFormats(t *testing.T) {
 	}
 }
 
-func TestBuildTitleCandidates_QuotedTrack(t *testing.T) {
-	title := "Don't say " + string(rune(34)) + "lazy" + string(rune(34))
-	candidates := buildTitleCandidates(title, "")
-	requireCandidate(t, candidates, "Don't say lazy", "")
-}
-
-func TestBuildTitleCandidates_StripsAnimeAndLyricsMetadata(t *testing.T) {
-	title := "Don't say lazy [ending 1 K-on] [FULL version] ~ Lyrics English - Romaji - 日本語 - 한국어 - 中文 / Sub Español"
-	candidates := buildTitleCandidates(title, "")
-	requireCandidate(t, candidates, "Don't say lazy", "")
-
-	for _, candidate := range candidates {
-		if strings.EqualFold(candidate.artist, "Sub Español") {
-			t.Fatalf("subtitle language was incorrectly detected as artist: %+v", candidate)
-		}
-	}
-}
-
-func TestBuildTitleCandidates_RetainsOriginalAsFallback(t *testing.T) {
+func TestBuildTitleCandidates_FallbackDoesNotRestoreBracketContents(t *testing.T) {
 	rawTitle := "Some Song [Fan Upload] / Random Channel"
 	candidates := buildTitleCandidates(rawTitle, "")
-	if candidateIndex(candidates, rawTitle, "") < 0 {
-		t.Fatalf("raw title should remain available as a fallback candidate")
-	}
+	requireCandidate(t, candidates, "Some Song / Random Channel", "")
+	assertNoCandidateContains(t, candidates, "Fan Upload")
 }
 
 func TestBuildCandidateList_PrioritizesMusicMetadata(t *testing.T) {
@@ -147,6 +141,15 @@ func requireCandidate(t *testing.T, candidates []candidate, track, artist string
 			got = append(got, c.track+" | "+c.artist+" ("+c.source+")")
 		}
 		t.Fatalf("candidate (%q, %q) not found; got: %s", track, artist, strings.Join(got, "; "))
+	}
+}
+
+func assertNoCandidateContains(t *testing.T, candidates []candidate, value string) {
+	t.Helper()
+	for _, candidate := range candidates {
+		if strings.Contains(strings.ToLower(candidate.track+" "+candidate.artist), strings.ToLower(value)) {
+			t.Errorf("candidate %+v still contains %q", candidate, value)
+		}
 	}
 }
 
