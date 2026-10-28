@@ -48,7 +48,7 @@ func (m *VersionModal) View() string {
 		Faint(true)
 
 	if m.width <= 0 || m.height <= 0 {
-		return madeByStyle.Render(" Made by ミＧＩＡＮ4０４シ ") + "\n" + versionStyle.Render(m.version)
+		return madeByStyle.Render("Made by ミＧＩＡＮ4０４シ") + "\n" + versionStyle.Render(m.version)
 	}
 
 	rows := strings.Split(lipgloss.Place(
