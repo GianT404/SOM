@@ -10,7 +10,7 @@ import (
 )
 
 func TestLyricsSearchModalEnterPreviewsBeforeApplying(t *testing.T) {
-	modal := NewLyricsSearchModal(nil, domain.Track{ID: "video-1", Title: "Current track"}, 90, 30)
+	modal := NewLyricsSearchModal(nil, domain.Track{ID: "video-1", Title: "Current track"}, 90, 30, nil)
 	modal.stage = lyricsSearchResults
 	modal.results = []domain.LyricsSearchResult{{
 		TrackName:  "Candidate track",
@@ -27,6 +27,12 @@ func TestLyricsSearchModalEnterPreviewsBeforeApplying(t *testing.T) {
 	got := updated.(*LyricsSearchModal)
 	if got.stage != lyricsSearchPreview {
 		t.Fatalf("stage after first Enter = %v, want preview", got.stage)
+	}
+	if got.previewPanel == nil {
+		t.Fatal("first Enter should prepare a temporary RightPanel preview")
+	}
+	if got.previewPanel.curLine != 0 {
+		t.Fatalf("initial preview lyric index = %d, want 0", got.previewPanel.curLine)
 	}
 	if cmd != nil {
 		t.Fatal("first Enter must not emit an apply message")
@@ -50,7 +56,7 @@ func TestLyricsSearchModalEnterPreviewsBeforeApplying(t *testing.T) {
 }
 
 func TestLyricsSearchModalEscapeFromPreviewReturnsToResults(t *testing.T) {
-	modal := NewLyricsSearchModal(nil, domain.Track{ID: "video-1", Title: "Current track"}, 90, 30)
+	modal := NewLyricsSearchModal(nil, domain.Track{ID: "video-1", Title: "Current track"}, 90, 30, nil)
 	modal.stage = lyricsSearchPreview
 	modal.preview = 0
 	modal.cursor = 0
@@ -63,6 +69,9 @@ func TestLyricsSearchModalEscapeFromPreviewReturnsToResults(t *testing.T) {
 	}
 	if got.preview != -1 {
 		t.Fatalf("preview index after Esc = %d, want -1", got.preview)
+	}
+	if got.previewPanel != nil {
+		t.Fatal("Esc should discard the temporary preview panel")
 	}
 	if cmd != nil {
 		t.Fatal("Esc back to results should not emit a command")

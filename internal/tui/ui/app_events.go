@@ -283,7 +283,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			a.setStatus(StatusErrStyle.Render("X Lyrics search is unavailable for this provider"))
 			break
 		}
-		modal := NewLyricsSearchModal(searcher, *a.playback.NowPlay, a.width, a.height)
+		modal := NewLyricsSearchModal(searcher, *a.playback.NowPlay, a.width, a.height, a.player)
 		a.modals = append(a.modals, modal)
 		cmds = append(cmds, modal.Init())
 
@@ -296,19 +296,7 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 			break
 		}
 		result := msg.Result
-		lyricTrack := result.Lyrics
-		lyricTrack.Language = "lrclib"
-		if lyricTrack.TrackName == "" {
-			lyricTrack.TrackName = result.TrackName
-		}
-		if lyricTrack.ArtistName == "" {
-			lyricTrack.ArtistName = result.ArtistName
-		}
-		lr := domain.LyricsResp{
-			Title: result.TrackName, Artist: result.ArtistName, VideoID: msg.VideoID,
-			AllTracks: []domain.LyricsTrack{lyricTrack},
-		}
-		lr.SelectLanguage(0)
+		lr := manualLyricsResponse(msg.VideoID, result)
 		a.right.SetLyrics(lr)
 		if a.left.plStore != nil {
 			if raw, err := json.Marshal(lr); err == nil {

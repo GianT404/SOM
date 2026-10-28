@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"som/internal/domain"
+	"som/internal/tui/player"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -25,8 +26,10 @@ const (
 )
 
 type LyricsSearchModal struct {
-	provider domain.LyricsSearchProvider
-	track    domain.Track
+	provider     domain.LyricsSearchProvider
+	player       *player.Player
+	previewPanel *RightPanel
+	track        domain.Track
 	input    textinput.Model
 	stage    lyricsSearchStage
 	results  []domain.LyricsSearchResult
@@ -41,7 +44,7 @@ type LyricsSearchModal struct {
 	request  uint64
 }
 
-func NewLyricsSearchModal(provider domain.LyricsSearchProvider, track domain.Track, width, height int) *LyricsSearchModal {
+func NewLyricsSearchModal(provider domain.LyricsSearchProvider, track domain.Track, width, height int, p *player.Player) *LyricsSearchModal {
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "Enter track title or artist..."
@@ -52,6 +55,7 @@ func NewLyricsSearchModal(provider domain.LyricsSearchProvider, track domain.Tra
 	input.CursorEnd()
 	return &LyricsSearchModal{
 		provider: provider,
+		player:   p,
 		track:    track,
 		input:    input,
 		width:    width,
@@ -70,6 +74,7 @@ func (m *LyricsSearchModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		m.loading = false
 		m.results = result.Results
 		m.cursor, m.offset, m.preview = 0, 0, -1
+		m.previewPanel = nil
 		m.err = ""
 		if result.Err != nil {
 			m.err = result.Err.Error()
@@ -78,6 +83,14 @@ func (m *LyricsSearchModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		}
 		m.stage = lyricsSearchResults
 		return m, nil
+	}
+
+	if m.stage == lyricsSearchPreview && m.previewPanel != nil {
+		if _, ok := msg.(PlaybackTickMsg); ok {
+			updated, cmd := m.previewPanel.Update(msg, false, false)
+			m.previewPanel = &updated
+			return m, cmd
+		}
 	}
 
 	key, ok := msg.(tea.KeyPressMsg)
@@ -109,6 +122,7 @@ func (m *LyricsSearchModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		case "esc":
 			m.stage = lyricsSearchResults
 			m.preview = -1
+			m.previewPanel = nil
 		case "enter":
 			if m.preview < 0 || m.preview >= len(m.results) {
 				return m, nil
@@ -129,6 +143,7 @@ func (m *LyricsSearchModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		}
 		m.stage = lyricsSearchInput
 		m.preview = -1
+		m.previewPanel = nil
 		m.input.Focus()
 		m.input.CursorEnd()
 		m.err = ""
@@ -136,10 +151,9 @@ func (m *LyricsSearchModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 		if m.loading || m.cursor < 0 || m.cursor >= len(m.results) {
 			return m, nil
 		}
-		// First Enter opens a read-only preview. Applying/saving requires
-		// a second Enter from the preview stage.
-		m.preview = m.cursor
-		m.stage = lyricsSearchPreview
+		// First Enter previews the candidate through the existing playback-synced
+		// RightPanel renderer. A second Enter applies and saves it.
+		m.beginPreview()
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
@@ -166,6 +180,7 @@ func (m *LyricsSearchModal) searchAgain() tea.Cmd {
 	}
 	m.results, m.err = nil, ""
 	m.preview = -1
+	m.previewPanel = nil
 	m.loading = true
 	m.stage = lyricsSearchResults
 	return manualLyricsSearchCmd(m.provider, m.query, m.request)
@@ -263,9 +278,34 @@ func (m *LyricsSearchModal) View() string {
 	return renderBox(width, "Search Lyrics on LRCLib", lipgloss.NewStyle().Width(innerW).Render(strings.TrimSuffix(b.String(), "\n")), themeCol("#e8593c"))
 }
 
+func (m *LyricsSearchModal) beginPreview() {
+	if m.cursor < 0 || m.cursor >= len(m.results) {
+		return
+	}
+
+	m.preview = m.cursor
+	result := m.results[m.preview]
+	panel := NewRightPanel(m.player)
+	width := minInt(maxInt(m.width-8, 48), 78)
+	if m.width <= 0 {
+		width = 68
+	}
+	panel.SetSize(width, m.previewVisibleRows()+2)
+	track := m.track
+	panel.SetTrack(&track)
+	panel.SetLyrics(manualLyricsResponse(m.track.ID, result))
+	if m.player != nil {
+		panel.elapsed = m.player.Position()
+	}
+	panel.syncSyncedLine(true)
+
+	m.previewPanel = &panel
+	m.stage = lyricsSearchPreview
+}
+
 func (m *LyricsSearchModal) renderPreview(width, innerW int) string {
 	var b strings.Builder
-	if m.preview < 0 || m.preview >= len(m.results) {
+	if m.preview < 0 || m.preview >= len(m.results) || m.previewPanel == nil {
 		b.WriteString("  No result selected.\n\n  Esc: back to results")
 		return renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(b.String()), themeCol("#e8593c"))
 	}
@@ -275,68 +315,33 @@ func (m *LyricsSearchModal) renderPreview(width, innerW int) string {
 	artist := fallbackLabel(result.ArtistName, "Unknown artist")
 	b.WriteString("  " + runewidth.Truncate(title+" — "+artist, innerW-2, "…") + "\n")
 
-	kind := "Plain lyrics"
+	kind := "Plain lyrics (not time-synced)"
 	if len(result.Lyrics.Synced) > 0 {
-		kind = "Synced lyrics"
+		kind = "Synced lyrics · follows playback"
 	}
 	b.WriteString("  " + DimItemStyle.Render(kind) + "\n\n")
 
-	maxLineWidth := innerW - 4
-	if maxLineWidth < 1 {
-		maxLineWidth = 1
-	}
-	lines := lyricsSearchPreviewLines(result.Lyrics, maxLineWidth)
-	if len(lines) == 0 {
-		b.WriteString("  " + DimItemStyle.Render("This result contains no lyric text.") + "\n")
-	} else {
-		visible := m.previewVisibleRows()
-		if len(lines) > visible {
-			visible--
-			if visible < 1 {
-				visible = 1
-			}
-		}
-		for _, line := range lines[:minInt(len(lines), visible)] {
-			if line == "" {
-				b.WriteString("\n")
-				continue
-			}
-			b.WriteString(LyricNormalStyle.Render("  "+line) + "\n")
-		}
-		if len(lines) > visible {
-			b.WriteString(DimItemStyle.Render("  … more lines") + "\n")
-		}
-	}
-
+	m.previewPanel.SetSize(width, m.previewVisibleRows()+2)
+	b.WriteString(m.previewPanel.renderLyrics(innerW, 0) + "\n")
 	b.WriteString("\n  Enter: apply & save   Esc: back to results")
 	return renderBox(width, "Lyrics Preview", lipgloss.NewStyle().Width(innerW).Render(strings.TrimSuffix(b.String(), "\n")), themeCol("#e8593c"))
 }
 
-func lyricsSearchPreviewLines(track domain.LyricsTrack, maxWidth int) []string {
-	var lines []string
-	if len(track.Synced) > 0 {
-		for _, lyric := range track.Synced {
-			text := strings.TrimSpace(lyric.Text)
-			if text == "" {
-				continue
-			}
-			lines = append(lines, wordWrap(text, maxWidth)...)
-		}
-		return lines
+func manualLyricsResponse(videoID string, result domain.LyricsSearchResult) domain.LyricsResp {
+	lyricTrack := result.Lyrics
+	lyricTrack.Language = "lrclib"
+	if lyricTrack.TrackName == "" {
+		lyricTrack.TrackName = result.TrackName
 	}
-
-	plain := strings.ReplaceAll(track.Plain, "\r\n", "\n")
-	if strings.TrimSpace(plain) == "" {
-		return nil
+	if lyricTrack.ArtistName == "" {
+		lyricTrack.ArtistName = result.ArtistName
 	}
-	for _, paragraph := range strings.Split(plain, "\n") {
-		if strings.TrimSpace(paragraph) == "" {
-			lines = append(lines, "")
-			continue
-		}
-		lines = append(lines, wordWrap(paragraph, maxWidth)...)
+	lr := domain.LyricsResp{
+		Title: result.TrackName, Artist: result.ArtistName, VideoID: videoID,
+		AllTracks: []domain.LyricsTrack{lyricTrack},
 	}
-	return lines
+	lr.SelectLanguage(0)
+	return lr
 }
 
 func manualLyricsSearchCmd(provider domain.LyricsSearchProvider, query string, requestID uint64) tea.Cmd {
