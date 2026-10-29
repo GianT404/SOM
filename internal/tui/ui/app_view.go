@@ -355,17 +355,17 @@ func (a *App) setViewCursor(v *tea.View, contentTop int) {
 				v.Cursor = c
 			}
 			return
-		if modal, ok := a.modals[len(a.modals)-1].(*LyricsSearchModal); ok {
-			if modal.stage == lyricsSearchInput && modal.input.Focused() {
-				if c := modal.input.Cursor(); c != nil {
-					popup := modal.View()
-					c.Position.X += (a.width-lipgloss.Width(popup))/2 + 4
-					c.Position.Y += (a.height-lipgloss.Height(popup))/2 + 1
-					v.Cursor = c
+			if modal, ok := a.modals[len(a.modals)-1].(*LyricsSearchModal); ok {
+				if modal.stage == lyricsSearchInput && modal.input.Focused() {
+					if c := modal.input.Cursor(); c != nil {
+						popup := modal.View()
+						c.Position.X += (a.width-lipgloss.Width(popup))/2 + 4
+						c.Position.Y += (a.height-lipgloss.Height(popup))/2 + 1
+						v.Cursor = c
+					}
 				}
+				return
 			}
-			return
-		}
 		}
 	}
 
@@ -547,7 +547,7 @@ func (a *App) renderLyricAnim(innerW, innerH, frame int) string {
 		return renderNoLyricsContent(innerW, innerH, frame)
 	}
 
-	progress := float64(time.Since(a.lyricAnimStart)) / float64(350*time.Millisecond)
+	progress := float64(time.Since(a.lyricAnimStart)) / float64(200*time.Millisecond)
 	return render.LyricAnimation(
 		a.prevLyric,
 		a.currLyric,
