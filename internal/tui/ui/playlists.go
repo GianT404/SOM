@@ -246,7 +246,7 @@ func (p LeftPanel) renderPlaylistDetail(innerW int, filtered []storage.PlaylistT
 
 			return t.Title, t.Artist, t.Path, t.Duration, false, isPlaying, origIdx
 		},
-		false, false, nil, nil,
+		false, false, false, nil, nil,
 	)
 }
 

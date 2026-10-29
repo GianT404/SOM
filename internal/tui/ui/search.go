@@ -48,7 +48,7 @@ func (p LeftPanel) ViewSearchContent(w, h int, playingID string) string {
 			func(i int, t domain.Track) (string, string, string, int, bool, bool, int) {
 				return t.Title, t.Artist, t.ID, t.Duration, p.isDownloaded(t), t.ID == playingID && playingID != "", i + 1
 			},
-			false, true, nil, nil,
+			false, true, false, nil, nil,
 		)
 		if showLoadMore {
 			label := "  Load more..."

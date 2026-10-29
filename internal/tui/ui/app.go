@@ -43,6 +43,7 @@ func sessionTick() tea.Cmd {
 type MoveSession struct {
 	TargetPlIdx int
 	Selected    map[string]bool
+	AddOnly     bool
 }
 
 type App struct {
@@ -143,53 +144,117 @@ func (a *App) selectedMoveCount() int {
 
 func (a *App) toggleMoveSelection() {
 	locals := a.left.getFilteredLocals()
-	if a.left.dlCursor < 0 || a.left.dlCursor >= len(locals) {
+	if a.moveSession == nil || a.left.dlCursor < 0 || a.left.dlCursor >= len(locals) {
 		return
 	}
-	if a.moveSession != nil {
-		path := locals[a.left.dlCursor].Path
-		a.moveSession.Selected[path] = !a.moveSession.Selected[path]
+
+	path := locals[a.left.dlCursor].Path
+	if a.moveSession.AddOnly && a.moveSession.TargetPlIdx >= 0 &&
+		a.moveSession.TargetPlIdx < len(a.left.playlists) &&
+		playlistContainsLocalPath(a.left.playlists[a.moveSession.TargetPlIdx], path) {
+		a.setStatus(StatusMsgStyle.Render("> Track already in playlist"))
+		return
 	}
+
+	a.moveSession.Selected[path] = !a.moveSession.Selected[path]
+}
+
+func playlistTrackLocalPath(track storage.PlaylistTrack) string {
+	if track.Path != "" {
+		return strings.TrimPrefix(track.Path, "local:")
+	}
+	return strings.TrimPrefix(track.ID, "local:")
+}
+
+func playlistContainsLocalPath(playlist storage.Playlist, path string) bool {
+	for _, track := range playlist.Tracks {
+		if track.ID == path ||
+			track.Path == path ||
+			strings.TrimPrefix(track.ID, "local:") == path ||
+			strings.TrimPrefix(track.Path, "local:") == path {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) applyMoveToPlaylist() {
-	if a.moveSession == nil || a.moveSession.TargetPlIdx < 0 || a.moveSession.TargetPlIdx >= len(a.left.playlists) {
+	if a.moveSession == nil ||
+		a.moveSession.TargetPlIdx < 0 ||
+		a.moveSession.TargetPlIdx >= len(a.left.playlists) {
 		return
 	}
-	pl := &a.left.playlists[a.moveSession.TargetPlIdx]
-	existing := make(map[string]bool, len(pl.Tracks))
-	for _, t := range pl.Tracks {
-		existing[t.ID] = true
+	if a.left.plStore == nil {
+		a.setStatus(StatusErrStyle.Render("X Playlist storage is unavailable"))
+		return
 	}
 
-	added, removed := 0, 0
-	for _, lf := range a.left.locals {
-		if !a.moveSession.Selected[lf.Path] {
+	pl := &a.left.playlists[a.moveSession.TargetPlIdx]
+	existing := make(map[string]bool, len(pl.Tracks))
+	for _, track := range pl.Tracks {
+		existing[track.ID] = true
+	}
+
+	added, removed, skipped := 0, 0, 0
+	for _, track := range a.left.locals {
+		if !a.moveSession.Selected[track.Path] {
 			continue
 		}
-		id := lf.Path
-		if existing[id] {
+
+		id := track.Path
+		isExisting := existing[id]
+		if a.moveSession.AddOnly && !isExisting {
+			isExisting = playlistContainsLocalPath(*pl, id)
+		}
+
+		if isExisting {
+			if a.moveSession.AddOnly {
+				skipped++
+				continue
+			}
+
 			if err := a.left.plStore.RemoveTrackFromPlaylist(pl.ID, id); err == nil {
-				var newTracks []storage.PlaylistTrack
-				for _, t := range pl.Tracks {
-					if t.ID != id {
-						newTracks = append(newTracks, t)
+				newTracks := make([]storage.PlaylistTrack, 0, len(pl.Tracks))
+				for _, current := range pl.Tracks {
+					if current.ID != id {
+						newTracks = append(newTracks, current)
 					}
 				}
 				pl.Tracks = newTracks
 				existing[id] = false
 				removed++
 			}
-		} else {
-			if err := a.left.plStore.AddTrackToPlaylist(pl.ID, id); err == nil {
-				pl.Tracks = append(pl.Tracks, storage.PlaylistTrack{
-					ID: id, Title: lf.Name, Artist: lf.Artist, Duration: lf.Duration, Thumbnail: lf.Thumbnail, Path: lf.Path,
-				})
-				existing[id] = true
-				added++
-			}
+			continue
 		}
+
+		if err := a.left.plStore.AddTrackToPlaylist(pl.ID, id); err != nil {
+			continue
+		}
+		pl.Tracks = append(pl.Tracks, storage.PlaylistTrack{
+			ID:        id,
+			Title:     track.Name,
+			Artist:    track.Artist,
+			Duration:  track.Duration,
+			Thumbnail: track.Thumbnail,
+			Path:      track.Path,
+		})
+		existing[id] = true
+		added++
 	}
+
+	if a.moveSession.AddOnly {
+		noun := "tracks"
+		if added == 1 {
+			noun = "track"
+		}
+		message := fmt.Sprintf("> Added %d %s to \"%s\"", added, noun, pl.Name)
+		if skipped > 0 {
+			message += fmt.Sprintf(" (%d already present)", skipped)
+		}
+		a.setStatus(StatusOKStyle.Render(message))
+		return
+	}
+
 	a.setStatus(StatusOKStyle.Render(fmt.Sprintf("> Changed: %d added, %d removed in \"%s\"", added, removed, pl.Name)))
 }
 

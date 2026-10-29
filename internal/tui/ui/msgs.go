@@ -89,6 +89,7 @@ type RemoveFromQueueMsg struct {
 type InitMoveSessionMsg struct {
 	TargetPlIdx int    // >= 0: Chọn playlist có sẵn
 	NewPlName   string // TargetPlIdx == -1: Tạo playlist mới
+	AddOnly     bool
 }
 
 type ExecuteMoveMsg struct{}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/spinner"
@@ -163,4 +164,85 @@ func TestSpinnerKeepsTickingWhileLoadingMore(t *testing.T) {
 	if len(cmds) == 0 || cmds[0] == nil {
 		t.Fatal("spinner tick should schedule the next animation tick while loading more")
 	}
+}
+
+
+func TestApplyMoveToPlaylistAddOnlySkipsExistingTracks(t *testing.T) {
+	db, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	existingPath := filepath.Join(t.TempDir(), "existing.mp3")
+	newPath := filepath.Join(t.TempDir(), "new.mp3")
+	for _, path := range []string{existingPath, newPath} {
+		if err := db.UpsertLocalFile(storage.LocalFile{Path: path, Name: filepath.Base(path), Duration: 180}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pl, err := db.CreatePlaylist("Add only")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AddTrackToPlaylist(pl.ID, existingPath); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{
+		left: LeftPanel{
+			plStore: db,
+			playlists: []storage.Playlist{{
+				ID: pl.ID,
+				Name: pl.Name,
+				Tracks: []storage.PlaylistTrack{{
+					ID: existingPath, Path: existingPath, Title: "Existing",
+				}},
+			}},
+			locals: []LocalFile{
+				{Path: existingPath, Name: "Existing", Duration: 180},
+				{Path: newPath, Name: "New", Duration: 180},
+			},
+		},
+		moveSession: &MoveSession{
+			TargetPlIdx: 0,
+			Selected: map[string]bool{
+				existingPath: true,
+				newPath:      true,
+			},
+			AddOnly: true,
+		},
+	}
+
+	a.applyMoveToPlaylist()
+
+	tracks := a.left.playlists[0].Tracks
+	if len(tracks) != 2 {
+		t.Fatalf("track count=%d, want 2", len(tracks))
+	}
+	if tracks[0].ID != existingPath || tracks[1].ID != newPath {
+		t.Fatalf("track IDs=%q, %q; want existing then new", tracks[0].ID, tracks[1].ID)
+	}
+	if !strings.Contains(a.statusMsg, "Added 1 track") {
+		t.Fatalf("status=%q, want one added track", a.statusMsg)
+	}
+}
+
+func TestCmdOptionListIncludesAddTracksForActivePlaylist(t *testing.T) {
+	playlist := storage.Playlist{ID: "pl_test", Name: "Test"}
+	a := &App{
+		sidebarActive: SidePlaylists,
+		left: LeftPanel{
+			activePlaylist: &playlist,
+			playlists:      []storage.Playlist{playlist},
+		},
+	}
+
+	for _, option := range a.cmdOptionList() {
+		if option == "Add tracks to playlist" {
+			return
+		}
+	}
+	t.Fatal("Add tracks to playlist option not available inside an active playlist")
 }

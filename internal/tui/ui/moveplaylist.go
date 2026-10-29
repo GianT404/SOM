@@ -129,13 +129,14 @@ func (m *MovePickModal) View() string {
 // 3. CONFIRM MOVE MODAL
 // ==========================================
 type MoveConfirmModal struct {
-	plName string
-	count  int
-	cursor int
+	plName  string
+	count   int
+	addOnly bool
+	cursor  int
 }
 
-func NewMoveConfirmModal(plName string, count int) *MoveConfirmModal {
-	return &MoveConfirmModal{plName: plName, count: count, cursor: 1}
+func NewMoveConfirmModal(plName string, count int, addOnly bool) *MoveConfirmModal {
+	return &MoveConfirmModal{plName: plName, count: count, addOnly: addOnly, cursor: 1}
 }
 func (m *MoveConfirmModal) Init() tea.Cmd { return nil }
 func (m *MoveConfirmModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
@@ -158,9 +159,18 @@ func (m *MoveConfirmModal) Update(msg tea.Msg) (Overlay, tea.Cmd) {
 	return m, nil
 }
 func (m *MoveConfirmModal) View() string {
+	action, title := "Move", "Confirm Move"
+	if m.addOnly {
+		action, title = "Add", "Confirm Add"
+	}
+	trackLabel := "tracks"
+	if m.count == 1 {
+		trackLabel = "track"
+	}
+
 	var b strings.Builder
 	b.WriteString("\n ")
-	b.WriteString(DimItemStyle.Render(fmt.Sprintf("Move %d track to \"%s\"?", m.count, m.plName)))
+	b.WriteString(DimItemStyle.Render(fmt.Sprintf("%s %d %s to \"%s\"?", action, m.count, trackLabel, m.plName)))
 	b.WriteString("\n\n ")
 	cancelStyle, confirmStyle := NormalItemStyle, NormalItemStyle
 	if m.cursor == 0 {
@@ -169,5 +179,5 @@ func (m *MoveConfirmModal) View() string {
 		confirmStyle = SelectedItemStyle
 	}
 	b.WriteString(fmt.Sprintf("%s     %s", cancelStyle.Render("[ Cancel ]"), confirmStyle.Render("[ Confirm ]")))
-	return renderBox(60, "Confirm Move", b.String(), themeCol("#e8593c"))
+	return renderBox(60, title, b.String(), themeCol("#e8593c"))
 }

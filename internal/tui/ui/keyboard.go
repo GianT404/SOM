@@ -77,10 +77,16 @@ func (a *App) handleKeys(msg tea.KeyPressMsg) tea.Cmd {
 	case "i":
 		if a.moveSession != nil && a.sidebarActive == SideDownloads && !a.left.input.Focused() {
 			if a.selectedMoveCount() == 0 {
-				a.setStatus(StatusErrStyle.Render("X No tracks selected to move"))
+				action := "move"
+				if a.moveSession.AddOnly {
+					action = "add"
+				}
+				a.setStatus(StatusErrStyle.Render("X No tracks selected to " + action))
+			} else if a.moveSession.TargetPlIdx < 0 || a.moveSession.TargetPlIdx >= len(a.left.playlists) {
+				a.setStatus(StatusErrStyle.Render("X Target playlist not found"))
 			} else {
 				plName := a.left.playlists[a.moveSession.TargetPlIdx].Name
-				modal := NewMoveConfirmModal(plName, a.selectedMoveCount())
+				modal := NewMoveConfirmModal(plName, a.selectedMoveCount(), a.moveSession.AddOnly)
 				a.modals = []Overlay{modal}
 				cmds = append(cmds, modal.Init())
 			}

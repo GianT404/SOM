@@ -58,19 +58,19 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 		a.left.SetSize(layout.TracklistWidth, contentH)
 		var alreadyInMove map[string]bool
 		var selected map[string]bool
-		selectMode := false
+		selectMode, addOnly := false, false
 		if a.moveSession != nil &&
 			a.moveSession.TargetPlIdx >= 0 &&
 			a.moveSession.TargetPlIdx < len(a.left.playlists) {
 			selectMode = true
+			addOnly = a.moveSession.AddOnly
 			selected = a.moveSession.Selected
 			alreadyInMove = map[string]bool{}
-			for _, t := range a.left.playlists[a.moveSession.TargetPlIdx].Tracks {
-				path := t.Path
-				if path == "" {
-					path = strings.TrimPrefix(t.ID, "local:")
+			for _, track := range a.left.playlists[a.moveSession.TargetPlIdx].Tracks {
+				path := playlistTrackLocalPath(track)
+				if path != "" {
+					alreadyInMove[path] = true
 				}
-				alreadyInMove[path] = true
 			}
 		}
 
@@ -79,6 +79,7 @@ func (a *App) renderMainContent(layout tuilayout.UILayout) string {
 			contentH,
 			selected,
 			selectMode,
+			addOnly,
 			alreadyInMove,
 			playingID,
 		)
@@ -223,10 +224,16 @@ func (a *App) somRowHints() []globalHelpHint {
 			if a.moveSession.TargetPlIdx >= 0 && a.moveSession.TargetPlIdx < len(a.left.playlists) {
 				plName = a.left.playlists[a.moveSession.TargetPlIdx].Name
 			}
+			action := "move to"
+			existingHint := StyleHint("+", "already in playlist")
+			if a.moveSession.AddOnly {
+				action = "add to"
+				existingHint = StyleHint("✓", "already in playlist")
+			}
 			return []globalHelpHint{
 				{text: StyleHint(".", "select")},
-				{text: StyleHint("i", fmt.Sprintf("move to \"%s\" (%d)", plName, a.selectedMoveCount()))},
-				{text: StyleHint("+", "already in playlist")},
+				{text: StyleHint("i", fmt.Sprintf("%s \"%s\" (%d)", action, plName, a.selectedMoveCount()))},
+				{text: existingHint},
 				{text: StyleHint("esc", "cancel")},
 			}
 		}

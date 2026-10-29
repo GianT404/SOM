@@ -57,12 +57,12 @@ func (p *LeftPanel) scanLocalFiles() {
 
 	p.locals = append(pinned, unpinned...)
 }
-func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
+func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, selectMode, addOnly bool, alreadyIn map[string]bool, playingID string) string {
 	innerW := w - 2
 	listContent := lipgloss.NewStyle().
 		PaddingLeft(1).
 		Render(
-			p.renderLocalList(innerW, selected, selectMode, alreadyIn, playingID),
+			p.renderLocalList(innerW, selected, selectMode, addOnly, alreadyIn, playingID),
 		)
 
 	if p.isSearchVisible() {
@@ -93,11 +93,11 @@ func (p LeftPanel) ViewDownloadsContent(w, h int, selected map[string]bool, sele
 		count := len(p.getFilteredLocals())
 		title := fmt.Sprintf("Search (%d)", count)
 		if selectMode {
-			title = fmt.Sprintf(
-				"Move to playlist (%d) -  %d",
-				count,
-				countSelected(selected),
-			)
+			prefix := "Move to playlist"
+			if addOnly {
+				prefix = "Add to playlist"
+			}
+			title = fmt.Sprintf("%s (%d) - %d", prefix, count, countSelected(selected))
 		}
 
 		searchBox := lipgloss.NewStyle().
@@ -125,7 +125,7 @@ func countSelected(m map[string]bool) int {
 	return n
 }
 
-func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode bool, alreadyIn map[string]bool, playingID string) string {
+func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectMode, addOnly bool, alreadyIn map[string]bool, playingID string) string {
 	locals := p.getFilteredLocals()
 	if len(locals) == 0 {
 		if p.input.Focused() && strings.TrimSpace(p.input.Value()) != "" {
@@ -158,7 +158,7 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 
 			return title, f.Artist, f.Path, f.Duration, false, isPlaying, origIdx
 		},
-		selectMode, false, selected, alreadyIn,
+		selectMode, false, addOnly, selected, alreadyIn,
 	)
 }
 

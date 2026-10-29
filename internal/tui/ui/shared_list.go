@@ -19,6 +19,7 @@ func renderSharedTrackList[T any](
 	extract func(i int, item T) (title, artist, path string, duration int, showCheck bool, isPlaying bool, displayIdx int),
 	selectMode bool,
 	showCheckColumn bool,
+	addOnly bool,
 	selected map[string]bool,
 	alreadyIn map[string]bool,
 ) string {
@@ -52,9 +53,12 @@ func renderSharedTrackList[T any](
 
 		tick := ""
 		if selectMode {
-			if alreadyIn[path] != selected[path] {
+			switch {
+			case addOnly && alreadyIn[path]:
+				tick = "[✓] "
+			case alreadyIn[path] != selected[path]:
 				tick = "[+] "
-			} else {
+			default:
 				tick = "[ ] "
 			}
 		}

@@ -521,8 +521,15 @@ func (a *App) handleDataEvents(msg tea.Msg) tea.Cmd {
 				break
 			}
 		}
-		if idx >= 0 {
-			a.moveSession = &MoveSession{TargetPlIdx: idx, Selected: make(map[string]bool)}
+		if idx >= 0 && idx < len(a.left.playlists) {
+			a.moveSession = &MoveSession{
+				TargetPlIdx: idx,
+				Selected:    make(map[string]bool),
+				AddOnly:     msg.AddOnly,
+			}
+			if msg.AddOnly {
+				a.setStatus(StatusMsgStyle.Render(fmt.Sprintf("> Select tracks to add to \"%s\"", a.left.playlists[idx].Name)))
+			}
 			cmds = append(cmds, a.switchSidebar(SideDownloads))
 			a.left.input.Blur()
 		}

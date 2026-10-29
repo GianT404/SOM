@@ -255,6 +255,17 @@ func (a *App) runCmdOption(opt string) tea.Cmd {
 		}
 		a.setStatus(StatusErrStyle.Render("X No local track selected"))
 		return nil
+	case "Add tracks to playlist":
+		targetIdx := a.activePlaylistIndex()
+		if targetIdx < 0 {
+			a.setStatus(StatusErrStyle.Render("X Active playlist not found"))
+			return nil
+		}
+
+		a.modals = nil
+		return func() tea.Msg {
+			return InitMoveSessionMsg{TargetPlIdx: targetIdx, AddOnly: true}
+		}
 	case "Move to playlist":
 		if len(a.left.playlists) == 0 {
 			modal := NewMoveCreateModal(a.width)
@@ -385,6 +396,18 @@ func (a *App) selectedFileInfoTarget() (*LocalFile, bool) {
 	return a.renameTarget()
 }
 
+func (a *App) activePlaylistIndex() int {
+	if a.left.activePlaylist == nil {
+		return -1
+	}
+	for i := range a.left.playlists {
+		if a.left.playlists[i].ID == a.left.activePlaylist.ID {
+			return i
+		}
+	}
+	return -1
+}
+
 func (a *App) cmdOptionList() []string {
 	if a.sidebarActive == SideSearch ||
 		a.sidebarActive == SideQueue ||
@@ -405,6 +428,7 @@ func (a *App) cmdOptionList() []string {
 		return []string{
 			"Audio settings",
 			"Playback speed",
+			"Add tracks to playlist",
 			"Show file info",
 			"Remove from playlist",
 		}
