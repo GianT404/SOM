@@ -158,7 +158,7 @@ func (p LeftPanel) renderLocalList(innerW int, selected map[string]bool, selectM
 
 			return title, f.Artist, f.Path, f.Duration, false, isPlaying, origIdx
 		},
-		selectMode, selected, alreadyIn,
+		selectMode, false, selected, alreadyIn,
 	)
 }
 

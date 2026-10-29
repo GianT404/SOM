@@ -86,7 +86,7 @@ func TestThirdColumnLayoutKeepsSectionsInsideContainer(t *testing.T) {
 func TestTracklistLayoutKeepsColumnsPositive(t *testing.T) {
 	for _, width := range []int{1, 4, 10, 20, 40, 80, 120} {
 		for _, selectMode := range []bool{false, true} {
-			layout := NewTracklistLayout(width, selectMode)
+			layout := NewTracklistLayout(width, selectMode, true)
 
 			if layout.Width < 1 || layout.TitleWidth < 1 || layout.ArtistWidth < 1 {
 				t.Fatalf("width=%d select=%v has invalid widths: %+v", width, selectMode, layout)
@@ -116,5 +116,20 @@ func TestUILayoutHandlesTinyTerminalWidth(t *testing.T) {
 		if got := layout.TracklistWidth + layout.ThirdColumnWidth; got != layout.MainWidth {
 			t.Fatalf("width=%d columns use %d, want %d", width, got, layout.MainWidth)
 		}
+	}
+}
+
+func TestTracklistLayoutUsesUnusedCheckSpaceForArtist(t *testing.T) {
+	withCheck := NewTracklistLayout(80, false, true)
+	withoutCheck := NewTracklistLayout(80, false, false)
+
+	if withoutCheck.CheckWidth != 0 {
+		t.Fatalf("check width without Saved column = %d, want 0", withoutCheck.CheckWidth)
+	}
+	if withoutCheck.TitleWidth != withCheck.TitleWidth {
+		t.Fatalf("Title width changed from %d to %d", withCheck.TitleWidth, withoutCheck.TitleWidth)
+	}
+	if withoutCheck.ArtistWidth != withCheck.ArtistWidth+tracklistCheckWidth {
+		t.Fatalf("Artist width = %d, want %d", withoutCheck.ArtistWidth, withCheck.ArtistWidth+tracklistCheckWidth)
 	}
 }

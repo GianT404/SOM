@@ -34,6 +34,6 @@ func (p LeftPanel) renderQueueList(innerW int, queue []domain.Track, playingID s
 		func(i int, t domain.Track) (string, string, string, int, bool, bool, int) {
 			return t.Title, t.Artist, t.ID, t.Duration, false, t.ID == playingID && playingID != "", i + 1
 		},
-		false, nil, nil,
+		false, false, nil, nil,
 	)
 }

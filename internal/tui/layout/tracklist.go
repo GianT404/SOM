@@ -20,7 +20,7 @@ type TracklistLayout struct {
 	ArtistWidth int
 }
 
-func NewTracklistLayout(width int, selectMode bool) TracklistLayout {
+func NewTracklistLayout(width int, selectMode, showCheckColumn bool) TracklistLayout {
 	if width < 1 {
 		width = 1
 	}
@@ -30,18 +30,32 @@ func NewTracklistLayout(width int, selectMode bool) TracklistLayout {
 		tickWidth = tracklistTickWidth
 	}
 
-	availableTextWidth := width - tickWidth - tracklistCheckWidth - tracklistIndexWidth - tracklistTimeWidth - tracklistSpacing
+	checkWidth := 0
+	if showCheckColumn {
+		checkWidth = tracklistCheckWidth
+	}
+
+	availableTextWidth := width - tickWidth - checkWidth - tracklistIndexWidth - tracklistTimeWidth - tracklistSpacing
 	if availableTextWidth < tracklistMinTextW {
 		availableTextWidth = tracklistMinTextW
 	}
 
-	titleWidth := int(float64(availableTextWidth) * tracklistTitleRatio)
+	// Khi không có cột Saved, giữ nguyên Title và dành phần trống cho Artist.
+	titleBudgetWidth := availableTextWidth
+	if !showCheckColumn {
+		titleBudgetWidth -= tracklistCheckWidth
+		if titleBudgetWidth < tracklistMinTextW {
+			titleBudgetWidth = tracklistMinTextW
+		}
+	}
+
+	titleWidth := int(float64(titleBudgetWidth) * tracklistTitleRatio)
 	artistWidth := availableTextWidth - titleWidth
 
 	return TracklistLayout{
 		Width:       width,
 		TickWidth:   tickWidth,
-		CheckWidth:  tracklistCheckWidth,
+		CheckWidth:  checkWidth,
 		IndexWidth:  tracklistIndexWidth,
 		TimeWidth:   tracklistTimeWidth,
 		TitleWidth:  titleWidth,

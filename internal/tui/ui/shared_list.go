@@ -18,6 +18,7 @@ func renderSharedTrackList[T any](
 	visibleRows int,
 	extract func(i int, item T) (title, artist, path string, duration int, showCheck bool, isPlaying bool, displayIdx int),
 	selectMode bool,
+	showCheckColumn bool,
 	selected map[string]bool,
 	alreadyIn map[string]bool,
 ) string {
@@ -28,7 +29,7 @@ func renderSharedTrackList[T any](
 		end = len(items)
 	}
 
-	layout := layout.NewTracklistLayout(innerW, selectMode)
+	layout := layout.NewTracklistLayout(innerW, selectMode, showCheckColumn)
 	headerTick := "  "
 	if selectMode {
 		headerTick = "      "
@@ -59,10 +60,12 @@ func renderSharedTrackList[T any](
 		}
 
 		checkStr := ""
-		if showCheck {
+		if showCheckColumn && showCheck {
 			checkStr = "[Saved]"
 		}
-		checkStr = runewidth.FillRight(checkStr, layout.CheckWidth)
+		if layout.CheckWidth > 0 {
+			checkStr = runewidth.FillRight(checkStr, layout.CheckWidth)
+		}
 
 		idx := fmt.Sprintf("%-*d", layout.IndexWidth, displayIdx)
 		safeTitle := runewidth.FillRight(truncate(title, layout.TitleWidth), layout.TitleWidth)
