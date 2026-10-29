@@ -123,7 +123,7 @@ npx expo start
 | Key | Action |
 |-----|--------|
 | `?` | Help popup |
-| `Tab` / `1`-`7` | Sidebar tabs |
+| `Tab` / `Shift+Tab` / `1`-`7` | Sidebar tabs |
 | `/` | Focus search input |
 | `:` | Command popup (add to queue,audio settings, playback, rename, delete, move to playlist, sort, file info) |
 | `\` | Audio visualizer |
